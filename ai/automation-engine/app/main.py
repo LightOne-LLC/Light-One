@@ -19,13 +19,33 @@ def run_task(user_input: str) -> tuple[Task, str]:
     (e.g. only invoke the Recommender for an engineer-match result)
     without re-deriving routing themselves.
     """
-    planner = Planner()
+    task = Planner().plan(user_input)
+    return _run_planned_task(task)
+
+
+def run_llm_task(user_input: str) -> tuple[Task, str]:
+    """Same Task -> Router -> Executor -> Evaluator -> Repair/Retry loop as
+    run_task(), except the Task comes from LLMPlanner (a real LLM choosing
+    a Tool + arguments) instead of the rule-based Planner — proves the
+    pipeline is planner-agnostic without duplicating the loop.
+
+    Imported lazily so the default rule-based CLI path never imports
+    `ollama` (app.llm_planner -> app.llm -> ollama)."""
+    from app.llm_planner import LLMPlanner
+
+    task = LLMPlanner().plan(user_input)
+    return _run_planned_task(task)
+
+
+def _run_planned_task(task: Task) -> tuple[Task, str]:
+    """The Router -> Executor -> Evaluator -> Repair/Retry(max 1) portion
+    of the pipeline, shared by every Planner (rule-based or LLM) so it's
+    implemented exactly once."""
     router = ToolRouter()
     executor = ToolExecutor()
     evaluator = Evaluator()
     repair = AIRepair()
 
-    task = planner.plan(user_input)
     task.status = "running"
 
     routed_tool = router.route(task.tool)
@@ -92,6 +112,12 @@ def run_gmail_intake_cli() -> None:
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "--gmail-intake":
         run_gmail_intake_cli()
+        return
+
+    if len(sys.argv) > 1 and sys.argv[1] == "--llm":
+        instruction = " ".join(sys.argv[2:])
+        task, routed_tool = run_llm_task(instruction)
+        _print_task_result(task, routed_tool, label="llm")
         return
 
     if len(sys.argv) > 1:

@@ -9,4 +9,11 @@ class ToolRouter:
             "メール取得": "gmail_get_latest_email",
         }
 
+        if tool_name in tools.values():
+            # Already a registered Executor tool name rather than one of the
+            # rule-based Planner's Japanese labels — e.g. the LLM Planner is
+            # constrained to choose directly from ToolRegistry's names, so
+            # pass it through unchanged instead of failing to route it.
+            return tool_name
+
         return tools.get(tool_name, "unknown_tool")
