@@ -1,8 +1,27 @@
 # SES Matching（現行プロダクト・実装中）
 
-SES案件×要員のマッチングプロダクト。現時点では、案件情報・要員情報から4軸スコアを
-算出する**マッチングスコアリングエンジン**のみを実装しています（データ取得、DB、
-API、UIは未実装）。
+SES案件×要員のマッチングプロダクト。スマホから開ける最小PWAとして、既存の
+Matching Engineの結果を画面で確認できます（データはダミー、DB/Gmail/認証は未接続）。
+
+全体の処理フロー:
+
+```
+PWA (React + vite-plugin-pwa)
+        ↓
+  Demo Data (src/demo/dummyData.ts — 匿名ダミーの ProjectRecord[] / EngineerRecord[])
+        ↓ (呼び出し側が事前に実施する想定。今回のダミーデータは検証済み前提で直接使用)
+  validateProjectRecord / validateEngineerRecord
+        ↓
+  matchProjectToEngineers()
+        ├─ toProjectInput / toEngineerInput
+        └─ calcTotalScore (Scoring Engine)
+        ↓
+  スコア降順のcandidate一覧を画面表示
+```
+
+将来的にはDemo Dataの部分を「Gmail → Parser/Normalizer → ProjectRecord/EngineerRecord」
+に差し替える想定。`ProjectRecord`/`EngineerRecord`を「外部データの正規化後の境界」として
+維持しているのはそのためで、UI・Matching Engine側にメール解析ロジックは書かない。
 
 ## 現在の実装状況
 
@@ -35,24 +54,19 @@ API、UIは未実装）。
   - `npm test` で8件のテスト(降順・同点順序・空配列・Scoring Engineとの結果一致等)
     が通ることを確認済み。
 
-処理フローの全体像:
-
-```
-ProjectRecord / EngineerRecord[]
-        ↓ (呼び出し側が事前に実施)
-  validateProjectRecord / validateEngineerRecord
-        ↓
-  matchProjectToEngineers()
-        ├─ toProjectInput / toEngineerInput
-        └─ calcTotalScore (Scoring Engine)
-        ↓
-  スコア降順のcandidate一覧 [{ engineerId, score }, ...]
-```
-
-- 未実装: 案件/要員データの永続化(DB)、REST/GraphQL等のAPI、マッチング結果の
-  提示UI、営業/担当者による確認フロー、CSV/Gmail等からの実際の取り込み処理、
-  フィードバックによる重み自動学習(`weightLearning`は移植済みだがまだどこからも
-  呼び出されていない)。
+- `src/demo/dummyData.ts` — 画面表示用の匿名ダミーデータ(`dummyProjects` / `dummyEngineers`)。
+  実在の企業・人物・案件ではない。DB/APIが無いため、現時点ではここに直接定義している。
+- `src/web/` — 最小PWA本体(React + react-router-dom + vite-plugin-pwa)。
+  - **Dashboard**(`/`): 案件数・要員数と、先頭案件に対する最新マッチングの1位候補を表示。
+  - **Projects**(`/projects`): 案件一覧(必須/歓迎スキル・単価・勤務地・remote可否・開始日)。
+  - **Engineers**(`/engineers`): 要員一覧(スキル・希望単価・希望勤務地・remote希望・稼働開始日)。
+  - **Matching**(`/matching/:projectId`): 案件を選択すると`matchProjectToEngineers()`を
+    呼び出し、候補要員をスコア降順で表示。UI側にスコア計算ロジックは一切持たない。
+  - PWA対応: `manifest.webmanifest`・Service Worker(`vite-plugin-pwa`)・
+    mobile viewport設定込み。`npm run build`でインストール可能なPWAとしてビルドされることを確認済み。
+- 未実装: Gmail API接続、実データの取り込み(DB)、REST/GraphQL等のAPI、本番認証、
+  ユーザー管理、LLM/AI自動解析、通知、フィードバックによる重み自動学習
+  (`weightLearning`は移植済みだがまだどこからも呼び出されていない)。
 
 ## 位置付け
 
@@ -64,6 +78,8 @@ ProjectRecord / EngineerRecord[]
 
 ```bash
 npm install
-npm test    # vitest: スコアリングエンジンのユニットテスト
-npm run build  # tsc: 型チェック込みビルド
+npm test        # vitest: scoring/intake/matching/PWA画面のユニットテスト
+npm run build   # tsc(型チェック) + vite build(PWAビルド)
+npm run dev -- --host 0.0.0.0   # 開発サーバーをLAN上のスマホから開けるようにする
+npm run preview -- --host 0.0.0.0  # npm run build後の成果物をプレビュー
 ```
