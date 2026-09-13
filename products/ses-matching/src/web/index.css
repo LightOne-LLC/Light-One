@@ -109,6 +109,22 @@ h2 {
   color: #1e40af;
 }
 
+button {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+button:disabled {
+  opacity: 0.6;
+}
+
 select {
   width: 100%;
   padding: 10px;

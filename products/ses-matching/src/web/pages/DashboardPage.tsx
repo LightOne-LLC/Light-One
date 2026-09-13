@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { dummyEngineers, dummyProjects } from '../../demo/dummyData';
 import { matchProjectToEngineers } from '../../matching/matchProjectToEngineers';
+import { GmailImport } from '../components/GmailImport';
 import { scoreColorClass } from '../scoreColor';
 
 export function DashboardPage() {
@@ -40,6 +41,9 @@ export function DashboardPage() {
       ) : (
         <p className="empty-note">案件がありません。</p>
       )}
+
+      <h2>Gmail Import</h2>
+      <GmailImport />
     </>
   );
 }

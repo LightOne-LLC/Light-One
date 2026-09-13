@@ -1,27 +1,38 @@
 # SES Matching（現行プロダクト・実装中）
 
 SES案件×要員のマッチングプロダクト。スマホから開ける最小PWAとして、既存の
-Matching Engineの結果を画面で確認できます（データはダミー、DB/Gmail/認証は未接続）。
+Matching Engineの結果を画面で確認でき、PWAから直接Gmailを1通取り込んで
+Parser/Validation結果を表示できます（DB・本番認証・大量同期は未実装）。
 
 全体の処理フロー:
 
 ```
-PWA (React + vite-plugin-pwa)
-        ↓
-  Demo Data (src/demo/dummyData.ts — 匿名ダミーの ProjectRecord[] / EngineerRecord[])
-        ↓ (呼び出し側が事前に実施する想定。今回のダミーデータは検証済み前提で直接使用)
-  validateProjectRecord / validateEngineerRecord
-        ↓
-  matchProjectToEngineers()
-        ├─ toProjectInput / toEngineerInput
-        └─ calcTotalScore (Scoring Engine)
-        ↓
-  スコア降順のcandidate一覧を画面表示
+SES Matching PWA (ブラウザ)
+        │
+        │ fetch('/api/gmail/fetch-one')  ※credentials/tokenはここを一切通らない
+        ▼
+Vite dev/preview server 内の最小API (src/server/vitePlugin.ts, GET /api/gmail/fetch-one)
+        │
+        ▼
+  src/gmail/ (OAuth, Gmailから1通だけ取得) → RawEmail
+        │
+        ▼
+  src/parser/ (キーワード抽出) → Project候補 / Engineer候補 / Unparsed
+        │
+        ▼
+  validateProjectRecord / validateEngineerRecord (src/intake/, 既存のまま)
+        │ (Projectでvalidation PASSの場合のみ)
+        ▼
+  matchProjectToEngineers() (src/matching/, 既存のまま)
+        │
+        ▼
+  GmailImportResult (本文を含まない安全な要約) を PWA へ返しDashboardに表示
 ```
 
-将来的にはDemo Dataの部分を「Gmail → Parser/Normalizer → ProjectRecord/EngineerRecord」
-に差し替える想定。`ProjectRecord`/`EngineerRecord`を「外部データの正規化後の境界」として
-維持しているのはそのためで、UI・Matching Engine側にメール解析ロジックは書かない。
+Dashboard以外の画面(Projects/Engineers/Matching)は引き続き
+`src/demo/dummyData.ts`の匿名ダミーデータを表示する（差し替え未実装）。
+`ProjectRecord`/`EngineerRecord`を「外部データの正規化後の境界」として
+維持しているため、UI・Matching Engine側にメール解析ロジックは書いていない。
 
 ## 現在の実装状況
 
@@ -57,7 +68,11 @@ PWA (React + vite-plugin-pwa)
 - `src/demo/dummyData.ts` — 画面表示用の匿名ダミーデータ(`dummyProjects` / `dummyEngineers`)。
   実在の企業・人物・案件ではない。DB/APIが無いため、現時点ではここに直接定義している。
 - `src/web/` — 最小PWA本体(React + react-router-dom + vite-plugin-pwa)。
-  - **Dashboard**(`/`): 案件数・要員数と、先頭案件に対する最新マッチングの1位候補を表示。
+  - **Dashboard**(`/`): 案件数・要員数、先頭案件に対する最新マッチングの1位候補、
+    および「Gmail Import」(`GmailImport`コンポーネント)を表示。ボタン押下で
+    `/api/gmail/fetch-one`を呼び出し、取得成功/失敗、Parser種別(Project/Engineer/
+    Unparsed)、抽出フィールド名、validation結果、(Projectの場合)候補1位を表示する。
+    メール本文は一切表示しない。
   - **Projects**(`/projects`): 案件一覧(必須/歓迎スキル・単価・勤務地・remote可否・開始日)。
   - **Engineers**(`/engineers`): 要員一覧(スキル・希望単価・希望勤務地・remote希望・稼働開始日)。
   - **Matching**(`/matching/:projectId`): 案件を選択すると`matchProjectToEngineers()`を
@@ -90,8 +105,22 @@ PWA (React + vite-plugin-pwa)
   - 実際のSESメールが多様な形式を取ることは十分あり得るため、このParserで拾えない
     メールは`unparsed`になる(想定内)。ルールベースで実際に限界が見えてから、
     LLM Parserの検討に進む。
-- 未実装: Gmailメールの大量取り込み・定期同期、DB永続化、REST/GraphQL等のAPI、
-  本番認証、ユーザー管理、LLMベースのParser、Gmail送信・自動返信、通知、
+- `src/server/` — PWAが呼ぶ唯一のサーバー側API境界。新しいBackend framework
+  (Express等)は導入せず、Viteのdev/previewサーバー自身のmiddlewareフック
+  (`configureServer`/`configurePreviewServer`、`vitePlugin.ts`)に
+  `GET /api/gmail/fetch-one`を1本だけ生やしている。
+  - `gmailImportApi.ts`の`performGmailImport()`が実処理(gmail→parser→
+    validation→(該当時)matching)を行う純粋な非同期関数で、Gmail取得部分は
+    差し替え可能(テストではsyntheticなRawEmailを注入し、実Gmail/OAuthに
+    一切触れずに検証している)。
+  - レスポンス型`GmailImportResult`(`src/server/types.ts`)は本文(`bodyText`)を
+    含むフィールドを持たない。OAuth認証情報・トークンもブラウザへは一切渡らない
+    (Node側の`configureServer`フック内でのみ実行されるため)。
+  - **制約**: `vite dev` / `vite preview`実行中のみこのAPIは有効。`vite build`が
+    出力する`dist/`を単純な静的ファイルサーバーで配信した場合はAPIが存在しない
+    (本格的なサーバーが必要になった時点で改めて設計する)。
+- 未実装: Gmailメールの大量取り込み・定期同期、DB永続化、REST/GraphQL等の
+  汎用API、本番認証、ユーザー管理、LLMベースのParser、Gmail送信・自動返信、通知、
   フィードバックによる重み自動学習(`weightLearning`は移植済みだがまだどこからも
   呼び出されていない)。
 

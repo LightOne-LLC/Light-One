@@ -1,10 +1,12 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { gmailApiPlugin } from './src/server/vitePlugin';
 
 export default defineConfig({
   plugins: [
     react(),
+    gmailApiPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {

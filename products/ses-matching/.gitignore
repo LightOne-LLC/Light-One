@@ -1,6 +1,7 @@
 dist/
 vite.config.js
 vite.config.d.ts
+.tsc-node-out/
 
 # Gmail OAuth secrets — never commit these.
 credentials.json
