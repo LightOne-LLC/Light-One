@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "outDir": ".tsc-node-out"
+  },
+  "include": ["vite.config.ts", "src"],
+  "exclude": ["src/web", "src/**/__tests__/**"]
+}
