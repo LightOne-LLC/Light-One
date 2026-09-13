@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "gmail:fetch-one": "vite-node src/gmail/fetchOne.ts"
+    "gmail:fetch-one": "vite-node src/gmail/fetchOne.ts",
+    "build:gmail-function": "node scripts/bundleGmailFunction.mjs"
   },
   "dependencies": {
     "@google-cloud/local-auth": "^3.0.1",
@@ -24,6 +25,7 @@
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "esbuild": "^0.21.5",
     "jsdom": "^25.0.1",
     "typescript": "^5.5.4",
     "vite": "^5.4.6",

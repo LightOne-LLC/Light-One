@@ -10,18 +10,25 @@
  *
  *   Gmail account -> OAuth consent (browser) -> access/refresh token -> Gmail API
  *
- * Two files this depends on, neither committed to Git (see .gitignore):
+ * Two files this depends on locally, neither committed to Git (see
+ * .gitignore):
  *   - credentials.json (GMAIL_CREDENTIALS_PATH): the OAuth client secret
  *     downloaded once from Google Cloud Console (APIs & Services ->
  *     Credentials -> OAuth client ID -> Desktop app).
  *   - token.json (GMAIL_TOKEN_PATH): the cached user token, created on
  *     first successful consent. Delete it to force re-consent.
+ *
+ * In a serverless environment (no persistent filesystem, no browser to
+ * complete a consent screen in) these files don't apply. There,
+ * GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REFRESH_TOKEN env vars
+ * are used instead — same OAuth client, just already-granted credentials
+ * supplied directly instead of read from disk.
  */
 
 import { readFile, writeFile } from 'node:fs/promises';
 import { authenticate as runLocalAuthFlow } from '@google-cloud/local-auth';
 import { google } from 'googleapis';
-import type { OAuth2Client } from 'google-auth-library';
+import { OAuth2Client } from 'google-auth-library';
 import { toRawEmail, type GmailApiMessage } from './parseMessage';
 import type { RawEmail } from './types';
 
@@ -56,11 +63,39 @@ async function saveCredentials(client: OAuth2Client): Promise<void> {
   await writeFile(TOKEN_PATH, payload);
 }
 
-/** OAuth entry point: returns an authorized client, running the browser
- * consent flow only if no usable cached token exists. */
+/** Builds a client directly from already-granted credentials supplied via
+ * env vars, with no filesystem access — the path used in serverless
+ * environments. Returns null if any of the three vars is missing. */
+function credentialsFromEnv(): OAuth2Client | null {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+  if (!clientId || !clientSecret || !refreshToken) return null;
+
+  const client = new OAuth2Client(clientId, clientSecret);
+  client.setCredentials({ refresh_token: refreshToken });
+  return client;
+}
+
+/** OAuth entry point: returns an authorized client. Prefers env-var
+ * credentials (serverless-safe, no filesystem access); falls back to the
+ * local credentials.json/token.json flow, running the browser consent
+ * screen only if no usable cached token exists there either. In an
+ * environment with no filesystem/browser access and no env credentials,
+ * fails fast with a clear message instead of hanging on a consent flow
+ * that can't complete. */
 export async function authenticate(): Promise<OAuth2Client> {
+  const fromEnv = credentialsFromEnv();
+  if (fromEnv) return fromEnv;
+
   const saved = await loadSavedCredentialsIfExist();
   if (saved) return saved;
+
+  if (process.env.VERCEL) {
+    throw new Error(
+      'Gmail credentials are not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REFRESH_TOKEN.',
+    );
+  }
 
   const client = await runLocalAuthFlow({
     scopes: SCOPES,

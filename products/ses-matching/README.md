@@ -11,7 +11,10 @@ SES Matching PWA (ブラウザ)
         │
         │ fetch('/api/gmail/fetch-one')  ※credentials/tokenはここを一切通らない
         ▼
-Vite dev/preview server 内の最小API (src/server/vitePlugin.ts, GET /api/gmail/fetch-one)
+GET /api/gmail/fetch-one
+  (ローカル: src/server/vitePlugin.ts が vite dev/preview に生やす route
+   本番/Vercel: src/server/vercelGmailHandler.ts をビルド時にバンドルした
+               api/gmail/fetch-one.js が Vercel Function として同じ処理を提供)
         │
         ▼
   src/gmail/ (OAuth, Gmailから1通だけ取得) → RawEmail
@@ -119,6 +122,45 @@ Dashboard以外の画面(Projects/Engineers/Matching)は引き続き
   - **制約**: `vite dev` / `vite preview`実行中のみこのAPIは有効。`vite build`が
     出力する`dist/`を単純な静的ファイルサーバーで配信した場合はAPIが存在しない
     (本格的なサーバーが必要になった時点で改めて設計する)。
+- `src/server/vercelGmailHandler.ts` + `api/gmail/fetch-one.js`(生成物、
+  未コミット) — 本番/Vercel用のエントリポイント。Vercelの静的ホスティングは
+  `vite dev`/`vite preview`を実行しない(=`src/server/vitePlugin.ts`のフックが
+  効かない)ため、同じ`GET /api/gmail/fetch-one`をVercelのzero-config
+  Node Function規約(`api/`配下のファイル1つ=1エンドポイント)で別途提供している。
+  中身は`performGmailImport()`を呼ぶだけで、ロジックは`src/gmail`/`src/parser`/
+  `src/intake`/`src/matching`から一切変更していない。
+  - **デプロイ前に必ず`npm run build:gmail-function`を実行する**(ローカルの
+    `npm run build`/`npm test`/`npm run dev`からは呼ばれない、手動の1ステップ)。
+    `scripts/bundleGmailFunction.mjs`が`src/server/vercelGmailHandler.ts`を
+    esbuildで自己完結バンドルし、`api/gmail/fetch-one.js`として出力する
+    (このファイルは`dist/`と同様ビルド生成物であり、`.gitignore`済みでコミット
+    しない)。理由: このプロジェクトはESM(`"type": "module"`)で、Node本来の
+    ESM解決は相対importに拡張子を要求するため、`src/`配下の既存ファイル群
+    (あえて拡張子省略のまま、Vite/vitestのbundler解決に合わせている)を
+    そのままVercel Functionの実行時import解決に使うと失敗する。この既存
+    ファイル群を書き換える代わりに、Vercel向けの1エントリだけを事前に
+    バンドルして解決済みにする方式を取った。
+  - この生成をVercel自身の`vercel-build`ビルドコマンドにはしていない。
+    `vercel deploy`/`vercel --prod`(CLI)はデプロイ時点のローカル
+    ディレクトリのファイルをそのままアップロードし、`api/`配下に何を
+    デプロイするかもその時点のスナップショットから決まる —
+    ビルドコマンド実行中に生成したファイルは関数として認識されない
+    (実際に試して確認した)。加えて、Vercelは1回のデプロイ内でビルド
+    コマンドを複数回実行することがあり、最初にソースファイル自身を
+    上書きバンドルする実装では2回目の実行で「型情報が失われた生成済み
+    JSを再度`tsc`が型チェックして失敗する」という不具合も実際に発生した。
+    そのため、出力先(`api/gmail/fetch-one.js`)を入力元
+    (`src/server/vercelGmailHandler.ts`)と別パスにしたうえで、
+    デプロイ前にローカルで生成する方式に落ち着いた。
+  - 本番のGmail認証は環境変数(`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` /
+    `GOOGLE_REFRESH_TOKEN`、Vercel Environment Variablesに設定)を使う。
+    `src/gmail/client.ts`の`authenticate()`はこれらが揃っていればファイル
+    I/Oを一切行わずそれらから直接認証情報を構築し、揃っていなければ
+    (ローカル開発時と同様)`credentials.json`/`token.json`ベースの既存フローに
+    フォールバックする。Vercel環境かつどちらの経路も使えない場合は、
+    ブラウザ用の同意画面を試みてハングする前に安全に失敗する。
+  - 未設定のままデプロイした場合、APIは`{"success": false, "reason": "..."}`
+    という安全なJSONを返す(メール本文・secretを含まない)。
 - 未実装: Gmailメールの大量取り込み・定期同期、DB永続化、REST/GraphQL等の
   汎用API、本番認証、ユーザー管理、LLMベースのParser、Gmail送信・自動返信、通知、
   フィードバックによる重み自動学習(`weightLearning`は移植済みだがまだどこからも
@@ -140,6 +182,18 @@ npm run dev -- --host 0.0.0.0   # 開発サーバーをLAN上のスマホから�
 npm run preview -- --host 0.0.0.0  # npm run build後の成果物をプレビュー
 npm run gmail:fetch-one  # Gmailから最新の1通だけ取得しParser/Validationまで確認(要credentials.json/token.json)
 ```
+
+### Vercelへのデプロイ
+
+```bash
+npm run build:gmail-function   # api/gmail/fetch-one.js を生成(必ずdeployの直前に実行)
+npx vercel --prod              # または vercel(preview) / vercel --yes 等
+```
+`api/`はGit管理外の生成物のみのディレクトリなので、上記の順番を守らないと
+`/api/gmail/fetch-one`が存在しないままデプロイされる。本番のGmail認証には
+`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REFRESH_TOKEN`を
+Vercel Environment Variablesに設定する(値そのものはこのREADMEにもコミット
+にも書かない)。
 
 ### Gmail連携のセットアップ(`npm run gmail:fetch-one`)
 
