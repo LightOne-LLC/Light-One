@@ -121,8 +121,46 @@ console.log(result);
 //   verified: true, needsHumanReview: false, notes: [], trace: {...} }
 ```
 
-An Automation Engine calls the same flow via the wire-format `LLMTaskRequest`
-(spec section 8) through `parseLLMTaskRequest` + `router.executeClassify`.
+A same-process (Node/TypeScript) caller uses the wire-format `LLMTaskRequest`
+(spec section 8) directly via `parseLLMTaskRequest` + `router.executeClassify`,
+as above. A caller in another process or language (the Automation Engine is
+Python) uses the `execute-task` CLI instead — see below.
+
+## Calling the Router from outside this package (`execute-task`)
+
+The Automation Engine (`ai/automation-engine`, Python) cannot `import` this
+TypeScript package, and until now nothing exposed the wire-format
+`LLMTaskRequest` outside a Node process — confirmed by reading
+`ai/automation-engine/app/llm_planner.py`, which explicitly reimplements its
+own separate, minimal Ollama-calling code in Python rather than reach into
+`ai/llm-platform`, because "no Python bridge \[exists] today". `execute-task`
+is that bridge: the smallest possible one — one process per call, JSON in on
+stdin, JSON out on stdout, no server, no port, no new abstraction:
+
+```bash
+echo '{"task_type": "classify", "domain": "ses", "input": "件名: ...", "system_prompt": "..."}' \
+  | npm run execute-task
+# {"output": {"category": "project", "confidence": 0.9, "reason": "..."}, "verified": true, ...}
+```
+
+Any external process (a Python `subprocess.run([...], input=..., capture_output=True)`
+call, for example) can invoke this the same way `execFileSync`/`execFile`
+already does in this package's own tests (`tests/executeTaskCli.test.ts`).
+The request body is the same `LLMTaskRequest` used internally, plus two
+fields read directly off the body rather than added to that type: an
+optional `system_prompt` (forwarded to the Router, same as every domain
+model already passes one) and an optional `timeout_ms` (forwarded as the
+per-request `timeoutMs` every `LLMProvider.classify` call already accepts —
+this is what raising the benchmark's timeout below is built on top of, now
+available to any caller, not just the benchmark script).
+
+Only `task_type: "classify"` works — `LLMRouter.executeClassify` is the only
+task type with a full Router pipeline today, so anything else returns a
+clear `UNSUPPORTED_TASK_TYPE` JSON error rather than silently doing nothing.
+Errors are always JSON on stdout with a non-zero exit code:
+`{"error": {"code": "...", "message": "..."}}`, using the same error `code`s
+(`MODEL_UNAVAILABLE`, `TIMEOUT`, `MALFORMED_OUTPUT`, `INVALID_INPUT`) every
+`LLMProviderError` subclass already defines.
 
 ## Benchmarking the SES classifier for real
 
@@ -189,6 +227,17 @@ on this machine and is too large for it):
   CPU-constrained hardware, not a bug — the point of this run was to
   confirm the pipeline, timeout handling, and benchmark reporting all work
   against real inference, which they now demonstrably do.
+- The `execute-task` CLI (the cross-process bridge added above) was run
+  against real Ollama the same way an external Python caller would invoke
+  it, and hit all three of its outcome paths for real: a `TIMEOUT` error
+  at the exact `timeout_ms` requested (proving that field is genuinely
+  plumbed through, not ignored), a `MALFORMED_OUTPUT` error when a plain
+  `domain: "general"` request (no `system_prompt`) got back non-JSON text
+  from the 0.5B model, and — with a `system_prompt` added — a real
+  success: `{"category": "other", "confidence": 0.9, "reason": "...",
+  ...}` with `trace.providerKind: "local"`, `trace.modelId:
+  "general-local"`, in ~92s. All three are genuine Ollama responses, not
+  mocked.
 
 ## Hardware check
 

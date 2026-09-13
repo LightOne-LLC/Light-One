@@ -105,7 +105,10 @@ export class LLMRouter {
    * This is the path SES classification (and any future classify-type
    * domain model) runs through.
    */
-  async executeClassify(task: LLMTask, options: { systemPrompt?: string } = {}): Promise<EvaluatedResult<ClassifyResult>> {
+  async executeClassify(
+    task: LLMTask,
+    options: { systemPrompt?: string; timeoutMs?: number } = {},
+  ): Promise<EvaluatedResult<ClassifyResult>> {
     const startedAt = Date.now();
     const input = typeof task.input === 'string' ? task.input : JSON.stringify(task.input ?? '');
 
@@ -120,7 +123,7 @@ export class LLMRouter {
 
     const decision = this.route(task.metadata);
     const provider = this.providerFactory(decision.descriptor);
-    const result = await provider.classify({ input, systemPrompt: options.systemPrompt });
+    const result = await provider.classify({ input, systemPrompt: options.systemPrompt, timeoutMs: options.timeoutMs });
 
     const evaluated = Evaluator.evaluateClassification(result);
     return {
