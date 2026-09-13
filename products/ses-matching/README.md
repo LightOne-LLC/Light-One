@@ -64,9 +64,36 @@ PWA (React + vite-plugin-pwa)
     呼び出し、候補要員をスコア降順で表示。UI側にスコア計算ロジックは一切持たない。
   - PWA対応: `manifest.webmanifest`・Service Worker(`vite-plugin-pwa`)・
     mobile viewport設定込み。`npm run build`でインストール可能なPWAとしてビルドされることを確認済み。
-- 未実装: Gmail API接続、実データの取り込み(DB)、REST/GraphQL等のAPI、本番認証、
-  ユーザー管理、LLM/AI自動解析、通知、フィードバックによる重み自動学習
-  (`weightLearning`は移植済みだがまだどこからも呼び出されていない)。
+- `src/gmail/` — Gmail APIから**1通だけ**メッセージを取得する最小adapter(独自実装)。
+  - [`ai/automation-engine/app/gmail_client.py`](../../ai/automation-engine/app/gmail_client.py)
+    と同じ設計(OAuth installed-appフロー、`gmail.readonly`のみ、credentials.json/token.json、
+    ページング無し)をTypeScriptで独立実装したもの。Automation Engineの機能を呼び出す
+    構成にはせず、Gmail API固有の型(`GmailApiMessage`)は`src/gmail/`の外に一切漏らさない。
+  - `RawEmail`型(`id`/`threadId`/`from`/`subject`/`date`/`bodyText`)がGmail API本来の
+    レスポンス形状をアプリ全体から隠す境界。
+  - `npm run gmail:fetch-one` で実行(認証情報は環境変数`GMAIL_CREDENTIALS_PATH`/
+    `GMAIL_TOKEN_PATH`で指定。デフォルトはカレントディレクトリの`credentials.json`/
+    `token.json`。**どちらもGitへコミットしない**、`.gitignore`済み)。
+  - ログには`id`/`threadId`/`from`/`subject`/`date`/本文の文字数と、Parser/Validationの
+    結果のみを出力し、メール本文そのものは絶対に出力しない。
+- `src/parser/` — `RawEmail`を案件/要員メールと判定し、既存の`validateProjectRecord`/
+  `validateEngineerRecord`にそのまま渡せる候補オブジェクトへ変換する最小Parser。
+  - キーワード(「必須スキル」「単価」「勤務地」等)による決定論的な行抽出のみ。
+    LLM/AI分類は使わない。
+  - 抽出できなかったフィールドは候補オブジェクトにキーごと含めない(値を推測して
+    埋めない)。正当性チェックは既存validationにすべて委譲する。
+  - 案件/要員のいずれとも判別できない場合は`{ status: 'unparsed', reason: '...' }`を返す。
+    想定外フォーマットで例外を投げない。
+  - 案件メールとして解析でき、かつvalidationを通過した場合は、`src/demo/dummyData.ts`の
+    ダミー要員に対して`matchProjectToEngineers()`まで自然に接続できることを確認済み
+    (`npm run gmail:fetch-one`実行時、または`src/parser/__tests__/`のテストで確認)。
+  - 実際のSESメールが多様な形式を取ることは十分あり得るため、このParserで拾えない
+    メールは`unparsed`になる(想定内)。ルールベースで実際に限界が見えてから、
+    LLM Parserの検討に進む。
+- 未実装: Gmailメールの大量取り込み・定期同期、DB永続化、REST/GraphQL等のAPI、
+  本番認証、ユーザー管理、LLMベースのParser、Gmail送信・自動返信、通知、
+  フィードバックによる重み自動学習(`weightLearning`は移植済みだがまだどこからも
+  呼び出されていない)。
 
 ## 位置付け
 
@@ -78,8 +105,19 @@ PWA (React + vite-plugin-pwa)
 
 ```bash
 npm install
-npm test        # vitest: scoring/intake/matching/PWA画面のユニットテスト
+npm test        # vitest: scoring/intake/matching/PWA画面/gmail/parserのユニットテスト
 npm run build   # tsc(型チェック) + vite build(PWAビルド)
 npm run dev -- --host 0.0.0.0   # 開発サーバーをLAN上のスマホから開けるようにする
 npm run preview -- --host 0.0.0.0  # npm run build後の成果物をプレビュー
+npm run gmail:fetch-one  # Gmailから最新の1通だけ取得しParser/Validationまで確認(要credentials.json/token.json)
 ```
+
+### Gmail連携のセットアップ(`npm run gmail:fetch-one`)
+
+1. Google Cloud ConsoleでOAuthクライアント(種類: デスクトップアプリ)を作成し、
+   `credentials.json`としてダウンロードして`products/ses-matching/`直下に置く
+   (`.gitignore`済みでコミットされない)。
+2. `npm run gmail:fetch-one`を実行すると、初回はブラウザでの同意画面が開き
+   (`@google-cloud/local-auth`)、完了すると`token.json`にトークンがキャッシュされる
+   (同じくコミットされない)。以降は再認証なしで実行できる。
+3. スコープは`gmail.readonly`のみ。メールの送信・削除・変更は一切行わない。

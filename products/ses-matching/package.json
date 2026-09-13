@@ -7,15 +7,20 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "gmail:fetch-one": "vite-node src/gmail/fetchOne.ts"
   },
   "dependencies": {
+    "@google-cloud/local-auth": "^3.0.1",
+    "google-auth-library": "^9.14.1",
+    "googleapis": "^144.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.2"
   },
   "devDependencies": {
     "@testing-library/react": "^16.0.1",
+    "@types/node": "^22.7.4",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",

@@ -1,3 +1,11 @@
 dist/
 vite.config.js
 vite.config.d.ts
+
+# Gmail OAuth secrets — never commit these.
+credentials.json
+client_secret.json
+token.json
+token.pickle
+.env
+.env.local
