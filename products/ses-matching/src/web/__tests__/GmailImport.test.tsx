@@ -75,6 +75,26 @@ describe('GmailImport', () => {
     expect(screen.getByText('skills')).toBeTruthy();
   });
 
+  it('engineer結果のskillNamesを表示する(BP要員メールの■スキル抽出結果)', async () => {
+    mockFetchOnce({
+      success: true,
+      messageId: 'm5',
+      subject: '個人事業主のご紹介',
+      type: 'engineer',
+      extractedFields: ['skills'],
+      skillNames: ['Java', 'Spring Boot', 'AWS'],
+      validation: { valid: false, errors: ['desiredRateMin: 0以上の数値である必要があります'] },
+    });
+
+    render(<GmailImport />);
+    fireEvent.click(screen.getByRole('button', { name: 'Gmailから1件取得' }));
+
+    await waitFor(() => expect(screen.getByText('Engineer')).toBeTruthy());
+    expect(screen.getByText('Java')).toBeTruthy();
+    expect(screen.getByText('Spring Boot')).toBeTruthy();
+    expect(screen.getByText('AWS')).toBeTruthy();
+  });
+
   it('unparsed結果を表示する', async () => {
     mockFetchOnce({
       success: true,

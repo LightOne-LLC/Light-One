@@ -9,6 +9,9 @@ export interface GmailImportResult {
   date?: string;
   type?: 'project' | 'engineer' | 'unparsed';
   extractedFields?: string[];
+  // 要員メールから抽出できたスキル名のみ(経験年数やその他の項目は含めない)。
+  // PWAのEngineer取り込み結果表示のための最小限の値渡し。
+  skillNames?: string[];
   validation?: { valid: boolean; errors: string[] };
   topCandidate?: { engineerId: string; score: number };
   reason?: string;

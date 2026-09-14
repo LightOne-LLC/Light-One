@@ -45,6 +45,18 @@ function ResultView({ result }: { result: GmailImportResult }) {
               ))}
             </div>
           )}
+          {result.skillNames && result.skillNames.length > 0 && (
+            <div>
+              <span className="card-row" style={{ display: 'block' }}>
+                Skills:
+              </span>
+              {result.skillNames.map((name, i) => (
+                <span key={`${name}-${i}`} className="skill-tag">
+                  {name}
+                </span>
+              ))}
+            </div>
+          )}
           <div className="card-row">
             <span>Validation</span>
             <span>{result.validation?.valid ? 'PASS' : 'FAIL'}</span>
