@@ -37,17 +37,29 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const entry = path.join(here, '..', 'src', 'server', 'vercelGmailHandler.ts');
-const outfile = path.join(here, '..', 'api', 'gmail', 'fetch-one.js');
 
-await build({
-  entryPoints: [entry],
-  outfile,
-  bundle: true,
-  platform: 'node',
-  format: 'esm',
-  target: 'node20',
-  packages: 'external',
-});
+// 単一メッセージ取得(fetch-one)と複数メッセージ取得(fetch)、両方のVercel
+// エントリポイントをここでバンドルする。理由(相対import拡張子問題、
+// vercel deployのスナップショットタイミング等)はこのファイル冒頭のコメント
+// を参照 — 両エントリポイントに共通する事情のため、片方だけの説明にしない。
+const targets = [
+  ['vercelGmailHandler.ts', 'fetch-one.js'],
+  ['vercelGmailBulkHandler.ts', 'fetch.js'],
+];
 
-console.log(`[bundleGmailFunction] bundled ${entry} -> ${outfile}`);
+for (const [entryName, outName] of targets) {
+  const entry = path.join(here, '..', 'src', 'server', entryName);
+  const outfile = path.join(here, '..', 'api', 'gmail', outName);
+
+  await build({
+    entryPoints: [entry],
+    outfile,
+    bundle: true,
+    platform: 'node',
+    format: 'esm',
+    target: 'node20',
+    packages: 'external',
+  });
+
+  console.log(`[bundleGmailFunction] bundled ${entry} -> ${outfile}`);
+}
