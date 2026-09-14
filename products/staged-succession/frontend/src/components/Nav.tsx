@@ -26,11 +26,12 @@ export function Nav() {
   const { user, role, signOut } = useAuth();
   if (!user) return null;
 
-  // Mobile keeps the bottom tab bar to 4 destinations, so 人材/企業 collapse
-  // into a single role-appropriate tab (their own profile section) instead
-  // of two separate tabs — the desktop bar below still keeps both.
-  const profileRoute = role === 'company' ? '/talents' : '/companies';
-  const profileLabel = role === 'company' ? '人材' : '企業';
+  // Mobile keeps the bottom tab bar to 4 destinations: this tab is the
+  // user's own profile page (TalentsPage/CompaniesPage only render the
+  // editable form when role matches), so it must route by the user's own
+  // role, not the opposite — the desktop bar below still shows both links.
+  const profileRoute = role === 'talent' ? '/talents' : '/companies';
+  const profileLabel = role === 'talent' ? '人材' : '企業';
 
   return (
     <>
