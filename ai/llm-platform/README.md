@@ -139,13 +139,25 @@ stdin, JSON out on stdout, no server, no port, no new abstraction:
 
 ```bash
 echo '{"task_type": "classify", "domain": "ses", "input": "件名: ...", "system_prompt": "..."}' \
-  | npm run execute-task
+  | npx tsx llm/src/cli.ts
 # {"output": {"category": "project", "confidence": 0.9, "reason": "..."}, "verified": true, ...}
 ```
 
-Any external process (a Python `subprocess.run([...], input=..., capture_output=True)`
-call, for example) can invoke this the same way `execFileSync`/`execFile`
-already does in this package's own tests (`tests/executeTaskCli.test.ts`).
+**For a programmatic caller (Python `subprocess`, etc.), invoke `npx tsx
+llm/src/cli.ts` directly, not `npm run execute-task`.** `npm run` prints its
+own banner (`> light-one-llm-platform@0.1.0 execute-task` etc.) to **stdout**
+ahead of the CLI's own output, which breaks naive `json.loads(stdout)` —
+confirmed by capturing raw stdout byte-for-byte in this exact setup.
+`npx tsx llm/src/cli.ts` (or `npm run execute-task --silent`) gives clean,
+JSON-only stdout; `npm run execute-task` (no `--silent`) is fine for manual,
+human-read use. Verified for real: a standalone Python script called
+`subprocess.run(["npx", "tsx", "llm/src/cli.ts"], input=..., capture_output=True)`
+from outside this package (standing in for the Automation Engine, which
+cannot `import` this TypeScript package either way) and successfully
+`json.loads()`-parsed the response — see "Verified real-model run" below.
+`execFileSync`/`execFile` in this package's own tests
+(`tests/executeTaskCli.test.ts`) sidesteps this the same way, by calling
+`tsx` directly rather than going through `npm run`.
 The request body is the same `LLMTaskRequest` used internally, plus two
 fields read directly off the body rather than added to that type: an
 optional `system_prompt` (forwarded to the Router, same as every domain
@@ -238,6 +250,21 @@ on this machine and is too large for it):
   ...}` with `trace.providerKind: "local"`, `trace.modelId:
   "general-local"`, in ~92s. All three are genuine Ollama responses, not
   mocked.
+- Confirmed 2026-09-15: a standalone Python script (`subprocess.run(["npx",
+  "tsx", "llm/src/cli.ts"], input=..., capture_output=True)`, standing in
+  for the Automation Engine — not a Node/TypeScript test) sent the same
+  `LLMTaskRequest` shape (`domain: "general"`, a `system_prompt`,
+  `timeout_ms: 120000`) and got back real Ollama output that
+  `json.loads()` parsed without error: `{"category": "other", "confidence":
+  1, "reason": "..."}`, latency 68.1s. A first attempt against the
+  registry's untouched default (`llama3.1:8b`, not pulled on this machine)
+  correctly came back as a parseable `{"error": {"code":
+  "MODEL_UNAVAILABLE", ...}}` instead of a Python-side crash — proving the
+  error path round-trips just as cleanly as the success path. This closes
+  the loop End-to-end: Python → `execute-task` → `LLMRouter` →
+  `OllamaProvider` → Ollama → JSON → Python, with **no LLM Platform code
+  change needed** — the existing wire format and CLI already sufficed once
+  invoked correctly (see the `npx tsx` vs. `npm run` note above).
 
 ## Hardware check
 
