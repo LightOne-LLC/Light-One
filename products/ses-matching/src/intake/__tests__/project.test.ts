@@ -11,7 +11,7 @@ const validProject: ProjectRecord = {
   rateMax: 80,
   location: '東京都',
   remoteAllowed: true,
-  startDate: '2026-04-01',
+  startDate: { precision: 'day', value: '2026-04-01' },
   japaneseLevel: 'business',
 };
 
@@ -64,6 +64,29 @@ describe('validateProjectRecord', () => {
     if (!result.valid) {
       expect(result.errors.some((e) => e.startsWith('startDate'))).toBe(true);
     }
+  });
+
+  it('startDateがmonth precisionでも受け付ける(2026-10はVALID)', () => {
+    const result = validateProjectRecord({ ...validProject, startDate: { precision: 'month', value: '2026-10' } });
+    expect(result.valid).toBe(true);
+  });
+
+  it('startDateがimmediate precisionでも受け付ける(即日)', () => {
+    const result = validateProjectRecord({ ...validProject, startDate: { precision: 'immediate', value: '' } });
+    expect(result.valid).toBe(true);
+  });
+
+  it('startDateがunknown precisionの場合は拒否する(勝手にPASS条件を緩めない)', () => {
+    const result = validateProjectRecord({ ...validProject, startDate: { precision: 'unknown', value: '' } });
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors.some((e) => e.startsWith('startDate'))).toBe(true);
+    }
+  });
+
+  it('startDateが構造的に不正なmonth precision(月が範囲外)の場合は拒否する', () => {
+    const result = validateProjectRecord({ ...validProject, startDate: { precision: 'month', value: '2026-13' } });
+    expect(result.valid).toBe(false);
   });
 
   it('不正なjapaneseLevelの場合は拒否する', () => {

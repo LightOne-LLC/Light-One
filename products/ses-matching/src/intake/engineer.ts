@@ -1,10 +1,10 @@
 import type { EngineerInput } from '../scoring/types';
 import type { EngineerRecord, ValidationResult } from './types';
 import {
+  isAcceptableDateValue,
   isJapaneseLevel,
   isNonEmptyString,
   isNonNegativeNumber,
-  isValidDateString,
   validateEngineerSkill,
 } from './validationHelpers';
 
@@ -52,8 +52,10 @@ export function validateEngineerRecord(input: unknown): ValidationResult<Enginee
     errors.push('remoteDesired: 真偽値である必要があります');
   }
 
-  if (!isValidDateString(record.availableFrom)) {
-    errors.push('availableFrom: YYYY-MM-DD形式の有効な日付である必要があります');
+  // day/month/immediateは有効な稼働可能時期情報として受け入れる。unknownは
+  // 引き続きFAILとし、根拠なくPASS条件を緩めない(日付を推測して埋めない)。
+  if (!isAcceptableDateValue(record.availableFrom)) {
+    errors.push('availableFrom: 有効な稼働可能時期情報(day/month/immediateのいずれか)である必要があります');
   }
 
   // 任意項目: 未指定(undefined)は許容する。値がある場合のみ形式を検査する

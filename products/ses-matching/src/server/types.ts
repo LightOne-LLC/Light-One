@@ -33,8 +33,8 @@ export interface GmailBulkImportResult {
   success: boolean;
   limit?: number;
   fetched?: number;
-  project?: { total: number; valid: number; invalid: number };
-  engineer?: { total: number; valid: number; invalid: number };
+  project?: { total: number; valid: number; invalid: number; datePrecision: DatePrecisionCounts };
+  engineer?: { total: number; valid: number; invalid: number; datePrecision: DatePrecisionCounts };
   unparsed?: number;
   // validationに失敗したフィールド名ごとの件数(例: { startDate: 31, rate: 5 })。
   // 個別メールがどれか、何が書かれていたかは一切含まない。
@@ -51,4 +51,15 @@ export interface GmailBulkImportResult {
 export interface GmailBulkMatchingSample {
   projectId: string;
   ranking: { engineerId: string; score: number }[];
+}
+
+// 案件のstartDate/要員のavailableFromの精度分布。個別メールの値そのものは
+// 含めず、件数の集計のみ(missing: 稼働時期に関するラベル自体が本文に
+// 見つからずフィールドが存在しなかった件数)。
+export interface DatePrecisionCounts {
+  day: number;
+  month: number;
+  immediate: number;
+  unknown: number;
+  missing: number;
 }

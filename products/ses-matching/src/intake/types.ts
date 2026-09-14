@@ -5,7 +5,7 @@
 // Scoring Engineは個々の計算に集中させたいため id を持たせず、
 // 「どの案件/要員のデータか」を扱うのはこの入力層の責務とする。
 
-import type { EngineerSkill, JapaneseLevel, RequiredSkill } from '../scoring/types';
+import type { DateValue, EngineerSkill, JapaneseLevel, RequiredSkill } from '../scoring/types';
 
 export interface ProjectRecord {
   id: string;
@@ -14,7 +14,7 @@ export interface ProjectRecord {
   rateMax: number; // 万円/月
   location: string; // 都道府県
   remoteAllowed: boolean;
-  startDate: string; // YYYY-MM-DD
+  startDate: DateValue;
   // 実メールでは日本語レベルが明記されないことが大半のため任意項目とする。
   // Scoring Engine自体はjapaneseLevelを一切参照しない(死んだフィールド)。
   // 未指定の場合、toProjectInput()が'none'へ正規化する。
@@ -28,7 +28,7 @@ export interface EngineerRecord {
   desiredRateMax: number;
   desiredLocations: string[];
   remoteDesired: boolean;
-  availableFrom: string; // YYYY-MM-DD
+  availableFrom: DateValue;
   // ProjectRecordと同様、実メールでは記載されないことが大半のため任意項目。
   // 未指定の場合、toEngineerInput()が'none'へ正規化する。
   japaneseLevel?: JapaneseLevel;
