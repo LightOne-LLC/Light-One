@@ -1,5 +1,11 @@
 import { Company, Talent } from '../src/types';
 
+/**
+ * All entries here are clearly-fictional demo/test data (see names below) —
+ * never a real person or company. Used only to populate a dev/staging
+ * Supabase project so the Search screen has candidates to browse.
+ */
+
 export interface SeedTalent extends Omit<Talent, 'id' | 'uid'> {
   email: string;
 }
@@ -9,8 +15,8 @@ export interface SeedCompany extends Omit<Company, 'id' | 'uid'> {
 
 export const SEED_TALENTS: SeedTalent[] = [
   {
-    email: 'talent1@example.com',
-    name: '田中 健一',
+    email: 'seed-talent-1@example.com',
+    name: 'サンプル 太郎',
     skills: ['経理', 'EC運営', 'Webマーケ'],
     interestedIndustries: ['製造業', '卸売業'],
     weeklyAvailableHours: 10,
@@ -19,11 +25,11 @@ export const SEED_TALENTS: SeedTalent[] = [
     prefecture: '長野県',
     successionInterestLevel: 5,
     fundingCapacity: 1200,
-    bio: '大手製造業で経理・EC運営を10年経験。将来は地方の製造業の事業承継に携わりたい。',
+    bio: '開発・検証用のダミープロフィールです（架空の人物）。製造業の経理・EC運営を想定。',
   },
   {
-    email: 'talent2@example.com',
-    name: '佐藤 美咲',
+    email: 'seed-talent-2@example.com',
+    name: 'テスト 花子',
     skills: ['Webデザイン', 'SNS運用', 'EC運営'],
     interestedIndustries: ['飲食業', '観光業'],
     weeklyAvailableHours: 5,
@@ -32,11 +38,11 @@ export const SEED_TALENTS: SeedTalent[] = [
     prefecture: '東京都',
     successionInterestLevel: 2,
     fundingCapacity: 100,
-    bio: 'フリーランスのWebデザイナー。副業の範囲でスポット的に関わりたい。',
+    bio: 'テスト用のダミープロフィールです（架空の人物）。',
   },
   {
-    email: 'talent3@example.com',
-    name: '鈴木 大輔',
+    email: 'seed-talent-3@example.com',
+    name: '検証 次郎',
     skills: ['製造業経験', '生産管理', '品質管理'],
     interestedIndustries: ['製造業'],
     weeklyAvailableHours: 15,
@@ -45,11 +51,11 @@ export const SEED_TALENTS: SeedTalent[] = [
     prefecture: '愛知県',
     successionInterestLevel: 4,
     fundingCapacity: 800,
-    bio: '精密機械メーカーで生産管理を15年。現場に入って改善から関わりたい。',
+    bio: '検証用のダミープロフィールです（架空の人物）。',
   },
   {
-    email: 'talent4@example.com',
-    name: '山本 花子',
+    email: 'seed-talent-4@example.com',
+    name: 'ダミー 三郎',
     skills: ['経営企画', '財務', 'M&A'],
     interestedIndustries: ['小売業', '卸売業'],
     weeklyAvailableHours: 8,
@@ -58,11 +64,11 @@ export const SEED_TALENTS: SeedTalent[] = [
     prefecture: '大阪府',
     successionInterestLevel: 5,
     fundingCapacity: 2000,
-    bio: '事業会社で経営企画・M&A実務に従事。将来的な独立・事業承継を検討中。',
+    bio: 'ダミーデータです。実在の人物ではありません。',
   },
   {
-    email: 'talent5@example.com',
-    name: '高橋 拓也',
+    email: 'seed-talent-5@example.com',
+    name: '架空 四郎',
     skills: ['農業経験', 'EC運営', '観光開発'],
     interestedIndustries: ['農業', '観光業'],
     weeklyAvailableHours: 20,
@@ -71,17 +77,17 @@ export const SEED_TALENTS: SeedTalent[] = [
     prefecture: '北海道',
     successionInterestLevel: 3,
     fundingCapacity: 300,
-    bio: '地元北海道で農業関連のEC支援をしている。地元から離れずに関われる先を探したい。',
+    bio: '架空の人物として作成したテストデータです。',
   },
 ];
 
 export const SEED_COMPANIES: SeedCompany[] = [
   {
-    email: 'company1@example.com',
-    name: '有限会社信州フーズ',
+    email: 'seed-company-1@example.com',
+    name: 'サンプル製作所',
     industry: '製造業',
     prefecture: '長野県',
-    overview: '長野県の味噌・漬物製造業。地元産の原料にこだわった加工食品を製造。後継者不在が課題。',
+    overview: '開発・検証用のダミー企業です（架空）。味噌・漬物製造業を想定したテストデータ。',
     financialHealth: 'average',
     wantedPersonaTags: ['経理', 'EC運営', 'Webマーケ'],
     wantedPersonaTagWeights: { 経理: 2, EC運営: 1.5, Webマーケ: 1 },
@@ -90,11 +96,11 @@ export const SEED_COMPANIES: SeedCompany[] = [
     successionTimeframe: '1-3y',
   },
   {
-    email: 'company2@example.com',
-    name: '株式会社湘南デザイン工房',
+    email: 'seed-company-2@example.com',
+    name: 'テスト商事株式会社',
     industry: '飲食業',
     prefecture: '神奈川県',
-    overview: '湘南エリアでカフェを3店舗運営。ブランディングとSNS発信を強化したい。',
+    overview: '検証用のダミー企業です（架空）。カフェ運営業を想定したテストデータ。',
     financialHealth: 'good',
     wantedPersonaTags: ['Webデザイン', 'SNS運用'],
     sideJobAcceptable: true,
@@ -102,11 +108,11 @@ export const SEED_COMPANIES: SeedCompany[] = [
     successionTimeframe: '5y+',
   },
   {
-    email: 'company3@example.com',
-    name: '中京精密工業株式会社',
+    email: 'seed-company-3@example.com',
+    name: '架空精密株式会社',
     industry: '製造業',
     prefecture: '愛知県',
-    overview: '自動車部品向け精密加工業。創業者が高齢で早期の後継者確保が急務。',
+    overview: 'テスト用の架空企業です。精密加工業を想定したダミーデータ。',
     financialHealth: 'needs_improvement',
     wantedPersonaTags: ['生産管理', '品質管理', '製造業経験'],
     wantedPersonaTagWeights: { 製造業経験: 2 },
@@ -115,11 +121,11 @@ export const SEED_COMPANIES: SeedCompany[] = [
     successionTimeframe: 'immediate',
   },
   {
-    email: 'company4@example.com',
-    name: '浪速商事株式会社',
+    email: 'seed-company-4@example.com',
+    name: 'ダミーフーズ株式会社',
     industry: '卸売業',
     prefecture: '大阪府',
-    overview: '関西圏の食品卸売業。経営企画・財務に強い後継候補を求めている。',
+    overview: 'ダミーデータとして作成した卸売業の架空企業です。',
     financialHealth: 'good',
     wantedPersonaTags: ['経営企画', '財務', 'M&A'],
     sideJobAcceptable: true,
@@ -127,11 +133,11 @@ export const SEED_COMPANIES: SeedCompany[] = [
     successionTimeframe: '1-3y',
   },
   {
-    email: 'company5@example.com',
-    name: '有限会社十勝ファーム',
+    email: 'seed-company-5@example.com',
+    name: '検証観光株式会社',
     industry: '農業',
     prefecture: '北海道',
-    overview: '十勝地方の畑作農家。まずは正社員候補を求めており副業からの受け入れは現状不可。',
+    overview: '検証用の架空農業法人です。副業からの受け入れは現状不可という設定のテストデータ。',
     financialHealth: 'average',
     wantedPersonaTags: ['農業経験', 'EC運営'],
     sideJobAcceptable: false,

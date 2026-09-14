@@ -1,7 +1,14 @@
 /**
- * Seeds a Supabase project with 5 talents + 5 companies and walks one pair
- * through phase1 -> phase2 -> phase3, and a second pair partway into phase2,
- * so the phase-tab UI has something to show immediately after setup.
+ * Seeds a Supabase project with 5 fictional talents + 5 fictional companies
+ * (see scripts/seedData.ts — clearly-fake demo/test data, never real people
+ * or companies). Only a few pairs are matched (see SEED_MATCH_PAIRS below):
+ * one walks through phase1 -> phase2 -> phase3, another sits partway into
+ * phase2, and one stays a plain phase-1 match — most pairs are left
+ * unmatched so the Search screen shows both "未接触" and "つながり中".
+ *
+ * Idempotent: safe to re-run. Users/profiles/talents/companies use
+ * create-or-find + upsert, matches/messages/phase_history are only written
+ * if they don't already exist for that pair/match.
  *
  * Requires admin (service_role) access, so this is a one-off Node script
  * run locally by whoever owns the Supabase project — never something the
@@ -78,20 +85,37 @@ function companyToRow(id: string, c: SeedCompany) {
   };
 }
 
+/**
+ * profiles has no UPDATE grant (role is immutable by design), but
+ * `.upsert()` compiles to `INSERT ... ON CONFLICT DO UPDATE`, which Postgres
+ * privilege-checks for INSERT *and* UPDATE up front regardless of whether a
+ * conflict actually happens — so upserting profiles as service_role always
+ * fails permission checks. A plain check-then-insert avoids that.
+ */
+async function insertProfileIfMissing(id: string, role: 'talent' | 'company'): Promise<void> {
+  const { data: existing, error: findError } = await admin.from('profiles').select('id').eq('id', id).maybeSingle();
+  if (findError) throw findError;
+  if (existing) return;
+  const { error } = await admin.from('profiles').insert({ id, role });
+  if (error) throw error;
+}
+
 async function seedProfiles(): Promise<{ talentIds: string[]; companyIds: string[] }> {
   const talentIds: string[] = [];
   for (const t of SEED_TALENTS) {
     const id = await getOrCreateUser(t.email);
-    await admin.from('profiles').upsert({ id, role: 'talent' });
-    await admin.from('talents').upsert(talentToRow(id, t));
+    await insertProfileIfMissing(id, 'talent');
+    const { error } = await admin.from('talents').upsert(talentToRow(id, t));
+    if (error) throw error;
     talentIds.push(id);
   }
 
   const companyIds: string[] = [];
   for (const c of SEED_COMPANIES) {
     const id = await getOrCreateUser(c.email);
-    await admin.from('profiles').upsert({ id, role: 'company' });
-    await admin.from('companies').upsert(companyToRow(id, c));
+    await insertProfileIfMissing(id, 'company');
+    const { error } = await admin.from('companies').upsert(companyToRow(id, c));
+    if (error) throw error;
     companyIds.push(id);
   }
 
@@ -116,26 +140,58 @@ function scorePhase1For(talent: Talent, company: Company) {
   });
 }
 
-async function seedAllPhase1Matches(talents: Talent[], companies: Company[]): Promise<Map<string, string>> {
+/**
+ * Only a handful of talent/company pairs get a match — most stay
+ * unmatched so the Search screen shows a realistic mix of "未接触" and
+ * "つながり中" instead of every candidate already being connected.
+ */
+const SEED_MATCH_PAIRS: [talentIndex: number, companyIndex: number][] = [
+  [0, 0], // walked through to phase 3 below
+  [3, 3], // walked through to phase 2 below
+  [1, 2], // left as a plain phase-1 match
+];
+
+async function getOrCreateMatch(talent: Talent, company: Company): Promise<string> {
+  const { data: existing, error: findError } = await admin
+    .from('matches')
+    .select('id')
+    .eq('talent_id', talent.id)
+    .eq('company_id', company.id)
+    .maybeSingle();
+  if (findError) throw findError;
+  if (existing) return existing.id as string;
+
+  const phase1 = scorePhase1For(talent, company);
+  const { data, error } = await admin
+    .from('matches')
+    .insert({ talent_id: talent.id, company_id: company.id, score_breakdown: { phase1, currentTotal: phase1.total } })
+    .select('id')
+    .single();
+  if (error) throw error;
+  await admin.from('matches').update({ phase_entered_at: { '1': daysAgo(60) } }).eq('id', data.id);
+  return data.id as string;
+}
+
+async function seedMatches(talents: Talent[], companies: Company[]): Promise<Map<string, string>> {
   const matchIdByPair = new Map<string, string>();
-  for (const talent of talents) {
-    for (const company of companies) {
-      const phase1 = scorePhase1For(talent, company);
-      const { data, error } = await admin
-        .from('matches')
-        .insert({ talent_id: talent.id, company_id: company.id, score_breakdown: { phase1, currentTotal: phase1.total } })
-        .select('id')
-        .single();
-      if (error) throw error;
-      await admin.from('matches').update({ phase_entered_at: { '1': daysAgo(60) } }).eq('id', data.id);
-      matchIdByPair.set(`${talent.id}_${company.id}`, data.id);
-    }
+  for (const [ti, ci] of SEED_MATCH_PAIRS) {
+    const talent = talents[ti];
+    const company = companies[ci];
+    const id = await getOrCreateMatch(talent, company);
+    matchIdByPair.set(`${talent.id}_${company.id}`, id);
   }
-  console.log(`Seeded ${matchIdByPair.size} phase-1 matches (5 talents x 5 companies).`);
+  console.log(`Seeded ${matchIdByPair.size} matches (out of ${talents.length * companies.length} possible pairs).`);
   return matchIdByPair;
 }
 
 async function seedMessages(matchId: string, talentId: string, companyId: string, exchanges: number, startDaysAgo: number) {
+  const { count, error: countError } = await admin
+    .from('messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('match_id', matchId);
+  if (countError) throw countError;
+  if (count && count > 0) return; // already seeded on a previous run
+
   const rows = Array.from({ length: exchanges }, (_, i) => {
     const isTalentTurn = i % 2 === 0;
     const day = Math.max(startDaysAgo - i * (startDaysAgo / exchanges), 0.1);
@@ -155,12 +211,33 @@ async function seedMessages(matchId: string, talentId: string, companyId: string
     .eq('id', matchId);
 }
 
+async function insertPhaseHistoryIfMissing(
+  matchId: string,
+  fromPhase: number,
+  toPhase: string,
+  rest: { reason: string; changed_by: string; score_at_change: number; created_at: string }
+) {
+  const { data: existing, error } = await admin
+    .from('phase_history')
+    .select('id')
+    .eq('match_id', matchId)
+    .eq('to_phase', toPhase)
+    .maybeSingle();
+  if (error) throw error;
+  if (existing) return; // already recorded on a previous run
+
+  await admin.from('phase_history').insert({ match_id: matchId, from_phase: fromPhase, to_phase: toPhase, ...rest });
+}
+
 async function seedPhaseWalkthrough(talents: Talent[], companies: Company[], matchIdByPair: Map<string, string>) {
   const talent1 = talents[0];
   const company1 = companies[0];
   const matchId1 = matchIdByPair.get(`${talent1.id}_${company1.id}`)!;
 
   await seedMessages(matchId1, talent1.id, company1.id, 50, 45);
+
+  const { data: match1Row, error: match1Error } = await admin.from('matches').select('phase').eq('id', matchId1).single();
+  if (match1Error) throw match1Error;
 
   const phase1a = scorePhase1For(talent1, company1);
   const phase2to3a = scorePhase2To3({
@@ -179,37 +256,35 @@ async function seedPhaseWalkthrough(talents: Talent[], companies: Company[], mat
     relocatable: talent1.relocatable,
   });
 
-  await admin
-    .from('matches')
-    .update({
-      continuation_intent: { talent: true, company: true },
-      reviews: { talentRating: 5, talentComment: '想像以上に温かく迎えてもらえた', companyRating: 4, companyComment: '真剣に向き合ってくれている' },
-      phase: 2,
-      phase_entered_at: { '1': daysAgo(60), '2': daysAgo(20) },
-    })
-    .eq('id', matchId1);
-  await admin.from('phase_history').insert({
-    match_id: matchId1,
-    from_phase: 1,
-    to_phase: '2',
+  if (match1Row.phase < 2) {
+    await admin
+      .from('matches')
+      .update({
+        continuation_intent: { talent: true, company: true },
+        reviews: { talentRating: 5, talentComment: '想像以上に温かく迎えてもらえた', companyRating: 4, companyComment: '真剣に向き合ってくれている' },
+        phase: 2,
+        phase_entered_at: { '1': daysAgo(60), '2': daysAgo(20) },
+      })
+      .eq('id', matchId1);
+  }
+  await insertPhaseHistoryIfMissing(matchId1, 1, '2', {
     reason: 'フェーズ1スコアが基準を満たし、双方が継続を希望しました。',
     changed_by: talent1.id,
     score_at_change: phase1a.total,
     created_at: daysAgo(20),
   });
 
-  await admin
-    .from('matches')
-    .update({
-      phase: 3,
-      score_breakdown: { phase1: phase1a, phase2to3: phase2to3a, phase3: phase3a, currentTotal: phase3a.total },
-      phase_entered_at: { '1': daysAgo(60), '2': daysAgo(20), '3': daysAgo(2) },
-    })
-    .eq('id', matchId1);
-  await admin.from('phase_history').insert({
-    match_id: matchId1,
-    from_phase: 2,
-    to_phase: '3',
+  if (match1Row.phase < 3) {
+    await admin
+      .from('matches')
+      .update({
+        phase: 3,
+        score_breakdown: { phase1: phase1a, phase2to3: phase2to3a, phase3: phase3a, currentTotal: phase3a.total },
+        phase_entered_at: { '1': daysAgo(60), '2': daysAgo(20), '3': daysAgo(2) },
+      })
+      .eq('id', matchId1);
+  }
+  await insertPhaseHistoryIfMissing(matchId1, 2, '3', {
     reason: '関与期間・やり取り量・レビューの総合スコアが承継検討フェーズの基準を満たしました。',
     changed_by: company1.id,
     score_at_change: phase2to3a.total,
@@ -221,18 +296,21 @@ async function seedPhaseWalkthrough(talents: Talent[], companies: Company[], mat
   const company4 = companies[3];
   const matchId2 = matchIdByPair.get(`${talent4.id}_${company4.id}`)!;
   await seedMessages(matchId2, talent4.id, company4.id, 8, 10);
-  await admin
-    .from('matches')
-    .update({
-      continuation_intent: { talent: true, company: true },
-      phase: 2,
-      phase_entered_at: { '1': daysAgo(60), '2': daysAgo(10) },
-    })
-    .eq('id', matchId2);
-  await admin.from('phase_history').insert({
-    match_id: matchId2,
-    from_phase: 1,
-    to_phase: '2',
+
+  const { data: match2Row, error: match2Error } = await admin.from('matches').select('phase').eq('id', matchId2).single();
+  if (match2Error) throw match2Error;
+
+  if (match2Row.phase < 2) {
+    await admin
+      .from('matches')
+      .update({
+        continuation_intent: { talent: true, company: true },
+        phase: 2,
+        phase_entered_at: { '1': daysAgo(60), '2': daysAgo(10) },
+      })
+      .eq('id', matchId2);
+  }
+  await insertPhaseHistoryIfMissing(matchId2, 1, '2', {
     reason: 'フェーズ1スコアが基準を満たし、双方が継続を希望しました。',
     changed_by: talent4.id,
     score_at_change: 0.75,
@@ -278,7 +356,7 @@ async function main() {
     successionTimeframe: r.succession_timeframe,
   }));
 
-  const matchIdByPair = await seedAllPhase1Matches(talents, companies);
+  const matchIdByPair = await seedMatches(talents, companies);
   await seedPhaseWalkthrough(talents, companies, matchIdByPair);
 
   console.log(`Seed complete. Sign in as any of the seed emails with password "${SEED_PASSWORD}".`);
