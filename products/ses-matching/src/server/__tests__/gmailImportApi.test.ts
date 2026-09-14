@@ -89,6 +89,28 @@ const bpEngineerWithRateEmail: RawEmail = {
   ].join('\n'),
 };
 
+// ・出社頻度：の記載もあるBP要員紹介メール。skillNames/rateRangeに加え、
+// locations(最寄駅)とremoteDesiredも取得できるが、稼働(availableFrom)は
+// 今回未対応のためvalidationはFAILのまま。
+const bpEngineerWithLocationRemoteEmail: RawEmail = {
+  id: 'email-7',
+  subject: '個人事業主のご紹介',
+  bodyText: [
+    SECRET_BODY_MARKER,
+    '■基本情報',
+    '・最寄駅：川崎駅',
+    '■希望条件',
+    '・稼働：10月〜',
+    '・出社頻度：フルリモート',
+    '・単金（税抜）：80万円',
+    '・ご経歴を拝見しご連絡いたしました',
+    '■スキル',
+    'Java, Spring Boot, AWS',
+    '■備考',
+    '募集フォームよりご連絡ください',
+  ].join('\n'),
+};
+
 describe('performGmailImport', () => {
   it('Gmail取得成功: 案件メールでvalidation PASSしtopCandidateまで返す', async () => {
     const result = await performGmailImport(async () => projectEmail);
@@ -115,23 +137,39 @@ describe('performGmailImport', () => {
     expect(result.validation?.valid).toBe(true);
     expect(result.skillNames).toEqual(['Java']);
     expect(result.rateRange).toEqual({ min: 70, max: 70 });
+    expect(result.locations).toEqual(['東京都']);
+    expect(result.remoteDesired).toBe(true);
   });
 
-  it('BP要員メール(■見出し形式・単金の記載無し)から■スキルを抽出しskillNamesを返す(出社頻度・稼働は未対応でvalidationはFAILのまま)', async () => {
+  it('BP要員メール(■見出し形式・単金/出社頻度の記載無し)から■スキルとlocations(最寄駅)を返す(remoteDesired/稼働は未対応でvalidationはFAILのまま)', async () => {
     const result = await performGmailImport(async () => bpEngineerEmail);
     expect(result.success).toBe(true);
     expect(result.type).toBe('engineer');
     expect(result.skillNames).toEqual(['Java', 'Spring Boot', 'AWS']);
     expect(result.rateRange).toBeUndefined();
+    expect(result.locations).toEqual(['渋谷駅']);
+    expect(result.remoteDesired).toBeUndefined();
     expect(result.validation?.valid).toBe(false);
   });
 
-  it('BP要員メール(・単金（税抜）：あり)からskillNamesとrateRangeの両方を返す(出社頻度・稼働は未対応でvalidationはFAILのまま)', async () => {
+  it('BP要員メール(・単金（税抜）：あり)からskillNamesとrateRangeの両方を返す(出社頻度は未記載のためremoteDesiredは未取得、稼働は未対応でvalidationはFAILのまま)', async () => {
     const result = await performGmailImport(async () => bpEngineerWithRateEmail);
     expect(result.success).toBe(true);
     expect(result.type).toBe('engineer');
     expect(result.skillNames).toEqual(['Java', 'Spring Boot', 'AWS']);
     expect(result.rateRange).toEqual({ min: 80, max: 80 });
+    expect(result.remoteDesired).toBeUndefined();
+    expect(result.validation?.valid).toBe(false);
+  });
+
+  it('BP要員メール(・出社頻度：フルリモートあり)からskillNames/rateRange/locations/remoteDesiredの全てを返す(稼働は未対応でvalidationはFAILのまま)', async () => {
+    const result = await performGmailImport(async () => bpEngineerWithLocationRemoteEmail);
+    expect(result.success).toBe(true);
+    expect(result.type).toBe('engineer');
+    expect(result.skillNames).toEqual(['Java', 'Spring Boot', 'AWS']);
+    expect(result.rateRange).toEqual({ min: 80, max: 80 });
+    expect(result.locations).toEqual(['川崎駅']);
+    expect(result.remoteDesired).toBe(true);
     expect(result.validation?.valid).toBe(false);
   });
 
@@ -164,6 +202,7 @@ describe('performGmailImport', () => {
       unrelatedEmail,
       bpEngineerEmail,
       bpEngineerWithRateEmail,
+      bpEngineerWithLocationRemoteEmail,
     ]) {
       const result = await performGmailImport(async () => email);
       expect(JSON.stringify(result)).not.toContain(SECRET_BODY_MARKER);

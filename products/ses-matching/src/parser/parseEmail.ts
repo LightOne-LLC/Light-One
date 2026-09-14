@@ -113,11 +113,28 @@ function parseEngineerCandidate(subject: string, body: string, id: string): Reco
     candidate.desiredRateMax = rateRange.max;
   }
 
+  // BP-A形式の実メールには「勤務地」「作業場所」「希望勤務地」に相当するラベルは
+  // 存在せず、「・最寄駅：」(要員の最寄駅、居住地に近い情報)のみが記載される。
+  // 「最寄駅」は「希望勤務地」そのものではないが、BP-A形式では他に代替の
+  // 位置情報が無いため、既存の【最寄駅】形式(非BP-A、通常のスキルシート形式)
+  // と同様にdesiredLocationsの値として採用する。実際に「勤務地」「作業場所」
+  // 相当のラベルが記載されているメールでは、そちらが優先される(labels配列の
+  // 先頭に「希望勤務地」を置いているため)。
   const locationsValue = extractLabeledValue(body, ['希望勤務地', '最寄駅']);
   if (locationsValue) candidate.desiredLocations = parseLocationList(locationsValue);
 
-  const remoteValue = extractLabeledValue(body, ['リモート希望', 'リモート', '通勤']);
-  const remoteDesired = (remoteValue ? parseYesNo(remoteValue) : undefined) ?? findRemoteInFreeText(subject);
+  // BP-A形式の「・出社頻度：」は「稼働●回まで出社可能」「常駐可能」等、
+  // リモートの可否を直接表さない自由文が多い(「可」の一致だけでtrue判定すると
+  // 「出社可能」「常駐可能」まで誤ってリモート希望=trueにしてしまう)。そのため
+  // 出社頻度の値は、直接的な「リモート」ラベルの値(parseYesNoで柔軟に判定)とは
+  // 別に、フルリモート/リモートメイン等の強いキーワードのみで判定する
+  // findRemoteInFreeTextを使う(該当が無ければ無理に推測せずundefinedのまま)。
+  const directRemoteValue = extractLabeledValue(body, ['リモート希望', 'リモート', '通勤']);
+  const commuteFrequencyValue = extractLabeledValue(body, ['出社頻度']);
+  const remoteDesired =
+    (directRemoteValue ? parseYesNo(directRemoteValue) : undefined) ??
+    (commuteFrequencyValue ? findRemoteInFreeText(commuteFrequencyValue) : undefined) ??
+    findRemoteInFreeText(subject);
   if (remoteDesired !== undefined) candidate.remoteDesired = remoteDesired;
 
   const availableFromValue = extractLabeledValue(body, ['稼働可能日', '稼働開始日', '稼働開始']);

@@ -67,6 +67,18 @@ function ResultView({ result }: { result: GmailImportResult }) {
               </span>
             </div>
           )}
+          {result.locations && result.locations.length > 0 && (
+            <div className="card-row">
+              <span>Location</span>
+              <span>{result.locations.join(', ')}</span>
+            </div>
+          )}
+          {result.remoteDesired !== undefined && (
+            <div className="card-row">
+              <span>Remote</span>
+              <span>{result.remoteDesired ? '希望' : '希望しない'}</span>
+            </div>
+          )}
           <div className="card-row">
             <span>Validation</span>
             <span>{result.validation?.valid ? 'PASS' : 'FAIL'}</span>

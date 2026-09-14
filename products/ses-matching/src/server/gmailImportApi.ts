@@ -41,6 +41,18 @@ function extractRateRange(candidate: Record<string, unknown>): { min: number; ma
   return undefined;
 }
 
+/** Parser候補(validation前)からdesiredLocationsのみを安全に取り出す。 */
+function extractLocations(candidate: Record<string, unknown>): string[] | undefined {
+  if (!Array.isArray(candidate.desiredLocations)) return undefined;
+  const locations = candidate.desiredLocations.filter((l): l is string => typeof l === 'string' && l.length > 0);
+  return locations.length > 0 ? locations : undefined;
+}
+
+/** Parser候補(validation前)からremoteDesiredのみを安全に取り出す。 */
+function extractRemoteDesired(candidate: Record<string, unknown>): boolean | undefined {
+  return typeof candidate.remoteDesired === 'boolean' ? candidate.remoteDesired : undefined;
+}
+
 async function fetchLatestRawEmail(): Promise<RawEmail | null> {
   const auth = await authenticate();
   const service = getGmailService(auth);
@@ -113,6 +125,8 @@ export async function performGmailImport(
     extractedFields,
     skillNames: extractSkillNames(parsed.candidate),
     rateRange: extractRateRange(parsed.candidate),
+    locations: extractLocations(parsed.candidate),
+    remoteDesired: extractRemoteDesired(parsed.candidate),
     validation: toValidationSummary(validation),
   };
 }
