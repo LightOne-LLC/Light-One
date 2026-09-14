@@ -23,7 +23,7 @@ export function LoginPage() {
       } else {
         await signIn(email, password);
       }
-      navigate('/matches');
+      navigate('/home');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {

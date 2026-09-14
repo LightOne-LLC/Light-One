@@ -2,6 +2,8 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { Nav } from './components/Nav';
 import { LoginPage } from './pages/LoginPage';
+import { HomePage } from './pages/HomePage';
+import { SearchPage } from './pages/SearchPage';
 import { TalentsPage } from './pages/TalentsPage';
 import { CompaniesPage } from './pages/CompaniesPage';
 import { MatchesPage } from './pages/MatchesPage';
@@ -24,6 +26,22 @@ export default function App() {
       <Nav />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="/home"
+          element={
+            <RequireAuth>
+              <HomePage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/search"
+          element={
+            <RequireAuth>
+              <SearchPage />
+            </RequireAuth>
+          }
+        />
         <Route
           path="/talents"
           element={
@@ -64,7 +82,7 @@ export default function App() {
             </RequireAuth>
           }
         />
-        <Route path="*" element={<Navigate to="/matches" replace />} />
+        <Route path="*" element={<Navigate to="/home" replace />} />
       </Routes>
     </>
   );

@@ -13,6 +13,12 @@ export function Nav() {
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-2">
         <div className="flex items-center gap-1">
           <span className="mr-3 font-bold text-slate-900">副業→承継マッチング</span>
+          <NavLink to="/home" className={linkClass}>
+            ホーム
+          </NavLink>
+          <NavLink to="/search" className={linkClass}>
+            さがす
+          </NavLink>
           <NavLink to="/talents" className={linkClass}>
             人材
           </NavLink>
