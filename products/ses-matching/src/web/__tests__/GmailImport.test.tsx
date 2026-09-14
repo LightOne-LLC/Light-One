@@ -133,6 +133,65 @@ describe('GmailImport', () => {
     expect(screen.getByText('65万円〜75万円')).toBeTruthy();
   });
 
+  it('engineer結果のlocationsとremoteDesired(true)を表示する(BP-Aの最寄駅・出社頻度抽出結果)', async () => {
+    mockFetchOnce({
+      success: true,
+      messageId: 'm8',
+      subject: '個人事業主のご紹介',
+      type: 'engineer',
+      extractedFields: ['skills'],
+      skillNames: ['Java'],
+      locations: ['川崎駅'],
+      remoteDesired: true,
+      validation: { valid: false, errors: ['availableFrom: 必須項目です'] },
+    });
+
+    render(<GmailImport />);
+    fireEvent.click(screen.getByRole('button', { name: 'Gmailから1件取得' }));
+
+    await waitFor(() => expect(screen.getByText('Engineer')).toBeTruthy());
+    expect(screen.getByText('川崎駅')).toBeTruthy();
+    expect(screen.getByText('希望')).toBeTruthy();
+  });
+
+  it('engineer結果のremoteDesired(false)を表示する', async () => {
+    mockFetchOnce({
+      success: true,
+      messageId: 'm9',
+      subject: '個人事業主のご紹介',
+      type: 'engineer',
+      extractedFields: ['skills'],
+      skillNames: ['Java'],
+      remoteDesired: false,
+      validation: { valid: false, errors: ['availableFrom: 必須項目です'] },
+    });
+
+    render(<GmailImport />);
+    fireEvent.click(screen.getByRole('button', { name: 'Gmailから1件取得' }));
+
+    await waitFor(() => expect(screen.getByText('Engineer')).toBeTruthy());
+    expect(screen.getByText('希望しない')).toBeTruthy();
+  });
+
+  it('locations/remoteDesiredが無ければそれらの行を表示しない', async () => {
+    mockFetchOnce({
+      success: true,
+      messageId: 'm10',
+      subject: '個人事業主のご紹介',
+      type: 'engineer',
+      extractedFields: ['skills'],
+      skillNames: ['Java'],
+      validation: { valid: false, errors: ['availableFrom: 必須項目です'] },
+    });
+
+    render(<GmailImport />);
+    fireEvent.click(screen.getByRole('button', { name: 'Gmailから1件取得' }));
+
+    await waitFor(() => expect(screen.getByText('Engineer')).toBeTruthy());
+    expect(screen.queryByText('Location')).toBeNull();
+    expect(screen.queryByText('Remote')).toBeNull();
+  });
+
   it('unparsed結果を表示する', async () => {
     mockFetchOnce({
       success: true,

@@ -360,9 +360,10 @@ describe('parseEmail (BP要員メールの分類タイブレーク)', () => {
 });
 
 // BP-A形式(PR #22のタイブレークでengineerと判定されるようになったメール)
-// から、■スキル見出しのスキルと、・単金（税抜）：の単価が取得できることを
-// 確認する。出社頻度・稼働(startDate)はまだ対応していないため、それらが
-// 未取得のままであることも合わせて確認する(今回のスコープ外、既知の状態)。
+// から、■スキル見出しのスキル、・単金（税抜）：の単価、・最寄駅：の
+// desiredLocations、・出社頻度：のremoteDesiredが取得できることを確認する。
+// 稼働(startDate/availableFrom)はまだ対応していないため、未取得のままで
+// あることも合わせて確認する(今回のスコープ外、既知の状態)。
 describe('parseEmail (BP-A要員メールからの■スキル抽出)', () => {
   const bpEngineerWithSkillsSection: RawEmail = {
     id: 'email-engineer-bp-skills-001',
@@ -396,9 +397,15 @@ describe('parseEmail (BP-A要員メールからの■スキル抽出)', () => {
     // ・単金（税抜）：80万円 → 固定値としてmin=max=80が取得できる。
     expect(result.candidate.desiredRateMin).toBe(80);
     expect(result.candidate.desiredRateMax).toBe(80);
-    // 出社頻度・稼働(startDate)は今回未対応のため、まだ取得できない
+    // ・最寄駅：渋谷駅 → desiredLocationsとして取得できる(BP-Aには
+    // 「勤務地」相当のラベルが無いため最寄駅を採用する、既存の【最寄駅】
+    // 形式と同じ扱い)。
+    expect(result.candidate.desiredLocations).toEqual(['渋谷駅']);
+    // ・出社頻度：フルリモート → 強いキーワード一致でremoteDesired=trueを
+    // 取得できる。
+    expect(result.candidate.remoteDesired).toBe(true);
+    // 稼働(startDate/availableFrom)は今回未対応のため、まだ取得できない
     // (Validationも今回はまだ通らない — スコープ外)。
-    expect(result.candidate.remoteDesired).toBeUndefined();
     expect(result.candidate.availableFrom).toBeUndefined();
   });
 
@@ -446,5 +453,186 @@ describe('parseEmail (BP-A要員メールからの■スキル抽出)', () => {
 
     expect(result.candidate.desiredRateMin).toBeUndefined();
     expect(result.candidate.desiredRateMax).toBeUndefined();
+  });
+});
+
+// BP-A要員メールから、マッチングに必要なlocation(desiredLocations)と
+// remoteDesiredを取得できることを確認する。実メール観察の結果、BP-Aには
+// 「勤務地」「作業場所」相当のラベルは存在せず「・最寄駅：」のみが記載される
+// ため、既存の【最寄駅】形式と同じ扱いでdesiredLocationsへ採用する。また
+// 「・出社頻度：」は「出社可能」「常駐可能」等リモートと無関係な文脈でも
+// 「可」を含むため、強いキーワードのみで判定するfindRemoteInFreeTextを使い、
+// 誤ってtrue判定しないことを確認する。
+describe('parseEmail (BP-A要員メールのlocation/remote抽出)', () => {
+  function bpAEmail(conditionLines: string[]): RawEmail {
+    return {
+      id: 'email-engineer-bp-location-remote',
+      subject: '個人事業主のご紹介',
+      bodyText: [
+        '■基本情報',
+        '・氏名：A.B（男性）',
+        '・最寄駅：川崎駅',
+        '■希望条件',
+        ...conditionLines,
+        '・ご経歴を拝見しご連絡いたしました',
+        '■スキル',
+        'Java',
+        '本メールの配信を停止希望の方は募集フォームよりご連絡ください',
+      ].join('\n'),
+    };
+  }
+
+  it('通常のBP-A形式(改行区切り)から最寄駅をdesiredLocationsとして取得する', () => {
+    const result = parseEmail(bpAEmail(['・稼働：即日', '・出社頻度：フルリモート']));
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'engineer') return;
+    expect(result.candidate.desiredLocations).toEqual(['川崎駅']);
+  });
+
+  it('HTML由来で1行に潰れた本文からもdesiredLocationsを取得する', () => {
+    const email: RawEmail = {
+      id: 'email-engineer-bp-location-collapsed',
+      subject: '個人事業主のご紹介',
+      bodyText:
+        '■基本情報 ・氏名：A.B（男性） ・最寄駅：川崎駅 ・所属：弊社フリーランス ■希望条件 ・稼働：即日 ・出社頻度：フルリモート ・ご経歴を拝見しご連絡いたしました ■スキル Java 本メールの配信を停止希望の方は募集フォームよりご連絡ください',
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'engineer') return;
+    expect(result.candidate.desiredLocations).toEqual(['川崎駅']);
+  });
+
+  it('最寄駅の値が空の場合はdesiredLocationsを取得しない(推測しない)', () => {
+    const email: RawEmail = {
+      id: 'email-engineer-bp-location-empty',
+      subject: '個人事業主のご紹介',
+      bodyText: [
+        '■基本情報',
+        '・氏名：A.B（男性）',
+        '・最寄駅：',
+        '・所属：弊社フリーランス',
+        '■希望条件',
+        '・稼働：即日',
+        '・ご経歴を拝見しご連絡いたしました',
+        '■スキル',
+        'Java',
+        '本メールの配信を停止希望の方は募集フォームよりご連絡ください',
+      ].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'engineer') return;
+    expect(result.candidate.desiredLocations).toBeUndefined();
+  });
+
+  it('最寄駅も希望勤務地も無ければdesiredLocationsを取得しない', () => {
+    const email: RawEmail = {
+      id: 'email-engineer-bp-location-missing',
+      subject: '個人事業主のご紹介',
+      bodyText: [
+        '■基本情報',
+        '・氏名：A.B（男性）',
+        '■希望条件',
+        '・稼働：即日',
+        '・ご経歴を拝見しご連絡いたしました',
+        '■スキル',
+        'Java',
+        '本メールの配信を停止希望の方は募集フォームよりご連絡ください',
+      ].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'engineer') return;
+    expect(result.candidate.desiredLocations).toBeUndefined();
+  });
+
+  it('「・リモート：可」のような直接ラベルはparseYesNoでtrueと判定する', () => {
+    const result = parseEmail(bpAEmail(['・稼働：即日', '・リモート：可']));
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'engineer') return;
+    expect(result.candidate.remoteDesired).toBe(true);
+  });
+
+  it('「・出社頻度：基本リモート」は強いキーワード一致でtrueと判定する', () => {
+    const result = parseEmail(bpAEmail(['・稼働：即日', '・出社頻度：基本リモート']));
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'engineer') return;
+    expect(result.candidate.remoteDesired).toBe(true);
+  });
+
+  it('「・出社頻度：月2回まで出社可能（全国可）」は"可"だけでtrueと誤判定しない(undefinedのまま)', () => {
+    const result = parseEmail(bpAEmail(['・稼働：即日', '・出社頻度：月2回まで出社可能（全国可）']));
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'engineer') return;
+    expect(result.candidate.remoteDesired).toBeUndefined();
+  });
+
+  it('「・出社頻度：1時間以内常駐可能」も同様に誤判定しない(undefinedのまま)', () => {
+    const result = parseEmail(bpAEmail(['・稼働：即日', '・出社頻度：1時間以内常駐可能']));
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'engineer') return;
+    expect(result.candidate.remoteDesired).toBeUndefined();
+  });
+
+  it('リモート表現が本文に一切無ければremoteDesiredを取得しない', () => {
+    const result = parseEmail(bpAEmail(['・稼働：即日']));
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'engineer') return;
+    expect(result.candidate.remoteDesired).toBeUndefined();
+  });
+
+  it('「・出社頻度：フル出社」のような否定表現は強いキーワード一致でfalseと判定する', () => {
+    const result = parseEmail(bpAEmail(['・稼働：即日', '・出社頻度：フル出社']));
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'engineer') return;
+    expect(result.candidate.remoteDesired).toBe(false);
+  });
+
+  it('integration: raw email → parseEmail → EngineerRecord までlocation/remoteが伝播する(availableFrom欠落以外はvalidation通過見込み)', () => {
+    const email = bpAEmail(['・稼働：即日', '・出社頻度：フルリモート', '・単金（税抜）：80万円']);
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'engineer') return;
+
+    expect(result.candidate.desiredLocations).toEqual(['川崎駅']);
+    expect(result.candidate.remoteDesired).toBe(true);
+    expect(result.candidate.desiredRateMin).toBe(80);
+    expect(result.candidate.desiredRateMax).toBe(80);
+
+    const validation = validateEngineerRecord(result.candidate);
+    expect(validation.valid).toBe(false);
+    if (validation.valid) return;
+    // availableFrom(稼働の日付化)は今回のスコープ外のため、それだけがエラーとして残る。
+    expect(validation.errors).toEqual(['availableFrom: YYYY-MM-DD形式の有効な日付である必要があります']);
+  });
+
+  it('既存のskills/rate/japaneseLevel抽出はlocation/remote追加後も壊れていない(回帰確認)', () => {
+    const result = parseEmail(engineerEmail);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'engineer') return;
+
+    expect(result.candidate.skills).toEqual([
+      { name: 'Java', years: 5 },
+      { name: 'AWS', years: 2 },
+    ]);
+    expect(result.candidate.desiredRateMin).toBe(70);
+    expect(result.candidate.desiredLocations).toEqual(['東京都', '神奈川県']);
+    expect(result.candidate.remoteDesired).toBe(true);
+    expect(result.candidate.japaneseLevel).toBe('business');
+
+    const validation = validateEngineerRecord(result.candidate);
+    expect(validation.valid).toBe(true);
+  });
+
+  it('案件メール(project)側のlocation/remoteAllowed抽出は今回の変更で壊れていない(回帰確認)', () => {
+    const result = parseEmail(projectEmail);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'project') return;
+
+    expect(result.candidate.location).toBe('東京都');
+    expect(result.candidate.remoteAllowed).toBe(true);
+
+    const validation = validateProjectRecord(result.candidate);
+    expect(validation.valid).toBe(true);
   });
 });
