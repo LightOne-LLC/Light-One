@@ -15,7 +15,10 @@ export interface ProjectRecord {
   location: string; // 都道府県
   remoteAllowed: boolean;
   startDate: string; // YYYY-MM-DD
-  japaneseLevel: JapaneseLevel;
+  // 実メールでは日本語レベルが明記されないことが大半のため任意項目とする。
+  // Scoring Engine自体はjapaneseLevelを一切参照しない(死んだフィールド)。
+  // 未指定の場合、toProjectInput()が'none'へ正規化する。
+  japaneseLevel?: JapaneseLevel;
 }
 
 export interface EngineerRecord {
@@ -26,7 +29,9 @@ export interface EngineerRecord {
   desiredLocations: string[];
   remoteDesired: boolean;
   availableFrom: string; // YYYY-MM-DD
-  japaneseLevel: JapaneseLevel;
+  // ProjectRecordと同様、実メールでは記載されないことが大半のため任意項目。
+  // 未指定の場合、toEngineerInput()が'none'へ正規化する。
+  japaneseLevel?: JapaneseLevel;
 }
 
 export type ValidationResult<T> = { valid: true; value: T } | { valid: false; errors: string[] };

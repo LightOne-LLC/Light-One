@@ -73,6 +73,20 @@ describe('validateEngineerRecord', () => {
       expect(result.errors.some((e) => e.startsWith('desiredLocations'))).toBe(true);
     }
   });
+
+  it('不正なjapaneseLevelの場合は拒否する', () => {
+    const result = validateEngineerRecord({ ...validEngineer, japaneseLevel: 'super-fluent' });
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors.some((e) => e.startsWith('japaneseLevel'))).toBe(true);
+    }
+  });
+
+  it('japaneseLevelが未指定(任意項目)でも受け付ける', () => {
+    const { japaneseLevel: _japaneseLevel, ...rest } = validEngineer;
+    const result = validateEngineerRecord(rest);
+    expect(result.valid).toBe(true);
+  });
 });
 
 describe('toEngineerInput', () => {
@@ -88,5 +102,11 @@ describe('toEngineerInput', () => {
       japaneseLevel: validEngineer.japaneseLevel,
     });
     expect((input as Record<string, unknown>).id).toBeUndefined();
+  });
+
+  it('japaneseLevel未指定の場合は"none"へ正規化する', () => {
+    const { japaneseLevel: _japaneseLevel, ...rest } = validEngineer;
+    const input = toEngineerInput(rest);
+    expect(input.japaneseLevel).toBe('none');
   });
 });

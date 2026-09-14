@@ -48,12 +48,19 @@ Dashboard以外の画面(Projects/Engineers/Matching)は引き続き
 - `src/intake/` — 外部から受け取る案件・要員データの入力型と最小validation。
   - `ProjectRecord` / `EngineerRecord`: Scoring Engineの`ProjectInput`/`EngineerInput`に
     `id`(識別用)を加えただけの入力型。DB/API/CSV等どこから来たデータかは問わない。
+    `EngineerRecord`は主に**BP(協力会社)から紹介される要員**を表現するもの
+    という前提を置いている(自社社員を中心に扱う設計にはしていない)。
+  - `japaneseLevel`は任意項目(`?:`)。実際のSES案件・要員メール25通を観察した
+    ところ全件で記載が無く、かつ現在のScoring Engine(`calcTotalScore`他)は
+    japaneseLevelを一切参照しない(legacy実装でも未使用だった)ため、必須にする
+    技術的根拠が無いと判断した。未指定の場合は`toProjectInput`/`toEngineerInput`
+    が`'none'`へ正規化する。
   - `validateProjectRecord` / `validateEngineerRecord`: 必須項目の存在・型・
     明らかに不正な値(負の単価、単価レンジの逆転、不正な日付、未知のjapaneseLevel等)
     のみを検査する。SES固有の複雑な業務ルールはまだ実装していない。
   - `toProjectInput` / `toEngineerInput`: 検証済みRecordから`id`を除いて
-    Scoring Engineの入力型へ変換する。
-  - `npm test` で18件のテスト(validationの正常系/異常系 + Scoring Engineへの
+    Scoring Engineの入力型へ変換する(`japaneseLevel`未指定時は`'none'`を補完)。
+  - `npm test` で23件のテスト(validationの正常系/異常系 + Scoring Engineへの
     実際の受け渡し確認)が通ることを確認済み。
 - `src/matching/` — 1案件に対する複数要員の候補ランキング。
   - `matchProjectToEngineers(project, engineers)`: `ProjectRecord`と

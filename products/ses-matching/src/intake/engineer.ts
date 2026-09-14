@@ -56,7 +56,9 @@ export function validateEngineerRecord(input: unknown): ValidationResult<Enginee
     errors.push('availableFrom: YYYY-MM-DD形式の有効な日付である必要があります');
   }
 
-  if (!isJapaneseLevel(record.japaneseLevel)) {
+  // 任意項目: 未指定(undefined)は許容する。値がある場合のみ形式を検査する
+  // (実メールでは日本語レベルが記載されないことが大半なため)。
+  if (record.japaneseLevel !== undefined && !isJapaneseLevel(record.japaneseLevel)) {
     errors.push('japaneseLevel: 有効な日本語レベルである必要があります');
   }
 
@@ -67,7 +69,8 @@ export function validateEngineerRecord(input: unknown): ValidationResult<Enginee
   return { valid: true, value: record as unknown as EngineerRecord };
 }
 
-/** 検証済みのEngineerRecordをScoring Engineが受け取るEngineerInputへ変換する（idを取り除くのみ）。 */
+/** 検証済みのEngineerRecordをScoring Engineが受け取るEngineerInputへ変換する
+ * （idを取り除き、japaneseLevel未指定は'none'へ正規化する）。 */
 export function toEngineerInput(record: EngineerRecord): EngineerInput {
   return {
     skills: record.skills,
@@ -76,6 +79,6 @@ export function toEngineerInput(record: EngineerRecord): EngineerInput {
     desiredLocations: record.desiredLocations,
     remoteDesired: record.remoteDesired,
     availableFrom: record.availableFrom,
-    japaneseLevel: record.japaneseLevel,
+    japaneseLevel: record.japaneseLevel ?? 'none',
   };
 }

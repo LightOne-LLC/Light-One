@@ -1,5 +1,5 @@
 import { validateEngineerRecord } from '../../intake/engineer';
-import { validateProjectRecord } from '../../intake/project';
+import { toProjectInput, validateProjectRecord } from '../../intake/project';
 import { dummyEngineers } from '../../demo/dummyData';
 import { matchProjectToEngineers } from '../../matching/matchProjectToEngineers';
 import type { RawEmail } from '../../gmail/types';
@@ -65,9 +65,8 @@ const bracketFormatProjectEmail: RawEmail = {
 };
 
 // 実メールでよく見る「日本語レベルの記載が無い」ケースをそのまま再現したもの。
-// 現在のvalidateProjectRecordはjapaneseLevelを必須とするため、Parserの
-// 抽出精度に関わらずここでValidationはFAILし続ける(実データ観察で判明した
-// 既知のギャップ)。
+// japaneseLevelは任意項目のため、他の必須項目が揃っていればValidationを
+// 通過する。
 const bracketFormatProjectEmailWithoutJapaneseLevel: RawEmail = {
   id: 'email-project-bracket-002',
   subject: '【新規案件情報】Linuxサーバ運用保守／基本リモート',
@@ -75,9 +74,9 @@ const bracketFormatProjectEmailWithoutJapaneseLevel: RawEmail = {
     '【必須スキル】Linux(3年以上) 【作業場所】新宿駅より徒歩5分 【作業期間】2026年10月1日〜2027年3月31日 【単価】〜75万円（固定） 【面談】1回',
 };
 
-// 実メールでよく見る「稼働開始日が月のみ(日が無い)」「日本語レベルの記載が
-// 無い」ケースをそのまま再現したもの。Parserの抽出自体は成功するが、
-// availableFrom(日が不明)とjapaneseLevel(記載なし)が欠けるため
+// 実メールでよく見る「稼働開始日が月のみ(日が無い)」ケースをそのまま
+// 再現したもの。japaneseLevelは任意項目になったため記載が無くても
+// 問題ないが、availableFrom(日が不明、推測しない)が欠けるため
 // ValidationはFAILし続ける(実データ観察で判明した既知のギャップ)。
 const bracketFormatEngineerEmail: RawEmail = {
   id: 'email-engineer-bracket-001',
@@ -245,20 +244,23 @@ describe('parseEmail (実フォーマット【ラベル】形式への対応)', 
     expect(result.candidate.remoteAllowed).toBe(true);
   });
 
-  it('実データで頻出する「稼働開始月のみ(日が無い)」「日本語レベル記載なし」の案件は、他項目が抽出できてもValidationがFAILし続ける(既知のギャップ、日付や日本語レベルを推測しない)', () => {
+  it('実データで頻出する「日本語レベル記載なし」の案件も、他の必須項目が揃っていればValidationを通過する(japaneseLevelは任意項目)', () => {
     const result = parseEmail(bracketFormatProjectEmailWithoutJapaneseLevel);
     expect(result.status).toBe('parsed');
     if (result.status !== 'parsed' || result.recordType !== 'project') return;
 
-    // 単価・勤務地・必須スキルは抽出できる
+    // 単価・勤務地・必須スキル・startDateは抽出できる一方、
+    // japaneseLevelは実メールに記載が無いため欠落する。
     expect(result.candidate.rateMin).toBe(75);
     expect(result.candidate.location).toBe('新宿駅より徒歩5分');
-    // startDateは日付が明示されているため抽出できる一方、japaneseLevelは
-    // 実メールに記載が無いため欠落し、Validationは通らない。
     expect(result.candidate.japaneseLevel).toBeUndefined();
 
     const validation = validateProjectRecord(result.candidate);
-    expect(validation.valid).toBe(false);
+    expect(validation.valid).toBe(true);
+    if (!validation.valid) return;
+
+    // toProjectInput()でjapaneseLevel未指定は'none'へ正規化される。
+    expect(toProjectInput(validation.value).japaneseLevel).toBe('none');
   });
 
   it('実データで頻出する「稼働開始日が月のみ」の要員メールは、日付を推測しないためavailableFromが欠落しValidationがFAILし続ける', () => {
