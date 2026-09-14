@@ -9,6 +9,9 @@ export default defineConfig({
     gmailApiPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
+      // 自動生成の登録スクリプトは使わず、src/web/registerAppUpdate.tsから
+      // 明示的にregisterSWを呼ぶ(更新検知時にreloadを強制しないため)。
+      injectRegister: null,
       manifest: {
         name: 'SES Matching',
         short_name: 'SES Matching',

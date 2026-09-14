@@ -104,7 +104,9 @@ function parseEngineerCandidate(subject: string, body: string, id: string): Reco
   const skillsValue = extractLabeledValue(body, ['スキル']);
   if (skillsValue) candidate.skills = parseEngineerSkillList(skillsValue);
 
-  const rateValue = extractLabeledValue(body, ['希望単価', '単価']);
+  // BP-A形式の「・単金（税抜）：」もここに接続する(単金＝要員側の希望単価と同義)。
+  // 括弧の全角/半角ゆれを個別のラベルとして扱う(注釈込みでラベルの一部とする)。
+  const rateValue = extractLabeledValue(body, ['希望単価', '単価', '単金（税抜）', '単金(税抜)', '単金']);
   const rateRange = rateValue ? parseRateRange(rateValue) : findRateInFreeText(subject);
   if (rateRange) {
     candidate.desiredRateMin = rateRange.min;

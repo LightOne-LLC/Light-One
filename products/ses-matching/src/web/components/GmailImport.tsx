@@ -57,6 +57,16 @@ function ResultView({ result }: { result: GmailImportResult }) {
               ))}
             </div>
           )}
+          {result.rateRange && (
+            <div className="card-row">
+              <span>Rate</span>
+              <span>
+                {result.rateRange.min === result.rateRange.max
+                  ? `${result.rateRange.min}万円`
+                  : `${result.rateRange.min}万円〜${result.rateRange.max}万円`}
+              </span>
+            </div>
+          )}
           <div className="card-row">
             <span>Validation</span>
             <span>{result.validation?.valid ? 'PASS' : 'FAIL'}</span>

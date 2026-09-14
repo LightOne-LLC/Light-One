@@ -32,6 +32,15 @@ function extractSkillNames(candidate: Record<string, unknown>): string[] | undef
   return names.length > 0 ? names : undefined;
 }
 
+/** Parser候補(validation前)から希望単価(desiredRateMin/Max)のみを安全に取り出す。 */
+function extractRateRange(candidate: Record<string, unknown>): { min: number; max: number } | undefined {
+  const { desiredRateMin, desiredRateMax } = candidate;
+  if (typeof desiredRateMin === 'number' && typeof desiredRateMax === 'number') {
+    return { min: desiredRateMin, max: desiredRateMax };
+  }
+  return undefined;
+}
+
 async function fetchLatestRawEmail(): Promise<RawEmail | null> {
   const auth = await authenticate();
   const service = getGmailService(auth);
@@ -103,6 +112,7 @@ export async function performGmailImport(
     type: 'engineer',
     extractedFields,
     skillNames: extractSkillNames(parsed.candidate),
+    rateRange: extractRateRange(parsed.candidate),
     validation: toValidationSummary(validation),
   };
 }

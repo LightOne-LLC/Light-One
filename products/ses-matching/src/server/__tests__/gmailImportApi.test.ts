@@ -48,8 +48,9 @@ const unrelatedEmail: RawEmail = {
   bodyText: `${SECRET_BODY_MARKER}\n来週の定例会議の件です。`,
 };
 
-// BP要員紹介メール(■見出し形式)を再現した合成データ。単金・出社頻度・稼働は
-// 未対応のためvalidationはFAILするが、■スキルからskillNamesは取得できる。
+// BP要員紹介メール(■見出し形式)を再現した合成データ。このメールには単金の
+// 記載が無いため、出社頻度・稼働と同様にrateRangeも未取得のままとなる
+// (■スキルからskillNamesは取得できる)。
 const bpEngineerEmail: RawEmail = {
   id: 'email-5',
   subject: '個人事業主のご紹介',
@@ -59,6 +60,27 @@ const bpEngineerEmail: RawEmail = {
     '・最寄駅：渋谷駅',
     '■希望条件',
     '・稼働：10月〜',
+    '・ご経歴を拝見しご連絡いたしました',
+    '■スキル',
+    'Java, Spring Boot, AWS',
+    '■備考',
+    '募集フォームよりご連絡ください',
+  ].join('\n'),
+};
+
+// ・単金（税抜）：の記載があるBP要員紹介メール。skillNamesに加えrateRangeも
+// 取得できるが、出社頻度・稼働(availableFrom)は今回未対応のため
+// validationはFAILのまま。
+const bpEngineerWithRateEmail: RawEmail = {
+  id: 'email-6',
+  subject: '個人事業主のご紹介',
+  bodyText: [
+    SECRET_BODY_MARKER,
+    '■基本情報',
+    '・最寄駅：渋谷駅',
+    '■希望条件',
+    '・稼働：10月〜',
+    '・単金（税抜）：80万円',
     '・ご経歴を拝見しご連絡いたしました',
     '■スキル',
     'Java, Spring Boot, AWS',
@@ -92,13 +114,24 @@ describe('performGmailImport', () => {
     expect(result.type).toBe('engineer');
     expect(result.validation?.valid).toBe(true);
     expect(result.skillNames).toEqual(['Java']);
+    expect(result.rateRange).toEqual({ min: 70, max: 70 });
   });
 
-  it('BP要員メール(■見出し形式)から■スキルを抽出しskillNamesを返す(単金等は未対応でvalidationはFAILのまま)', async () => {
+  it('BP要員メール(■見出し形式・単金の記載無し)から■スキルを抽出しskillNamesを返す(出社頻度・稼働は未対応でvalidationはFAILのまま)', async () => {
     const result = await performGmailImport(async () => bpEngineerEmail);
     expect(result.success).toBe(true);
     expect(result.type).toBe('engineer');
     expect(result.skillNames).toEqual(['Java', 'Spring Boot', 'AWS']);
+    expect(result.rateRange).toBeUndefined();
+    expect(result.validation?.valid).toBe(false);
+  });
+
+  it('BP要員メール(・単金（税抜）：あり)からskillNamesとrateRangeの両方を返す(出社頻度・稼働は未対応でvalidationはFAILのまま)', async () => {
+    const result = await performGmailImport(async () => bpEngineerWithRateEmail);
+    expect(result.success).toBe(true);
+    expect(result.type).toBe('engineer');
+    expect(result.skillNames).toEqual(['Java', 'Spring Boot', 'AWS']);
+    expect(result.rateRange).toEqual({ min: 80, max: 80 });
     expect(result.validation?.valid).toBe(false);
   });
 
@@ -124,7 +157,14 @@ describe('performGmailImport', () => {
   });
 
   it('レスポンスに本文(bodyText)を一切含めない', async () => {
-    for (const email of [projectEmail, incompleteProjectEmail, engineerEmail, unrelatedEmail, bpEngineerEmail]) {
+    for (const email of [
+      projectEmail,
+      incompleteProjectEmail,
+      engineerEmail,
+      unrelatedEmail,
+      bpEngineerEmail,
+      bpEngineerWithRateEmail,
+    ]) {
       const result = await performGmailImport(async () => email);
       expect(JSON.stringify(result)).not.toContain(SECRET_BODY_MARKER);
       expect(result).not.toHaveProperty('bodyText');
