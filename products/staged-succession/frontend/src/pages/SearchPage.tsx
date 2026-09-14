@@ -225,7 +225,7 @@ export function SearchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [matchedNotice, setMatchedNotice] = useState<string | null>(null);
+  const [matchedNotice, setMatchedNotice] = useState<{ name: string; matchId: string } | null>(null);
 
   useEffect(() => {
     if (!user || !role) {
@@ -284,7 +284,7 @@ export function SearchPage() {
     setError(null);
     try {
       const { match } = await api.likeOrSkip(entry.profile.id, decision);
-      if (match) setMatchedNotice(entry.profile.name);
+      if (match) setMatchedNotice({ name: entry.profile.name, matchId: match.id });
       setTimeout(() => setIndex((i) => i + 1), 260);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -311,11 +311,11 @@ export function SearchPage() {
         {matchedNotice && (
           <div className="font-jp mt-4 flex items-center justify-between gap-3 rounded-2xl border border-gold bg-surface-secondary px-4 py-3 text-[13px] shadow-card">
             <span className="text-foreground">
-              🎉 <span className="font-semibold text-gold">{matchedNotice}</span>さんとマッチしました！
+              🎉 <span className="font-semibold text-gold">{matchedNotice.name}</span>さんとマッチしました！
             </span>
             <div className="flex shrink-0 items-center gap-2">
-              <Link to="/matches" className="text-accent underline-offset-4 hover:underline">
-                マッチング一覧へ
+              <Link to={`/matches/${matchedNotice.matchId}/chat`} className="text-accent underline-offset-4 hover:underline">
+                メッセージを送る
               </Link>
               <button type="button" onClick={() => setMatchedNotice(null)} className="text-muted-foreground">
                 閉じる

@@ -27,7 +27,9 @@ export function ChatPage() {
   const { matchId } = useParams<{ matchId: string }>();
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
   const [body, setBody] = useState('');
+  const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -35,13 +37,16 @@ export function ChatPage() {
     if (!matchId) return;
 
     let cancelled = false;
+    setLoading(true);
     supabase
       .from('messages')
       .select('*')
       .eq('match_id', matchId)
       .order('created_at', { ascending: true })
       .then(({ data }) => {
-        if (!cancelled && data) setMessages((data as MessageRow[]).map(rowToMessage));
+        if (cancelled) return;
+        if (data) setMessages((data as MessageRow[]).map(rowToMessage));
+        setLoading(false);
       });
 
     // Realtime subscription — Supabase streams Postgres row changes over a
@@ -69,56 +74,81 @@ export function ChatPage() {
 
   async function handleSend(e: FormEvent) {
     e.preventDefault();
-    if (!body.trim() || !user || !matchId) return;
+    if (!body.trim() || !user || !matchId || sending) return;
     setError(null);
+    setSending(true);
     try {
       await api.sendMessage(matchId, body.trim());
       setBody('');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSending(false);
     }
   }
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-56px)] max-w-2xl flex-col px-4 py-4">
-      <div className="mb-3 flex items-start justify-between gap-2">
-        <h1 className="truncate text-sm font-semibold text-slate-900" title={matchId}>
-          メッセージ ({matchId})
-        </h1>
-        <Link to={`/matches/${matchId}/phase`} className="shrink-0 text-xs text-slate-500 underline">
-          フェーズ管理へ
-        </Link>
+    <div className="flex min-h-screen flex-col bg-background">
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-5 py-5" style={{ minHeight: 'calc(100dvh - 3.5rem)' }}>
+        <div className="animate-noren-rise mb-3 flex items-start justify-between gap-2">
+          <h1 className="font-mincho truncate text-[17px] font-semibold text-foreground" title={matchId}>
+            メッセージ
+          </h1>
+          <Link
+            to={`/matches/${matchId}/phase`}
+            className="font-jp shrink-0 text-[12px] text-muted-foreground underline-offset-4 hover:text-accent hover:underline"
+          >
+            フェーズ管理へ
+          </Link>
+        </div>
+
+        <div className="flex-1 space-y-2 overflow-y-auto rounded-2xl border border-border bg-surface p-4 shadow-card">
+          {loading ? (
+            <p className="font-jp text-[13px] text-muted-foreground">読み込み中...</p>
+          ) : (
+            <>
+              {messages.map((m) => {
+                const mine = m.senderId === user?.id;
+                return (
+                  <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+                    <div
+                      className={`font-jp max-w-[75%] rounded-2xl px-3.5 py-2.5 text-[13.5px] ${
+                        mine ? 'bg-accent text-accent-foreground' : 'bg-surface-secondary text-foreground'
+                      }`}
+                    >
+                      <p>{m.body}</p>
+                      <p className={`mt-1 text-[10px] ${mine ? 'text-accent-foreground/70' : 'text-muted-foreground'}`}>
+                        {formatTime(m.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+              {messages.length === 0 && <p className="font-jp text-[13px] text-muted-foreground">まだメッセージはありません。</p>}
+            </>
+          )}
+          <div ref={bottomRef} />
+        </div>
+
+        {error && <p className="font-jp mt-1.5 text-[12px] text-danger">{error}</p>}
+
+        <form onSubmit={handleSend} className="mt-3 flex gap-2">
+          <input
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="メッセージを入力..."
+            disabled={sending}
+            className="font-jp flex-1 rounded-full border border-border bg-surface px-4 py-2.5 text-[13.5px] text-foreground outline-none transition-colors focus:border-accent disabled:opacity-60"
+          />
+          <button
+            type="submit"
+            disabled={sending || !body.trim()}
+            className="font-jp rounded-full bg-accent px-5 py-2.5 text-[13.5px] font-semibold text-accent-foreground shadow-card transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {sending ? '送信中...' : '送信'}
+          </button>
+        </form>
       </div>
-
-      <div className="flex-1 space-y-2 overflow-y-auto rounded-lg border border-slate-200 bg-white p-3">
-        {messages.map((m) => {
-          const mine = m.senderId === user?.id;
-          return (
-            <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${mine ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-900'}`}>
-                <p>{m.body}</p>
-                <p className={`mt-1 text-[10px] ${mine ? 'text-slate-300' : 'text-slate-400'}`}>{formatTime(m.createdAt)}</p>
-              </div>
-            </div>
-          );
-        })}
-        {messages.length === 0 && <p className="text-sm text-slate-400">まだメッセージはありません。</p>}
-        <div ref={bottomRef} />
-      </div>
-
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
-
-      <form onSubmit={handleSend} className="mt-3 flex gap-2">
-        <input
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="メッセージを入力..."
-          className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
-        />
-        <button type="submit" className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700">
-          送信
-        </button>
-      </form>
     </div>
   );
 }
