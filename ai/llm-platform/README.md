@@ -1,16 +1,25 @@
 # Light One — Local LLM Platform (Phase 1 + Phase 2 validation harness)
 
-> **Remote environment limitation:** Ollama/model downloads unavailable due to egress allowlist.
-> **Real-model benchmark:** Pending execution on Light One Linux environment.
+> **Remote environment limitation:** applies only to sandboxes with an
+> egress allowlist blocking `ollama.com`/`huggingface.co` — not universal.
+> **Real-model benchmark:** Executed for real on a Light One dev machine with
+> Ollama installed — see "Verified real-model run" below for the actual output.
 >
-> This repo's remote development sandbox blocks outbound access to both
+> Some remote development sandboxes block outbound access to both
 > `ollama.com` and `huggingface.co` (organization egress policy — confirmed
-> via explicit 403 policy denials, not a bug to work around). So nothing
-> in this codebase has ever downloaded Ollama or a model here, and no real
-> local-model benchmark numbers exist yet. Everything in `models/ses/benchmark/`
-> is built and tested end-to-end against `MockLocalModel` instead, and is
-> ready to run for real — unmodified — the moment it reaches a machine
-> where `ollama serve` is actually reachable. See "Phase 2" below.
+> via explicit 403 policy denials in that setting, not a bug to work
+> around). In that case, nothing in this codebase can download Ollama or a
+> model, and `models/ses/benchmark/` still builds and tests end-to-end
+> against `MockLocalModel` instead, unmodified, ready to run for real the
+> moment it reaches a machine where `ollama serve` is reachable.
+>
+> On a machine where Ollama **is** installed and reachable (confirmed on a
+> Light One dev machine, 2026-09-13), the pipeline runs against a real
+> local model with no code changes — see "Verified real-model run" below.
+> The Model Registry's default `ses-classifier` model (`llama3.1:8b`,
+> `llm/src/registry/models.json`) may be larger than what a given machine
+> has pulled; override it per-run with `SES_CLASSIFIER_MODEL` (see
+> "Swapping the SES model" below) without editing the registry.
 
 Foundation for running **multiple task-specific Local/API models** behind
 one Router, instead of one general-purpose LLM for everything. This is a
@@ -112,8 +121,58 @@ console.log(result);
 //   verified: true, needsHumanReview: false, notes: [], trace: {...} }
 ```
 
-An Automation Engine calls the same flow via the wire-format `LLMTaskRequest`
-(spec section 8) through `parseLLMTaskRequest` + `router.executeClassify`.
+A same-process (Node/TypeScript) caller uses the wire-format `LLMTaskRequest`
+(spec section 8) directly via `parseLLMTaskRequest` + `router.executeClassify`,
+as above. A caller in another process or language (the Automation Engine is
+Python) uses the `execute-task` CLI instead — see below.
+
+## Calling the Router from outside this package (`execute-task`)
+
+The Automation Engine (`ai/automation-engine`, Python) cannot `import` this
+TypeScript package, and until now nothing exposed the wire-format
+`LLMTaskRequest` outside a Node process — confirmed by reading
+`ai/automation-engine/app/llm_planner.py`, which explicitly reimplements its
+own separate, minimal Ollama-calling code in Python rather than reach into
+`ai/llm-platform`, because "no Python bridge \[exists] today". `execute-task`
+is that bridge: the smallest possible one — one process per call, JSON in on
+stdin, JSON out on stdout, no server, no port, no new abstraction:
+
+```bash
+echo '{"task_type": "classify", "domain": "ses", "input": "件名: ...", "system_prompt": "..."}' \
+  | npx tsx llm/src/cli.ts
+# {"output": {"category": "project", "confidence": 0.9, "reason": "..."}, "verified": true, ...}
+```
+
+**For a programmatic caller (Python `subprocess`, etc.), invoke `npx tsx
+llm/src/cli.ts` directly, not `npm run execute-task`.** `npm run` prints its
+own banner (`> light-one-llm-platform@0.1.0 execute-task` etc.) to **stdout**
+ahead of the CLI's own output, which breaks naive `json.loads(stdout)` —
+confirmed by capturing raw stdout byte-for-byte in this exact setup.
+`npx tsx llm/src/cli.ts` (or `npm run execute-task --silent`) gives clean,
+JSON-only stdout; `npm run execute-task` (no `--silent`) is fine for manual,
+human-read use. Verified for real: a standalone Python script called
+`subprocess.run(["npx", "tsx", "llm/src/cli.ts"], input=..., capture_output=True)`
+from outside this package (standing in for the Automation Engine, which
+cannot `import` this TypeScript package either way) and successfully
+`json.loads()`-parsed the response — see "Verified real-model run" below.
+`execFileSync`/`execFile` in this package's own tests
+(`tests/executeTaskCli.test.ts`) sidesteps this the same way, by calling
+`tsx` directly rather than going through `npm run`.
+The request body is the same `LLMTaskRequest` used internally, plus two
+fields read directly off the body rather than added to that type: an
+optional `system_prompt` (forwarded to the Router, same as every domain
+model already passes one) and an optional `timeout_ms` (forwarded as the
+per-request `timeoutMs` every `LLMProvider.classify` call already accepts —
+this is what raising the benchmark's timeout below is built on top of, now
+available to any caller, not just the benchmark script).
+
+Only `task_type: "classify"` works — `LLMRouter.executeClassify` is the only
+task type with a full Router pipeline today, so anything else returns a
+clear `UNSUPPORTED_TASK_TYPE` JSON error rather than silently doing nothing.
+Errors are always JSON on stdout with a non-zero exit code:
+`{"error": {"code": "...", "message": "..."}}`, using the same error `code`s
+(`MODEL_UNAVAILABLE`, `TIMEOUT`, `MALFORMED_OUTPUT`, `INVALID_INPUT`) every
+`LLMProviderError` subclass already defines.
 
 ## Benchmarking the SES classifier for real
 
@@ -128,9 +187,9 @@ Output → Validator → Evaluator) against the 56-example synthetic dataset
 in `models/ses/benchmark/dataset.ts` and prints accuracy / precision /
 recall / F1 / confusion matrix / invalid-JSON rate / latency (avg, p50,
 p95) / per-category accuracy / failure cases / a suggested conclusion. If
-nothing is listening on the configured Ollama endpoint (as in this repo's
-remote sandbox), it prints `SKIPPED: local model unavailable` and exits 0
-— that's the correct, successful outcome here, not a failure.
+nothing is listening on the configured Ollama endpoint, it prints
+`SKIPPED: local model unavailable` and exits 0 — that's a correct,
+successful outcome in an environment with no Ollama, not a failure.
 
 **Swapping the SES model** — no code change needed either way:
 
@@ -141,6 +200,71 @@ SES_CLASSIFIER_MODEL=qwen2.5:7b npm run benchmark:ses
 # persistent: edit the one line in llm/src/registry/models.json
 #   "runtime": { "kind": "ollama", "model": "qwen2.5:7b" }
 ```
+
+**Raising the per-request timeout** on slower/CPU-only/memory-constrained
+hardware — `OllamaProvider`'s default is 15s, which a small local machine
+under load can exceed even for a small model (this is exactly what
+happened on the dev machine noted below until this override was added):
+
+```bash
+SES_CLASSIFIER_MODEL=qwen2.5:0.5b SES_CLASSIFIER_TIMEOUT_MS=60000 npm run benchmark:ses
+```
+
+### Verified real-model run
+
+Confirmed 2026-09-13 on a Light One dev machine (4-core Intel Celeron
+N5095, 5.7GB RAM, CPU-only) with `ollama serve` actually running and
+`qwen2.5:0.5b` pulled (the registry's default `llama3.1:8b` was not pulled
+on this machine and is too large for it):
+
+- A single real `classifySesEmail` call through the full
+  Router → `ses-classifier` → `OllamaProvider` → Ollama → Structured
+  Output → Validator → Evaluator pipeline correctly returned
+  `{ category: 'project', confidence: 1, verified: true }` in ~43s.
+- The first full `npm run benchmark:ses` run against all 56 examples used
+  the (until-then hardcoded) 15s default timeout, and every single request
+  timed out under this machine's memory pressure — 0% accuracy, but with
+  every failure correctly reported as a per-example `ModelTimeoutError`
+  rather than a crash. That gap is what `SES_CLASSIFIER_TIMEOUT_MS`
+  (above) was added to close.
+- A second run with `SES_CLASSIFIER_TIMEOUT_MS=60000` produced the first
+  real (non-timeout-dominated) numbers this repo has ever had for a local
+  model: **17.9% accuracy** (macro F1 16.5%) against the 56-example
+  dataset, average latency ~50.6s/request on this 4-core CPU-only
+  machine, still with some 60s timeouts at the tail (p95 60.0s). The
+  benchmark's own conclusion logic correctly judged this: *"Local model is
+  not yet sufficient on its own ... route to an API model when the
+  Evaluator flags `needsHumanReview=true`."* This is the expected result
+  for a 0.5B model with no fine-tuning (see "Phase 2" below) on
+  CPU-constrained hardware, not a bug — the point of this run was to
+  confirm the pipeline, timeout handling, and benchmark reporting all work
+  against real inference, which they now demonstrably do.
+- The `execute-task` CLI (the cross-process bridge added above) was run
+  against real Ollama the same way an external Python caller would invoke
+  it, and hit all three of its outcome paths for real: a `TIMEOUT` error
+  at the exact `timeout_ms` requested (proving that field is genuinely
+  plumbed through, not ignored), a `MALFORMED_OUTPUT` error when a plain
+  `domain: "general"` request (no `system_prompt`) got back non-JSON text
+  from the 0.5B model, and — with a `system_prompt` added — a real
+  success: `{"category": "other", "confidence": 0.9, "reason": "...",
+  ...}` with `trace.providerKind: "local"`, `trace.modelId:
+  "general-local"`, in ~92s. All three are genuine Ollama responses, not
+  mocked.
+- Confirmed 2026-09-15: a standalone Python script (`subprocess.run(["npx",
+  "tsx", "llm/src/cli.ts"], input=..., capture_output=True)`, standing in
+  for the Automation Engine — not a Node/TypeScript test) sent the same
+  `LLMTaskRequest` shape (`domain: "general"`, a `system_prompt`,
+  `timeout_ms: 120000`) and got back real Ollama output that
+  `json.loads()` parsed without error: `{"category": "other", "confidence":
+  1, "reason": "..."}`, latency 68.1s. A first attempt against the
+  registry's untouched default (`llama3.1:8b`, not pulled on this machine)
+  correctly came back as a parseable `{"error": {"code":
+  "MODEL_UNAVAILABLE", ...}}` instead of a Python-side crash — proving the
+  error path round-trips just as cleanly as the success path. This closes
+  the loop End-to-end: Python → `execute-task` → `LLMRouter` →
+  `OllamaProvider` → Ollama → JSON → Python, with **no LLM Platform code
+  change needed** — the existing wire format and CLI already sufficed once
+  invoked correctly (see the `npx tsx` vs. `npm run` note above).
 
 ## Hardware check
 
