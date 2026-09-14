@@ -20,12 +20,42 @@ function countMatches(text: string, keywords: string[]): number {
   return keywords.reduce((sum, keyword) => sum + (text.includes(keyword) ? 1 : 0), 0);
 }
 
+// 実際のBP要員紹介メール(HTML由来で改行が失われ1行化するケースが多い)で
+// 観察された、■見出し(■基本情報/■希望条件/■スキル/■経験/■PR/■備考)による
+// セクション構造と、・ラベル：の箇条書き(・稼働：/・出社頻度：)。
+// いずれも記号込みの複数文字からなる固有性の高い表現であり、通常の無関係な
+// メール本文に偶然出現することは考えにくいため、単独の一致でも
+// 「BP要員メールらしい構造的シグナル」として扱う(単純な1単語一致による
+// 粗い判定とは異なる)。
+const BP_ENGINEER_STRUCTURAL_MARKERS = [
+  '■基本情報',
+  '■希望条件',
+  '■スキル',
+  '■経験',
+  '■PR',
+  '■ＰＲ',
+  '■備考',
+  '・稼働：',
+  '・稼働:',
+  '・出社頻度：',
+  '・出社頻度:',
+];
+
+function hasBpEngineerStructuralSignal(body: string): boolean {
+  return BP_ENGINEER_STRUCTURAL_MARKERS.some((marker) => body.includes(marker));
+}
+
 function detectEmailType(subject: string, body: string): 'project' | 'engineer' | null {
   const text = `${subject}\n${body}`;
   const projectScore = countMatches(text, PROJECT_KEYWORDS);
   const engineerScore = countMatches(text, ENGINEER_KEYWORDS);
   if (projectScore === 0 && engineerScore === 0) return null;
-  if (projectScore === engineerScore) return null; // 同点は判別不能として扱う
+  if (projectScore === engineerScore) {
+    // 通常のキーワード判定が同点で決着しない場合のみ、BP要員メール特有の
+    // 構造的シグナルでタイブレークする。既存の非同点判定(明確にproject/
+    // engineerと判別できるメール)には一切影響しない。
+    return hasBpEngineerStructuralSignal(body) ? 'engineer' : null;
+  }
   return projectScore > engineerScore ? 'project' : 'engineer';
 }
 

@@ -274,3 +274,87 @@ describe('parseEmail (実フォーマット【ラベル】形式への対応)', 
     expect(validation.valid).toBe(false);
   });
 });
+
+// 実際のBP要員紹介メール(HTML由来で改行が失われ1行化するケースが多い)で
+// 観察された「■基本情報/■希望条件/■スキル等のセクション見出し + ・ラベル：の
+// 箇条書き」という構造。通常のキーワード判定(PROJECT_KEYWORDS/
+// ENGINEER_KEYWORDS)がたまたま同点になり、これまでunparsedへ落ちていた
+// 実例を再現した合成データ。「募集」(project側)と「経歴」(engineer側)を
+// それぞれ1回だけ含め、意図的に同点(1対1)を作っている。
+describe('parseEmail (BP要員メールの分類タイブレーク)', () => {
+  const tieWithFullBpStructure: RawEmail = {
+    id: 'email-engineer-tie-001',
+    subject: '個人事業主のご紹介',
+    bodyText: [
+      '■基本情報',
+      '・氏名：A.B（男性）',
+      '・最寄駅：渋谷駅',
+      '■希望条件',
+      '・稼働：10月〜',
+      '・出社頻度：フルリモート',
+      '・単金（税抜）：80万円',
+      '・ご経歴を拝見しご連絡いたしました',
+      '■スキル',
+      'Java、AWS',
+      '本メールの配信を停止希望の方は募集フォームよりご連絡ください',
+    ].join('\n'),
+  };
+
+  const tieWithBulletLabelOnly: RawEmail = {
+    id: 'email-engineer-tie-002',
+    subject: '個人事業主のご紹介',
+    bodyText: [
+      '弊社の個人事業主をご紹介します。',
+      '・稼働：即日',
+      '・ご経歴を拝見しご連絡いたしました',
+      '本メールの配信停止をご希望の方は募集フォームよりご連絡ください',
+    ].join('\n'),
+  };
+
+  const tieWithoutBpStructure: RawEmail = {
+    id: 'email-tie-no-structure-001',
+    subject: '個人事業主のご紹介',
+    bodyText: [
+      '弊社の個人事業主をご紹介します。',
+      '稼働開始は即日です。',
+      '経歴を確認の上ご連絡します。',
+      '配信停止をご希望の方は募集フォームよりご連絡ください。',
+    ].join('\n'),
+  };
+
+  it('project/engineerシグナルが同点でも、■基本情報等の構造的シグナルがあればengineerと判定する', () => {
+    const result = parseEmail(tieWithFullBpStructure);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed') return;
+    expect(result.recordType).toBe('engineer');
+  });
+
+  it('・稼働：の箇条書きラベルだけでも(■見出しが無くても)engineerと判定する', () => {
+    const result = parseEmail(tieWithBulletLabelOnly);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed') return;
+    expect(result.recordType).toBe('engineer');
+  });
+
+  it('BP要員メール特有の構造が無い通常の同点ケースは、従来通りunparsedのままにする', () => {
+    const result = parseEmail(tieWithoutBpStructure);
+    expect(result).toEqual({
+      status: 'unparsed',
+      reason: 'could not determine whether this is a project or engineer email',
+    });
+  });
+
+  it('明確な案件メールの判定は変わらずprojectのまま(既存挙動を維持)', () => {
+    const result = parseEmail(projectEmail);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed') return;
+    expect(result.recordType).toBe('project');
+  });
+
+  it('明確な要員メールの判定は変わらずengineerのまま(既存挙動を維持)', () => {
+    const result = parseEmail(engineerEmail);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed') return;
+    expect(result.recordType).toBe('engineer');
+  });
+});
