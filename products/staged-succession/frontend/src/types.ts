@@ -94,6 +94,8 @@ export interface MatchReviews {
   companyComment?: string;
 }
 
+export type LikeDecision = 'like' | 'skip';
+
 export interface Match {
   id: string;
   talentId: string;

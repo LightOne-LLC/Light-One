@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { scorePhase1, scorePhase2To3, scorePhase3, PHASE2TO3_PROMOTION_THRESHOLD } from '../calc/scoring';
 import {
   Company,
+  LikeDecision,
   Match,
   MatchPhase,
   MatchReviews,
@@ -11,6 +12,9 @@ import {
   ScoreBreakdown,
   Talent,
 } from '../types';
+
+/** Postgres unique_violation — see https://www.postgresql.org/docs/current/errcodes-appendix.html */
+const UNIQUE_VIOLATION = '23505';
 
 const PHASE1_PROMOTION_THRESHOLD = 0.6;
 
@@ -321,6 +325,69 @@ function parsePhaseOrStatus(s: string): MatchPhase | MatchStatus {
   return s as MatchStatus;
 }
 
+/**
+ * Called after recording a 'like'. Checks whether the target already liked
+ * the caller back and, if so, creates the match — reusing the exact same
+ * phase1 scoring + row shape `upsertMatchScore` already writes, so a
+ * swipe-born match is indistinguishable from a "候補を再計算"-born one.
+ *
+ * Race-safe by construction: `matches` has a `unique (talent_id, company_id)`
+ * constraint (0001_init.sql), so if two concurrent requests both try to
+ * create the same match, the second insert fails with a unique_violation,
+ * which is treated as success (re-fetch and return the winner's row) rather
+ * than an error.
+ */
+async function checkMutualLikeAndCreateMatch(uid: string, role: Role, targetId: string): Promise<Match | null> {
+  const { data: reciprocal, error: reciprocalError } = await supabase
+    .from('likes')
+    .select('decision')
+    .eq('liker_id', targetId)
+    .eq('target_id', uid)
+    .maybeSingle();
+  if (reciprocalError) throw new Error(reciprocalError.message);
+  if (!reciprocal || reciprocal.decision !== 'like') return null;
+
+  const talentId = role === 'talent' ? uid : targetId;
+  const companyId = role === 'talent' ? targetId : uid;
+
+  const { data: existing, error: existingError } = await supabase
+    .from('matches')
+    .select('*')
+    .eq('talent_id', talentId)
+    .eq('company_id', companyId)
+    .maybeSingle();
+  if (existingError) throw new Error(existingError.message);
+  if (existing) return matchFromRow(existing as MatchRow);
+
+  const [talent, company] = await Promise.all([
+    role === 'talent' ? getOwnTalent(uid) : api.getTalent(targetId),
+    role === 'company' ? getOwnCompany(uid) : api.getCompany(targetId),
+  ]);
+  const phase1 = scorePhase1For(talent, company);
+  const scoreBreakdown: ScoreBreakdown = { phase1, currentTotal: phase1.total };
+
+  const { data: inserted, error: insertError } = await supabase
+    .from('matches')
+    .insert({ talent_id: talentId, company_id: companyId, score_breakdown: scoreBreakdown })
+    .select('*')
+    .single();
+
+  if (insertError) {
+    if ((insertError as { code?: string }).code === UNIQUE_VIOLATION) {
+      const { data: raceWinner, error: raceError } = await supabase
+        .from('matches')
+        .select('*')
+        .eq('talent_id', talentId)
+        .eq('company_id', companyId)
+        .single();
+      if (raceError || !raceWinner) throw new Error(raceError?.message ?? 'マッチの取得に失敗しました。');
+      return matchFromRow(raceWinner as MatchRow);
+    }
+    throw new Error(insertError.message);
+  }
+  return matchFromRow(inserted as MatchRow);
+}
+
 export const api = {
   // --- talents ---
   upsertTalent: async (data: Omit<Talent, 'id' | 'uid'>) => {
@@ -504,6 +571,28 @@ export const api = {
     }
 
     throw new Error('これ以上昇格できません。');
+  },
+
+  // --- like / skip (swipe) ---
+  listDecidedTargetIds: async (): Promise<Set<string>> => {
+    const { uid } = await requireUser();
+    const { data, error } = await supabase.from('likes').select('target_id').eq('liker_id', uid);
+    if (error) throw new Error(error.message);
+    return new Set((data ?? []).map((r) => r.target_id as string));
+  },
+
+  likeOrSkip: async (targetId: string, decision: LikeDecision): Promise<{ match: Match | null }> => {
+    const { uid, role } = await requireUser();
+    if (targetId === uid) throw new Error('自分自身は選択できません。');
+
+    const { error } = await supabase.from('likes').insert({ liker_id: uid, liker_role: role, target_id: targetId, decision });
+    if (error && (error as { code?: string }).code !== UNIQUE_VIOLATION) throw new Error(error.message);
+    // unique_violation here just means this candidate was already decided
+    // (duplicate Like/Skip) — idempotent, not an error.
+
+    if (decision === 'skip') return { match: null };
+    const match = await checkMutualLikeAndCreateMatch(uid, role, targetId);
+    return { match };
   },
 
   listPhaseHistory: async (matchId: string): Promise<{ history: PhaseHistoryEntry[] }> => {
