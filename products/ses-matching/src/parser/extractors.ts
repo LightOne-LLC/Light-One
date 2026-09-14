@@ -1,12 +1,27 @@
 // メール本文からのフィールド抽出ヘルパー。すべて決定論的な文字列処理のみで、
 // 抽出できない場合はundefinedを返す(値を推測して埋めない)。
+//
+// 実際のSES案件・要員メール25通の観察に基づき、以下の形式に対応する:
+//   - 「ラベル：値」(コロン区切り、改行区切り) — 既存
+//   - 「【ラベル】値」(全角カッコ区切り、コロンなし。次の【まで、または末尾まで
+//     が値。HTML由来で本文が改行なしの1行に潰れているケースでも動作する) — 追加
+//   - ラベル内に全角スペースが混じる表記("場 所" 等)の吸収 — 追加
 
 import type { EngineerSkill, JapaneseLevel, RequiredSkill } from '../scoring/types';
 
 const SPLIT_PATTERN = /[、,・/]/;
 
-/** 本文中から「ラベル: 値」または「ラベル：値」の行を探し、値部分を返す。 */
-export function extractLabeledValue(body: string, labels: string[]): string | undefined {
+/** ラベル文字列を比較用に正規化する(内部の空白を除去)。"場 所"と"場所"を同一視するため。 */
+function normalizeLabel(label: string): string {
+  return label.replace(/\s+/g, '');
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** 「ラベル: 値」「ラベル：値」形式を行単位で探す(既存形式)。 */
+function extractColonValue(body: string, labels: string[]): string | undefined {
   for (const line of body.split(/\r?\n/)) {
     for (const label of labels) {
       const match = line.match(new RegExp(`^\\s*${escapeRegExp(label)}\\s*[:：]\\s*(.+)$`));
@@ -16,20 +31,93 @@ export function extractLabeledValue(body: string, labels: string[]): string | un
   return undefined;
 }
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** 「【ラベル】値」形式を本文全体から探す(次の【または末尾までが値)。
+ * 改行の有無に関わらず動作する。ラベル名は内部の空白を無視して比較する。 */
+function extractBracketValue(body: string, labels: string[]): string | undefined {
+  const normalizedTargets = labels.map(normalizeLabel);
+  const re = /【\s*([^】]{1,20})\s*】([\s\S]*?)(?=【|$)/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(body)) !== null) {
+    if (normalizedTargets.includes(normalizeLabel(match[1]))) {
+      const value = match[2].replace(/\s+/g, ' ').trim();
+      if (value) return value;
+    }
+  }
+  return undefined;
 }
 
-/** "60万円〜80万円" "60〜80万円" "70万円" などから min/max(万円)を取り出す。 */
+/** 本文中から「ラベル: 値」または「【ラベル】値」の値部分を探す。
+ * コロン形式を優先し(既存挙動を維持)、見つからなければ【】形式を試す。 */
+export function extractLabeledValue(body: string, labels: string[]): string | undefined {
+  return extractColonValue(body, labels) ?? extractBracketValue(body, labels);
+}
+
+/** 単価表記から{min,max}(万円)を取り出す。
+ *
+ * 対応するのは以下の、実メールで確認された明示的なパターンのみ:
+ *   - "68〜80万円" "68万円〜80万円" のような範囲区切り
+ *   - "73万(Min68万)" のように下限が明示されている場合
+ *   - 数値が1つだけの場合(例: "80万円" "76万(応相談)") — 固定値としてmin=maxとする
+ *   - "550,000円/月" のようなカンマ区切りの円表記(1万円単位へ換算)
+ *
+ * "〜65万円"のように上限のみが書かれ下限が不明な場合は、下限を捏造しないため
+ * 抽出しない("固定"の記載がある場合を除く — 例: "〜80万円（固定）"は単一の
+ * 確定値とみなせるため対応する)。2つの数値があってもその関係が範囲区切りや
+ * Min指定で明示されていなければレンジとして採用しない。
+ */
 export function parseRateRange(value: string): { min: number; max: number } | undefined {
-  const numbers = value.match(/\d+(?:\.\d+)?/g)?.map(Number) ?? [];
-  if (numbers.length >= 2) return { min: numbers[0], max: numbers[1] };
-  if (numbers.length === 1) return { min: numbers[0], max: numbers[0] };
+  const normalized = value.replace(/,/g, '').trim();
+  const allNumbers = normalized.match(/\d+(?:\.\d+)?/g) ?? [];
+
+  const minLabelMatch = normalized.match(/(\d+(?:\.\d+)?)\s*万\s*[（(]\s*Min\s*(\d+(?:\.\d+)?)\s*万/i);
+  if (minLabelMatch) {
+    const max = Number(minLabelMatch[1]);
+    const min = Number(minLabelMatch[2]);
+    return min <= max ? { min, max } : undefined;
+  }
+
+  const isFixed = /固定/.test(normalized);
+  const startsOpenEnded = /^[〜~\-−]/.test(normalized);
+
+  if (allNumbers.length === 1) {
+    if (startsOpenEnded && !isFixed) return undefined; // 下限不明の"〜X万"は捏造しない
+    const num = Number(allNumbers[0]);
+    const converted = !/万/.test(normalized) && num >= 1000 ? num / 10000 : num;
+    return { min: converted, max: converted };
+  }
+
+  const rangeMatch = normalized.match(/(\d+(?:\.\d+)?)\s*万?円?\s*[〜~\-−]\s*(\d+(?:\.\d+)?)\s*万円?/);
+  if (rangeMatch) {
+    const min = Number(rangeMatch[1]);
+    const max = Number(rangeMatch[2]);
+    return min <= max ? { min, max } : undefined;
+  }
+
+  return undefined;
+}
+
+/** サブジェクト等、ラベルの無い自由文中から単価を探す(件名フォールバック用)。
+ * ケース番号等の無関係な数値を誤って単価と判定しないよう、"万"が数値に
+ * 隣接している場合のみ採用する(ラベル文脈が無いため、より保守的にする)。 */
+export function findRateInFreeText(text: string): { min: number; max: number } | undefined {
+  const normalized = text.replace(/,/g, '');
+  const rangeMatch = normalized.match(/(\d+(?:\.\d+)?)\s*万?\s*円?\s*[〜~\-−]\s*(\d+(?:\.\d+)?)\s*万円?/);
+  if (rangeMatch) {
+    const min = Number(rangeMatch[1]);
+    const max = Number(rangeMatch[2]);
+    return min <= max ? { min, max } : undefined;
+  }
+  const singleMatch = normalized.match(/(\d+(?:\.\d+)?)\s*万円?/);
+  if (singleMatch) {
+    const num = Number(singleMatch[1]);
+    return { min: num, max: num };
+  }
   return undefined;
 }
 
 /** "2026-04-01"(そのまま) または "2026年4月1日" を YYYY-MM-DD に正規化する。
- * どちらの形にも合わなければ undefined(推測しない)。 */
+ * 文字列中のどこにあってもよい(範囲表記の先頭日付等にも対応)。
+ * どちらの形にも合わなければ undefined(月のみ等、日が無い場合は推測しない)。 */
 export function parseDateJa(value: string): string | undefined {
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
 
@@ -41,23 +129,40 @@ export function parseDateJa(value: string): string | undefined {
   return undefined;
 }
 
+const EXPERIENCE_RE = /^(.+?)[(（]\s*(?:約\s*)?(\d+(?:\.\d+)?)\s*(年|ヶ月|か月|カ月)/;
+
+/** "Java(3年以上)" "JavaScript(70ヶ月)" のような経験年数付きスキル表記から
+ * 名前と年数を取り出す。ヶ月/か月/カ月表記は年に換算する(小数第2位まで)。
+ * 経験年数の記載が無ければ years は undefined を返す(推測しない)。 */
+function parseNameAndExperience(token: string): { name: string; years: number | undefined } {
+  const match = token.match(EXPERIENCE_RE);
+  if (!match) return { name: token, years: undefined };
+  const num = Number(match[2]);
+  const years = match[3] === '年' ? num : Math.round((num / 12) * 100) / 100;
+  return { name: match[1].trim(), years };
+}
+
+/** 一部の要員票で見られる先頭の"言語：" "言語:" 見出しを取り除く
+ * (スキル名の一部ではなく、リストの見出しに過ぎないため)。 */
+function stripSkillListHeading(value: string): string {
+  return value.replace(/^言語[:：]\s*/, '');
+}
+
 /** "Java(3年以上)" "AWS" のようなカンマ区切りのスキル列挙を案件側の
  * RequiredSkill[]へ変換する。年数の記載が無いスキルはminYears: 0
  * (「明示的な下限なし」を表す、推測ではない)。 */
 export function parseRequiredSkillList(value: string, required: boolean): RequiredSkill[] {
-  return splitList(value).map((token) => {
-    const match = token.match(/^(.+?)[(（]\s*(\d+(?:\.\d+)?)\s*年/);
-    if (match) return { name: match[1].trim(), minYears: Number(match[2]), required };
-    return { name: token, minYears: 0, required };
+  return splitList(stripSkillListHeading(value)).map((token) => {
+    const { name, years } = parseNameAndExperience(token);
+    return { name, minYears: years ?? 0, required };
   });
 }
 
-/** 要員側のスキル列挙("Java(5年), AWS(2年)")をEngineerSkill[]へ変換する。 */
+/** 要員側のスキル列挙("Java(5年)、JavaScript(70ヶ月)")をEngineerSkill[]へ変換する。 */
 export function parseEngineerSkillList(value: string): EngineerSkill[] {
-  return splitList(value).map((token) => {
-    const match = token.match(/^(.+?)[(（]\s*(\d+(?:\.\d+)?)\s*年/);
-    if (match) return { name: match[1].trim(), years: Number(match[2]) };
-    return { name: token, years: 0 };
+  return splitList(stripSkillListHeading(value)).map((token) => {
+    const { name, years } = parseNameAndExperience(token);
+    return { name, years: years ?? 0 };
   });
 }
 
@@ -73,11 +178,26 @@ function splitList(value: string): string[] {
     .filter((token) => token.length > 0);
 }
 
+/** リモート関連の強いキーワード(誤判定しにくいもの)。 */
+const STRONG_REMOTE_POSITIVE = /フルリモート|リモートメイン|基本リモート|テレワーク/;
+const STRONG_REMOTE_NEGATIVE = /リモート不可|フル出社|出社必須/;
+
 /** "可"/"あり"/"希望" -> true, "不可"/"なし" -> false。判別できなければundefined。
- * "不可"が"可"を含んでしまうため、否定語を先にチェックする。 */
+ * "地方不可"のように"リモート"と無関係な"不可"に引きずられないよう、
+ * まずリモート専用の強いキーワードを優先的に判定する。 */
 export function parseYesNo(value: string): boolean | undefined {
+  if (STRONG_REMOTE_POSITIVE.test(value)) return true;
+  if (STRONG_REMOTE_NEGATIVE.test(value)) return false;
   if (/不可|なし|不要/.test(value)) return false;
   if (/可|あり|希望|OK/i.test(value)) return true;
+  return undefined;
+}
+
+/** ラベルの無い自由文(件名や、既に抽出済みの勤務地文字列等)からリモート可否を
+ * 判定する。誤判定を避けるため、強いキーワードのみで判定し、それ以外はundefined。 */
+export function findRemoteInFreeText(text: string): boolean | undefined {
+  if (STRONG_REMOTE_POSITIVE.test(text)) return true;
+  if (STRONG_REMOTE_NEGATIVE.test(text)) return false;
   return undefined;
 }
 

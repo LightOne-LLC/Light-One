@@ -1,6 +1,8 @@
 import type { RawEmail } from '../gmail/types';
 import {
   extractLabeledValue,
+  findRateInFreeText,
+  findRemoteInFreeText,
   parseDateJa,
   parseEngineerSkillList,
   parseJapaneseLevel,
@@ -27,10 +29,10 @@ function detectEmailType(subject: string, body: string): 'project' | 'engineer' 
   return projectScore > engineerScore ? 'project' : 'engineer';
 }
 
-function parseProjectCandidate(body: string, id: string): Record<string, unknown> {
+function parseProjectCandidate(subject: string, body: string, id: string): Record<string, unknown> {
   const candidate: Record<string, unknown> = { id };
 
-  const requiredValue = extractLabeledValue(body, ['必須スキル']);
+  const requiredValue = extractLabeledValue(body, ['必須スキル', '必要スキル']);
   const preferredValue = extractLabeledValue(body, ['歓迎スキル', '尚可スキル']);
   const requiredSkills = [
     ...(requiredValue ? parseRequiredSkillList(requiredValue, true) : []),
@@ -38,21 +40,24 @@ function parseProjectCandidate(body: string, id: string): Record<string, unknown
   ];
   if (requiredSkills.length > 0) candidate.requiredSkills = requiredSkills;
 
-  const rateValue = extractLabeledValue(body, ['単価']);
-  const rateRange = rateValue ? parseRateRange(rateValue) : undefined;
+  const rateValue = extractLabeledValue(body, ['単価', '金額', '契約金額']);
+  const rateRange = rateValue ? parseRateRange(rateValue) : findRateInFreeText(subject);
   if (rateRange) {
     candidate.rateMin = rateRange.min;
     candidate.rateMax = rateRange.max;
   }
 
-  const location = extractLabeledValue(body, ['勤務地']);
+  const location = extractLabeledValue(body, ['勤務地', '作業場所', '場所']);
   if (location) candidate.location = location;
 
-  const remoteValue = extractLabeledValue(body, ['リモート']);
-  const remoteAllowed = remoteValue ? parseYesNo(remoteValue) : undefined;
+  const remoteValue = extractLabeledValue(body, ['リモート', '通勤', '出社']);
+  const remoteAllowed =
+    (remoteValue ? parseYesNo(remoteValue) : undefined) ??
+    (location ? findRemoteInFreeText(location) : undefined) ??
+    findRemoteInFreeText(subject);
   if (remoteAllowed !== undefined) candidate.remoteAllowed = remoteAllowed;
 
-  const startDateValue = extractLabeledValue(body, ['稼働開始', '開始日']);
+  const startDateValue = extractLabeledValue(body, ['稼働開始', '開始日', '作業期間', '期間']);
   const startDate = startDateValue ? parseDateJa(startDateValue) : undefined;
   if (startDate) candidate.startDate = startDate;
 
@@ -63,27 +68,27 @@ function parseProjectCandidate(body: string, id: string): Record<string, unknown
   return candidate;
 }
 
-function parseEngineerCandidate(body: string, id: string): Record<string, unknown> {
+function parseEngineerCandidate(subject: string, body: string, id: string): Record<string, unknown> {
   const candidate: Record<string, unknown> = { id };
 
   const skillsValue = extractLabeledValue(body, ['スキル']);
   if (skillsValue) candidate.skills = parseEngineerSkillList(skillsValue);
 
-  const rateValue = extractLabeledValue(body, ['希望単価']);
-  const rateRange = rateValue ? parseRateRange(rateValue) : undefined;
+  const rateValue = extractLabeledValue(body, ['希望単価', '単価']);
+  const rateRange = rateValue ? parseRateRange(rateValue) : findRateInFreeText(subject);
   if (rateRange) {
     candidate.desiredRateMin = rateRange.min;
     candidate.desiredRateMax = rateRange.max;
   }
 
-  const locationsValue = extractLabeledValue(body, ['希望勤務地']);
+  const locationsValue = extractLabeledValue(body, ['希望勤務地', '最寄駅']);
   if (locationsValue) candidate.desiredLocations = parseLocationList(locationsValue);
 
-  const remoteValue = extractLabeledValue(body, ['リモート希望', 'リモート']);
-  const remoteDesired = remoteValue ? parseYesNo(remoteValue) : undefined;
+  const remoteValue = extractLabeledValue(body, ['リモート希望', 'リモート', '通勤']);
+  const remoteDesired = (remoteValue ? parseYesNo(remoteValue) : undefined) ?? findRemoteInFreeText(subject);
   if (remoteDesired !== undefined) candidate.remoteDesired = remoteDesired;
 
-  const availableFromValue = extractLabeledValue(body, ['稼働可能日', '稼働開始']);
+  const availableFromValue = extractLabeledValue(body, ['稼働可能日', '稼働開始日', '稼働開始']);
   const availableFrom = availableFromValue ? parseDateJa(availableFromValue) : undefined;
   if (availableFrom) candidate.availableFrom = availableFrom;
 
@@ -110,10 +115,10 @@ export function parseEmail(raw: RawEmail): ParsedEmailResult {
     const type = detectEmailType(subject, body);
 
     if (type === 'project') {
-      return { status: 'parsed', recordType: 'project', candidate: parseProjectCandidate(body, raw.id) };
+      return { status: 'parsed', recordType: 'project', candidate: parseProjectCandidate(subject, body, raw.id) };
     }
     if (type === 'engineer') {
-      return { status: 'parsed', recordType: 'engineer', candidate: parseEngineerCandidate(body, raw.id) };
+      return { status: 'parsed', recordType: 'engineer', candidate: parseEngineerCandidate(subject, body, raw.id) };
     }
     return { status: 'unparsed', reason: 'could not determine whether this is a project or engineer email' };
   } catch {
