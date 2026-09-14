@@ -5,9 +5,9 @@
 @tailwind utilities;
 
 body {
-  /* pb-24 reserves space below md so page content never sits under Nav's
+  /* pb-28 reserves space below md so page content never sits under Nav's
      fixed mobile bottom tab bar; md:pb-0 removes it once that bar is hidden. */
-  @apply bg-slate-50 text-slate-900 pb-24 md:pb-0;
+  @apply bg-slate-50 text-slate-900 pb-28 md:pb-0;
 }
 
 /**

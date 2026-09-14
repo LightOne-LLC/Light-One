@@ -7,7 +7,7 @@ const desktopLinkClass = ({ isActive }: { isActive: boolean }) =>
   }`;
 
 const mobileLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `font-jp flex flex-1 flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-medium transition-colors ${
+  `font-jp flex flex-1 flex-col items-center justify-center gap-1.5 py-3.5 text-[12.5px] font-medium transition-colors ${
     isActive ? 'text-accent' : 'text-muted-foreground'
   }`;
 
