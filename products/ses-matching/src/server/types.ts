@@ -12,6 +12,8 @@ export interface GmailImportResult {
   // 要員メールから抽出できたスキル名のみ(経験年数やその他の項目は含めない)。
   // PWAのEngineer取り込み結果表示のための最小限の値渡し。
   skillNames?: string[];
+  // 要員メールから抽出できた希望単価(万円)。min===maxの場合は固定値を表す。
+  rateRange?: { min: number; max: number };
   validation?: { valid: boolean; errors: string[] };
   topCandidate?: { engineerId: string; score: number };
   reason?: string;

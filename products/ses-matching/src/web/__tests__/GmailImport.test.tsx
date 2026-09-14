@@ -95,6 +95,44 @@ describe('GmailImport', () => {
     expect(screen.getByText('AWS')).toBeTruthy();
   });
 
+  it('engineer結果のrateRangeを表示する(・単金（税抜）：の固定値抽出結果)', async () => {
+    mockFetchOnce({
+      success: true,
+      messageId: 'm6',
+      subject: '個人事業主のご紹介',
+      type: 'engineer',
+      extractedFields: ['skills'],
+      skillNames: ['Java'],
+      rateRange: { min: 80, max: 80 },
+      validation: { valid: false, errors: ['availableFrom: 必須項目です'] },
+    });
+
+    render(<GmailImport />);
+    fireEvent.click(screen.getByRole('button', { name: 'Gmailから1件取得' }));
+
+    await waitFor(() => expect(screen.getByText('Engineer')).toBeTruthy());
+    expect(screen.getByText('80万円')).toBeTruthy();
+  });
+
+  it('engineer結果のrateRangeを表示する(範囲の場合はmin〜max表記)', async () => {
+    mockFetchOnce({
+      success: true,
+      messageId: 'm7',
+      subject: '個人事業主のご紹介',
+      type: 'engineer',
+      extractedFields: ['skills'],
+      skillNames: ['Java'],
+      rateRange: { min: 65, max: 75 },
+      validation: { valid: false, errors: ['availableFrom: 必須項目です'] },
+    });
+
+    render(<GmailImport />);
+    fireEvent.click(screen.getByRole('button', { name: 'Gmailから1件取得' }));
+
+    await waitFor(() => expect(screen.getByText('Engineer')).toBeTruthy());
+    expect(screen.getByText('65万円〜75万円')).toBeTruthy();
+  });
+
   it('unparsed結果を表示する', async () => {
     mockFetchOnce({
       success: true,

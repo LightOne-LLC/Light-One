@@ -360,9 +360,9 @@ describe('parseEmail (BP要員メールの分類タイブレーク)', () => {
 });
 
 // BP-A形式(PR #22のタイブレークでengineerと判定されるようになったメール)
-// から、今回追加した■スキル見出しでスキルが取得できることを確認する。
-// 単金(税抜)・出社頻度・稼働はまだ対応していないため、それらが未取得の
-// ままであることも合わせて確認する(今回のスコープ外、既知の状態)。
+// から、■スキル見出しのスキルと、・単金（税抜）：の単価が取得できることを
+// 確認する。出社頻度・稼働(startDate)はまだ対応していないため、それらが
+// 未取得のままであることも合わせて確認する(今回のスコープ外、既知の状態)。
 describe('parseEmail (BP-A要員メールからの■スキル抽出)', () => {
   const bpEngineerWithSkillsSection: RawEmail = {
     id: 'email-engineer-bp-skills-001',
@@ -393,10 +393,58 @@ describe('parseEmail (BP-A要員メールからの■スキル抽出)', () => {
       { name: 'Spring Boot', years: 0 },
       { name: 'AWS', years: 0 },
     ]);
-    // 単金(税抜)・出社頻度・稼働は今回未対応のため、まだ取得できない
+    // ・単金（税抜）：80万円 → 固定値としてmin=max=80が取得できる。
+    expect(result.candidate.desiredRateMin).toBe(80);
+    expect(result.candidate.desiredRateMax).toBe(80);
+    // 出社頻度・稼働(startDate)は今回未対応のため、まだ取得できない
     // (Validationも今回はまだ通らない — スコープ外)。
-    expect(result.candidate.desiredRateMin).toBeUndefined();
     expect(result.candidate.remoteDesired).toBeUndefined();
     expect(result.candidate.availableFrom).toBeUndefined();
+  });
+
+  it('・単金（税抜）：の範囲表記(全角チルダ)からmin/maxを取得する', () => {
+    const email: RawEmail = {
+      id: 'email-engineer-bp-rate-range-001',
+      subject: '個人事業主のご紹介',
+      bodyText: [
+        '■基本情報',
+        '・最寄駅：渋谷駅',
+        '■希望条件',
+        '・単金（税抜）：65万～75万',
+        '・ご経歴を拝見しご連絡いたしました',
+        '■スキル',
+        'Java',
+        '本メールの配信を停止希望の方は募集フォームよりご連絡ください',
+      ].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'engineer') return;
+
+    expect(result.candidate.desiredRateMin).toBe(65);
+    expect(result.candidate.desiredRateMax).toBe(75);
+  });
+
+  it('単金の記載が無いBP-Aメールでは、従来通りdesiredRateMinを取得しない(回帰確認)', () => {
+    const email: RawEmail = {
+      id: 'email-engineer-bp-no-rate-001',
+      subject: '個人事業主のご紹介',
+      bodyText: [
+        '■基本情報',
+        '・最寄駅：渋谷駅',
+        '■希望条件',
+        '・稼働：即日',
+        '・ご経歴を拝見しご連絡いたしました',
+        '■スキル',
+        'Java',
+        '本メールの配信を停止希望の方は募集フォームよりご連絡ください',
+      ].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'engineer') return;
+
+    expect(result.candidate.desiredRateMin).toBeUndefined();
+    expect(result.candidate.desiredRateMax).toBeUndefined();
   });
 });

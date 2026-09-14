@@ -57,6 +57,27 @@ h2 {
   margin-bottom: 12px;
 }
 
+.update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--accent);
+  color: var(--surface);
+  padding: 10px 16px;
+  font-size: 0.85rem;
+}
+
+.update-banner button {
+  background: var(--surface);
+  color: var(--accent);
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
 .card-title {
   font-weight: 600;
   margin-bottom: 6px;

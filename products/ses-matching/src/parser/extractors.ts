@@ -8,6 +8,11 @@
 //   - ラベル内に全角スペースが混じる表記("場 所" 等)の吸収 — 追加
 //   - 「■ラベル 値」(■のみの見出し、閉じカッコ無し。BP要員紹介メールの
 //     「■スキル」等で使われる。次の■または末尾までが値) — 追加
+//   - 「・ラベル：値」(箇条書きの「・」で始まるコロン形式。BP要員紹介メールの
+//     「・単金（税抜）：」等で使われる。ラベル自体に全角カッコの注釈が
+//     含まれる場合も、その注釈込みでラベルの一部として扱う。実メールでは
+//     HTML由来で本文全体が1行に潰れ、複数の「・ラベル：値」が空白区切りで
+//     並ぶため、次の「・」または「■」または末尾までを値とする) — 追加
 
 import type { EngineerSkill, JapaneseLevel, RequiredSkill } from '../scoring/types';
 
@@ -63,17 +68,39 @@ function extractSectionValue(body: string, labels: string[]): string | undefined
   return undefined;
 }
 
-/** 本文中から「ラベル: 値」「【ラベル】値」「■ラベル 値」の値部分を探す。
- * コロン形式 → 【】形式 → ■見出し形式の順に試す(既存挙動を維持しつつ、
- * より新しい/緩い形式は最後に試すことで誤検出のリスクを下げる)。 */
+/** 「・ラベル：値」形式(箇条書きの「・」で始まるコロン形式)を本文全体から
+ * 探す。BP要員紹介メールで観察された「・単金（税抜）：100万円 ・希望：…」
+ * のように、HTML由来で本文全体が1行に潰れ複数の「・ラベル：値」が空白
+ * 区切りで並ぶケースに対応するため、行単位ではなく本文全体から次の
+ * 「・」または「■」または末尾までを値とする。 */
+function extractBulletColonValue(body: string, labels: string[]): string | undefined {
+  for (const label of labels) {
+    const match = body.match(new RegExp(`・\\s*${escapeRegExp(label)}\\s*[:：]\\s*([^・■]*)`));
+    if (match) {
+      const value = match[1].replace(/\s+/g, ' ').trim();
+      if (value) return value;
+    }
+  }
+  return undefined;
+}
+
+/** 本文中から「ラベル: 値」「【ラベル】値」「■ラベル 値」「・ラベル：値」の
+ * 値部分を探す。コロン形式 → 【】形式 → ■見出し形式 → ・箇条書き形式の順に
+ * 試す(既存挙動を維持しつつ、より新しい/緩い形式は最後に試すことで
+ * 誤検出のリスクを下げる)。 */
 export function extractLabeledValue(body: string, labels: string[]): string | undefined {
-  return extractColonValue(body, labels) ?? extractBracketValue(body, labels) ?? extractSectionValue(body, labels);
+  return (
+    extractColonValue(body, labels) ??
+    extractBracketValue(body, labels) ??
+    extractSectionValue(body, labels) ??
+    extractBulletColonValue(body, labels)
+  );
 }
 
 /** 単価表記から{min,max}(万円)を取り出す。
  *
  * 対応するのは以下の、実メールで確認された明示的なパターンのみ:
- *   - "68〜80万円" "68万円〜80万円" のような範囲区切り
+ *   - "68〜80万円" "68万円〜80万円" "65万～75万"(全角チルダ)のような範囲区切り
  *   - "73万(Min68万)" のように下限が明示されている場合
  *   - 数値が1つだけの場合(例: "80万円" "76万(応相談)") — 固定値としてmin=maxとする
  *   - "550,000円/月" のようなカンマ区切りの円表記(1万円単位へ換算)
@@ -95,7 +122,7 @@ export function parseRateRange(value: string): { min: number; max: number } | un
   }
 
   const isFixed = /固定/.test(normalized);
-  const startsOpenEnded = /^[〜~\-−]/.test(normalized);
+  const startsOpenEnded = /^[〜～~\-−]/.test(normalized);
 
   if (allNumbers.length === 1) {
     if (startsOpenEnded && !isFixed) return undefined; // 下限不明の"〜X万"は捏造しない
@@ -104,7 +131,7 @@ export function parseRateRange(value: string): { min: number; max: number } | un
     return { min: converted, max: converted };
   }
 
-  const rangeMatch = normalized.match(/(\d+(?:\.\d+)?)\s*万?円?\s*[〜~\-−]\s*(\d+(?:\.\d+)?)\s*万円?/);
+  const rangeMatch = normalized.match(/(\d+(?:\.\d+)?)\s*万?円?\s*[〜～~\-−]\s*(\d+(?:\.\d+)?)\s*万円?/);
   if (rangeMatch) {
     const min = Number(rangeMatch[1]);
     const max = Number(rangeMatch[2]);
@@ -119,7 +146,7 @@ export function parseRateRange(value: string): { min: number; max: number } | un
  * 隣接している場合のみ採用する(ラベル文脈が無いため、より保守的にする)。 */
 export function findRateInFreeText(text: string): { min: number; max: number } | undefined {
   const normalized = text.replace(/,/g, '');
-  const rangeMatch = normalized.match(/(\d+(?:\.\d+)?)\s*万?\s*円?\s*[〜~\-−]\s*(\d+(?:\.\d+)?)\s*万円?/);
+  const rangeMatch = normalized.match(/(\d+(?:\.\d+)?)\s*万?\s*円?\s*[〜～~\-−]\s*(\d+(?:\.\d+)?)\s*万円?/);
   if (rangeMatch) {
     const min = Number(rangeMatch[1]);
     const max = Number(rangeMatch[2]);

@@ -74,6 +74,26 @@ describe('extractLabeledValue (■見出し形式)', () => {
   });
 });
 
+// BP要員紹介メールで観察された「・ラベル：値」形式(箇条書きの「・」で
+// 始まるコロン形式)。ラベル自体に全角カッコの注釈("単金（税抜）")が
+// 含まれる場合も、その注釈込みでラベルの一部として一致させる。
+describe('extractLabeledValue (・箇条書きコロン形式)', () => {
+  it('「・単金（税抜）：」から値を抽出できる(注釈込みのラベル一致、改行区切り)', () => {
+    const body = '・最寄駅：渋谷駅\n・単金（税抜）：70万円\n・稼働：即日';
+    expect(extractLabeledValue(body, ['単金（税抜）'])).toBe('70万円');
+  });
+
+  it('HTML由来で1行に潰れ複数の「・ラベル：値」が並ぶ実メール相当の構造からも抽出できる', () => {
+    const body = '・出社：応相談 ・単金（税抜）：100万円 ・希望：開発推進案件 ・NG：管理系業務 ■スキル';
+    expect(extractLabeledValue(body, ['単金（税抜）'])).toBe('100万円');
+  });
+
+  it('該当ラベルが無ければundefinedを返す(・稼働／・出社頻度は今回対象外)', () => {
+    const body = '・稼働：即日\n・出社頻度：フルリモート';
+    expect(extractLabeledValue(body, ['単金（税抜）'])).toBeUndefined();
+  });
+});
+
 describe('parseRateRange', () => {
   it('範囲区切り"68〜80万円"を抽出する', () => {
     expect(parseRateRange('68〜80万円')).toEqual({ min: 68, max: 80 });
@@ -114,6 +134,10 @@ describe('parseRateRange', () => {
 
   it('既存のコロン形式テストで使われていた単一値"70万円"は引き続きmin=max扱い', () => {
     expect(parseRateRange('70万円')).toEqual({ min: 70, max: 70 });
+  });
+
+  it('全角チルダ"65万～75万"の範囲区切りを抽出する(BP-Aの単金表記で観察)', () => {
+    expect(parseRateRange('65万～75万')).toEqual({ min: 65, max: 75 });
   });
 });
 
