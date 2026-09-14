@@ -52,7 +52,8 @@ const anotherValidEngineerEmail: RawEmail = {
   ].join('\n'),
 };
 
-// BP-A形式(稼働のみ記載、availableFromは今回未対応なのでvalidationはFAILする)。
+// BP-A形式(・稼働：に年の無い"10月〜"のみ記載 -> unknown precisionとなり
+// validationはFAILする)。
 const incompleteBpEngineerEmail: RawEmail = {
   id: 'email-engineer-bp-incomplete',
   subject: '個人事業主のご紹介',
@@ -66,6 +67,41 @@ const incompleteBpEngineerEmail: RawEmail = {
     '■スキル',
     'Java',
     '募集フォームよりご連絡ください',
+  ].join('\n'),
+};
+
+// 株式会社キャリアビート形式(■ラベル■値、両側■)の案件メール。
+// ■期間■に年+月のみ(日無し)の表記があり、month precisionとして取得できる。
+const monthPrecisionProjectEmail: RawEmail = {
+  id: 'email-project-month-precision',
+  subject: '案件のご紹介',
+  bodyText: [
+    SECRET_BODY_MARKER,
+    '■必須スキル■',
+    'Java、Spring Boot',
+    '■単価■',
+    '60万円~80万円',
+    '■場所■',
+    '東京都',
+    '■期間■',
+    '2026年10月 ~ 2027年3月',
+  ].join('\n'),
+};
+
+// 同形式で■期間■が「即日~長期」の案件メール(immediate precision)。
+const immediateProjectEmail: RawEmail = {
+  id: 'email-project-immediate',
+  subject: '案件のご紹介2',
+  bodyText: [
+    SECRET_BODY_MARKER,
+    '■必須スキル■',
+    'Java',
+    '■単価■',
+    '70万円',
+    '■場所■',
+    '大阪府',
+    '■期間■',
+    '即日~長期',
   ].join('\n'),
 };
 
@@ -112,8 +148,18 @@ describe('performGmailBulkImport', () => {
 
     expect(result.success).toBe(true);
     expect(result.fetched).toBe(4);
-    expect(result.project).toEqual({ total: 2, valid: 1, invalid: 1 });
-    expect(result.engineer).toEqual({ total: 1, valid: 1, invalid: 0 });
+    expect(result.project).toEqual({
+      total: 2,
+      valid: 1,
+      invalid: 1,
+      datePrecision: { day: 1, month: 0, immediate: 0, unknown: 0, missing: 1 },
+    });
+    expect(result.engineer).toEqual({
+      total: 1,
+      valid: 1,
+      invalid: 0,
+      datePrecision: { day: 1, month: 0, immediate: 0, unknown: 0, missing: 0 },
+    });
     expect(result.unparsed).toBe(1);
   });
 
@@ -128,10 +174,11 @@ describe('performGmailBulkImport', () => {
   it('空の結果でもクラッシュせずゼロ集計を返す', async () => {
     const result = await performGmailBulkImport(50, async () => []);
 
+    const emptyDatePrecision = { day: 0, month: 0, immediate: 0, unknown: 0, missing: 0 };
     expect(result.success).toBe(true);
     expect(result.fetched).toBe(0);
-    expect(result.project).toEqual({ total: 0, valid: 0, invalid: 0 });
-    expect(result.engineer).toEqual({ total: 0, valid: 0, invalid: 0 });
+    expect(result.project).toEqual({ total: 0, valid: 0, invalid: 0, datePrecision: emptyDatePrecision });
+    expect(result.engineer).toEqual({ total: 0, valid: 0, invalid: 0, datePrecision: emptyDatePrecision });
     expect(result.unparsed).toBe(0);
     expect(result.validationErrors).toEqual({});
     expect(result.matching).toEqual({ validProjects: 0, validEngineers: 0, matchableProjects: 0, sample: undefined });
@@ -208,5 +255,33 @@ describe('performGmailBulkImport', () => {
     expect(json).not.toContain(SECRET_BODY_MARKER);
     expect(json).not.toContain('agency@example.test');
     expect(json).not.toContain('スキルシート送付の件');
+  });
+
+  it('日付精度(day/month/immediate/unknown/missing)をフィールド別に正しく集計する', async () => {
+    const result = await performGmailBulkImport(50, async () => [
+      validProjectEmail, // startDate: day
+      monthPrecisionProjectEmail, // startDate: month
+      immediateProjectEmail, // startDate: immediate
+      incompleteProjectEmail, // startDate: missing(記載なし)
+      validEngineerEmail, // availableFrom: day
+      anotherValidEngineerEmail, // availableFrom: day
+      incompleteBpEngineerEmail, // availableFrom: unknown(年の無い"10月〜")
+    ]);
+
+    expect(result.success).toBe(true);
+    expect(result.project?.datePrecision).toEqual({
+      day: 1,
+      month: 1,
+      immediate: 1,
+      unknown: 0,
+      missing: 1,
+    });
+    expect(result.engineer?.datePrecision).toEqual({
+      day: 2,
+      month: 0,
+      immediate: 0,
+      unknown: 1,
+      missing: 0,
+    });
   });
 });

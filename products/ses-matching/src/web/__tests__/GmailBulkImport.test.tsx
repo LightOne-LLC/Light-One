@@ -54,6 +54,37 @@ describe('GmailBulkImport', () => {
     expect(screen.getByText('startDate: 6')).toBeTruthy();
   });
 
+  it('日付精度(day/month/immediate/不明)の集計を案件・要員それぞれ表示する', async () => {
+    mockFetchOnce({
+      success: true,
+      fetched: 4,
+      project: {
+        total: 1,
+        valid: 0,
+        invalid: 1,
+        datePrecision: { day: 0, month: 1, immediate: 0, unknown: 0, missing: 0 },
+      },
+      engineer: {
+        total: 1,
+        valid: 0,
+        invalid: 1,
+        datePrecision: { day: 0, month: 0, immediate: 1, unknown: 2, missing: 3 },
+      },
+      unparsed: 0,
+      validationErrors: {},
+      matching: { validProjects: 0, validEngineers: 0, matchableProjects: 0 },
+    });
+
+    render(<GmailBulkImport />);
+    fireEvent.click(screen.getByRole('button', { name: '直近50件を取得' }));
+
+    await waitFor(() => expect(screen.getByText('案件: 開始時期')).toBeTruthy());
+    expect(screen.getByText('要員: 稼働可能時期')).toBeTruthy();
+    expect(screen.getByText(/月: 1/)).toBeTruthy();
+    // unknown(2) + missing(3) = 5件を「不明」としてまとめて表示する。
+    expect(screen.getByText(/不明: 5/)).toBeTruthy();
+  });
+
   it('validation失敗理由が無ければその行を表示しない', async () => {
     mockFetchOnce({
       success: true,

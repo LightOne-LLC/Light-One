@@ -74,9 +74,9 @@ const bracketFormatProjectEmailWithoutJapaneseLevel: RawEmail = {
     '【必須スキル】Linux(3年以上) 【作業場所】新宿駅より徒歩5分 【作業期間】2026年10月1日〜2027年3月31日 【単価】〜75万円（固定） 【面談】1回',
 };
 
-// 実メールでよく見る「稼働開始日が月のみ(日が無い)」ケースをそのまま
-// 再現したもの。japaneseLevelは任意項目になったため記載が無くても
-// 問題ないが、availableFrom(日が不明、推測しない)が欠けるため
+// 実メールでよく見る「稼働開始日が月のみ、かつ年が無い(日が無い)」ケースを
+// そのまま再現したもの。japaneseLevelは任意項目になったため記載が無くても
+// 問題ないが、availableFromは年が不明なため推測せずunknown precisionとなり、
 // ValidationはFAILし続ける(実データ観察で判明した既知のギャップ)。
 const bracketFormatEngineerEmail: RawEmail = {
   id: 'email-engineer-bracket-001',
@@ -111,7 +111,7 @@ describe('parseEmail', () => {
       rateMax: 80,
       location: '東京都',
       remoteAllowed: true,
-      startDate: '2026-04-01',
+      startDate: { precision: 'day', value: '2026-04-01' },
       japaneseLevel: 'business',
     });
     expect(result.candidate.requiredSkills).toEqual([
@@ -132,7 +132,7 @@ describe('parseEmail', () => {
       desiredRateMax: 70,
       desiredLocations: ['東京都', '神奈川県'],
       remoteDesired: true,
-      availableFrom: '2026-04-01',
+      availableFrom: { precision: 'day', value: '2026-04-01' },
       japaneseLevel: 'business',
     });
   });
@@ -198,7 +198,7 @@ describe('parseEmail (実フォーマット【ラベル】形式への対応)', 
 
     expect(result.candidate).toMatchObject({
       location: '新宿駅より徒歩5分',
-      startDate: '2026-10-01',
+      startDate: { precision: 'day', value: '2026-10-01' },
       rateMin: 75,
       rateMax: 75,
       japaneseLevel: 'business',
@@ -222,7 +222,7 @@ describe('parseEmail (実フォーマット【ラベル】形式への対応)', 
       desiredRateMax: 73,
       desiredLocations: ['新宿駅'],
       remoteDesired: true,
-      availableFrom: '2026-10-01',
+      availableFrom: { precision: 'day', value: '2026-10-01' },
       japaneseLevel: 'business',
     });
     expect(result.candidate.skills).toEqual([
@@ -263,12 +263,12 @@ describe('parseEmail (実フォーマット【ラベル】形式への対応)', 
     expect(toProjectInput(validation.value).japaneseLevel).toBe('none');
   });
 
-  it('実データで頻出する「稼働開始日が月のみ」の要員メールは、日付を推測しないためavailableFromが欠落しValidationがFAILし続ける', () => {
+  it('実データで頻出する「稼働開始日が月のみ、年も無い」の要員メールは、年を推測しないためunknown precisionとなりValidationがFAILし続ける', () => {
     const result = parseEmail(bracketFormatEngineerEmail);
     expect(result.status).toBe('parsed');
     if (result.status !== 'parsed' || result.recordType !== 'engineer') return;
 
-    expect(result.candidate.availableFrom).toBeUndefined();
+    expect(result.candidate.availableFrom).toEqual({ precision: 'unknown', value: '' });
 
     const validation = validateEngineerRecord(result.candidate);
     expect(validation.valid).toBe(false);
@@ -404,9 +404,9 @@ describe('parseEmail (BP-A要員メールからの■スキル抽出)', () => {
     // ・出社頻度：フルリモート → 強いキーワード一致でremoteDesired=trueを
     // 取得できる。
     expect(result.candidate.remoteDesired).toBe(true);
-    // 稼働(startDate/availableFrom)は今回未対応のため、まだ取得できない
-    // (Validationも今回はまだ通らない — スコープ外)。
-    expect(result.candidate.availableFrom).toBeUndefined();
+    // ・稼働：10月〜 → 年が無いため推測せずunknown precisionとなる
+    // (Validationも今回はまだ通らない)。
+    expect(result.candidate.availableFrom).toEqual({ precision: 'unknown', value: '' });
   });
 
   it('・単金（税抜）：の範囲表記(全角チルダ)からmin/maxを取得する', () => {
@@ -588,7 +588,7 @@ describe('parseEmail (BP-A要員メールのlocation/remote抽出)', () => {
     expect(result.candidate.remoteDesired).toBe(false);
   });
 
-  it('integration: raw email → parseEmail → EngineerRecord までlocation/remoteが伝播する(availableFrom欠落以外はvalidation通過見込み)', () => {
+  it('integration: raw email → parseEmail → EngineerRecord までlocation/remote/availableFrom(即日)が伝播しvalidationを完全に通過する', () => {
     const email = bpAEmail(['・稼働：即日', '・出社頻度：フルリモート', '・単金（税抜）：80万円']);
     const result = parseEmail(email);
     expect(result.status).toBe('parsed');
@@ -598,12 +598,12 @@ describe('parseEmail (BP-A要員メールのlocation/remote抽出)', () => {
     expect(result.candidate.remoteDesired).toBe(true);
     expect(result.candidate.desiredRateMin).toBe(80);
     expect(result.candidate.desiredRateMax).toBe(80);
+    // ・稼働：即日 → immediate precisionとして取得でき、有効な稼働時期情報
+    // として受け入れられる。
+    expect(result.candidate.availableFrom).toEqual({ precision: 'immediate', value: '' });
 
     const validation = validateEngineerRecord(result.candidate);
-    expect(validation.valid).toBe(false);
-    if (validation.valid) return;
-    // availableFrom(稼働の日付化)は今回のスコープ外のため、それだけがエラーとして残る。
-    expect(validation.errors).toEqual(['availableFrom: YYYY-MM-DD形式の有効な日付である必要があります']);
+    expect(validation.valid).toBe(true);
   });
 
   it('既存のskills/rate/japaneseLevel抽出はlocation/remote追加後も壊れていない(回帰確認)', () => {

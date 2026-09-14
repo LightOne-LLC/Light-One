@@ -2,6 +2,7 @@ import {
   extractLabeledValue,
   findRateInFreeText,
   findRemoteInFreeText,
+  parseDateValue,
   parseEngineerSkillList,
   parseRateRange,
   parseRequiredSkillList,
@@ -209,5 +210,69 @@ describe('parseRequiredSkillList / parseEngineerSkillList (ヶ月表記対応)',
       { name: 'JavaScript', years: 5.83 },
       { name: 'Java', years: 4.25 },
     ]);
+  });
+});
+
+describe('parseDateValue', () => {
+  it('"2026-10-15"はday precisionとしてそのまま取得する', () => {
+    expect(parseDateValue('2026-10-15')).toEqual({ precision: 'day', value: '2026-10-15' });
+  });
+
+  it('"2026年10月1日"はday precisionへ正規化する', () => {
+    expect(parseDateValue('2026年10月1日')).toEqual({ precision: 'day', value: '2026-10-01' });
+  });
+
+  it('"2026-10"(年月のみ)はmonth precisionとしてそのまま取得する', () => {
+    expect(parseDateValue('2026-10')).toEqual({ precision: 'month', value: '2026-10' });
+  });
+
+  it('"2026年10月"(日が無い)はmonth precisionへ正規化する', () => {
+    expect(parseDateValue('2026年10月')).toEqual({ precision: 'month', value: '2026-10' });
+  });
+
+  it('"2026年10月 ~ 2027年3月"のような範囲表記は先頭の年月をmonth precisionとして取得する', () => {
+    expect(parseDateValue('2026年10月 ~ 2027年3月')).toEqual({ precision: 'month', value: '2026-10' });
+  });
+
+  it('"即日"はimmediate precisionとして取得する(具体的な暦日へは変換しない)', () => {
+    expect(parseDateValue('即日')).toEqual({ precision: 'immediate', value: '' });
+  });
+
+  it('"即日~長期"のような補足付きでもimmediate precisionとして取得する', () => {
+    expect(parseDateValue('即日~長期')).toEqual({ precision: 'immediate', value: '' });
+  });
+
+  it('年が無い"10月〜"は年を推測しないためunknown precisionとして扱う', () => {
+    expect(parseDateValue('10月〜')).toEqual({ precision: 'unknown', value: '' });
+  });
+
+  it('"8月or9月〜"のような複数月にまたがる曖昧な表記はunknown precisionとして扱う(1つに決め打ちしない)', () => {
+    expect(parseDateValue('8月or9月~長期')).toEqual({ precision: 'unknown', value: '' });
+  });
+
+  it('日付らしい記載が全く無ければundefinedを返す(フィールド自体が存在しなかったことと区別する)', () => {
+    expect(parseDateValue('スキル見合い')).toBeUndefined();
+  });
+});
+
+// 株式会社キャリアビート形式の案件メールで観察された「■ラベル■値」
+// (■で開閉された見出し)。単独の■(閉じ側が無いextractSectionValue)とは
+// 区別して扱う。
+describe('extractLabeledValue (■ラベル■形式、両側■)', () => {
+  it('「■期間■\\n値」から値を抽出できる(次の■または末尾までが値)', () => {
+    const body = '■単価■\n60万円~80万円\n■期間■\n2026年10月 ~ 2027年3月\n■備考■\n商流:貴社まで';
+    expect(extractLabeledValue(body, ['期間'])).toBe('2026年10月 ~ 2027年3月');
+  });
+
+  it('単独■(片側のみ)のextractSectionValue形式より後に試される(片側形式が優先して一致する)', () => {
+    // ■スキルの直後に■が無いため、既存のextractSectionValue(片側)が
+    // 先に一致する。両形式が混在していても既存挙動を壊さないことを確認する。
+    const body = '■スキル Java, AWS ■経験 5年';
+    expect(extractLabeledValue(body, ['スキル'])).toBe('Java, AWS');
+  });
+
+  it('■ラベル■形式が無い本文ではundefinedを返す', () => {
+    const body = 'スキルシートを送付いたします。';
+    expect(extractLabeledValue(body, ['期間'])).toBeUndefined();
   });
 });

@@ -1,10 +1,21 @@
 import { useState } from 'react';
-import type { GmailBulkImportResult } from '../../server/types';
+import type { DatePrecisionCounts, GmailBulkImportResult } from '../../server/types';
 import { scoreColorClass } from '../scoreColor';
 
 type Status = 'idle' | 'loading' | 'done' | 'error';
 
 const DEFAULT_LIMIT = 50;
+
+function DatePrecisionRow({ label, counts }: { label: string; counts: DatePrecisionCounts }) {
+  return (
+    <div className="card-row">
+      <span>{label}</span>
+      <span>
+        日付: {counts.day} / 月: {counts.month} / 即日: {counts.immediate} / 不明: {counts.unknown + counts.missing}
+      </span>
+    </div>
+  );
+}
 
 function ResultView({ result }: { result: GmailBulkImportResult }) {
   if (!result.success) {
@@ -29,6 +40,10 @@ function ResultView({ result }: { result: GmailBulkImportResult }) {
         <span>未分類</span>
         <span>{result.unparsed ?? 0}</span>
       </div>
+      {result.project?.datePrecision && <DatePrecisionRow label="案件: 開始時期" counts={result.project.datePrecision} />}
+      {result.engineer?.datePrecision && (
+        <DatePrecisionRow label="要員: 稼働可能時期" counts={result.engineer.datePrecision} />
+      )}
       <div className="card-row">
         <span>Validation PASS</span>
         <span>{(result.project?.valid ?? 0) + (result.engineer?.valid ?? 0)}</span>

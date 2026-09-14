@@ -3,7 +3,7 @@ import {
   extractLabeledValue,
   findRateInFreeText,
   findRemoteInFreeText,
-  parseDateJa,
+  parseDateValue,
   parseEngineerSkillList,
   parseJapaneseLevel,
   parseLocationList,
@@ -88,7 +88,7 @@ function parseProjectCandidate(subject: string, body: string, id: string): Recor
   if (remoteAllowed !== undefined) candidate.remoteAllowed = remoteAllowed;
 
   const startDateValue = extractLabeledValue(body, ['稼働開始', '開始日', '作業期間', '期間']);
-  const startDate = startDateValue ? parseDateJa(startDateValue) : undefined;
+  const startDate = startDateValue ? parseDateValue(startDateValue) : undefined;
   if (startDate) candidate.startDate = startDate;
 
   const japaneseLevelValue = extractLabeledValue(body, ['日本語レベル', '日本語']);
@@ -137,8 +137,11 @@ function parseEngineerCandidate(subject: string, body: string, id: string): Reco
     findRemoteInFreeText(subject);
   if (remoteDesired !== undefined) candidate.remoteDesired = remoteDesired;
 
-  const availableFromValue = extractLabeledValue(body, ['稼働可能日', '稼働開始日', '稼働開始']);
-  const availableFrom = availableFromValue ? parseDateJa(availableFromValue) : undefined;
+  // BP-A形式の実メールは「・稼働：」(開始/可能日を表す接頭辞無しの単独ラベル)
+  // のみを使うため、末尾に素の'稼働'も候補として追加する(より具体的な
+  // ラベルを優先する順序は維持)。
+  const availableFromValue = extractLabeledValue(body, ['稼働可能日', '稼働開始日', '稼働開始', '稼働']);
+  const availableFrom = availableFromValue ? parseDateValue(availableFromValue) : undefined;
   if (availableFrom) candidate.availableFrom = availableFrom;
 
   const japaneseLevelValue = extractLabeledValue(body, ['日本語レベル', '日本語']);

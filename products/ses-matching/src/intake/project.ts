@@ -1,10 +1,10 @@
 import type { ProjectInput } from '../scoring/types';
 import type { ProjectRecord, ValidationResult } from './types';
 import {
+  isAcceptableDateValue,
   isJapaneseLevel,
   isNonEmptyString,
   isNonNegativeNumber,
-  isValidDateString,
   validateRequiredSkill,
 } from './validationHelpers';
 
@@ -52,8 +52,11 @@ export function validateProjectRecord(input: unknown): ValidationResult<ProjectR
     errors.push('remoteAllowed: 真偽値である必要があります');
   }
 
-  if (!isValidDateString(record.startDate)) {
-    errors.push('startDate: YYYY-MM-DD形式の有効な日付である必要があります');
+  // day('YYYY-MM-DD')/month('YYYY-MM')/immediate(即日)は有効な稼働時期情報
+  // として受け入れる。unknown(記載はあったが解決できない)は引き続きFAILとし、
+  // 根拠なくPASS条件を緩めない(日付を推測して埋めない)。
+  if (!isAcceptableDateValue(record.startDate)) {
+    errors.push('startDate: 有効な稼働時期情報(day/month/immediateのいずれか)である必要があります');
   }
 
   // 任意項目: 未指定(undefined)は許容する。値がある場合のみ形式を検査する

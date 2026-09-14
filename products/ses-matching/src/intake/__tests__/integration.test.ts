@@ -14,7 +14,7 @@ const dummyProject: ProjectRecord = {
   rateMax: 80,
   location: '東京都',
   remoteAllowed: true,
-  startDate: '2026-04-01',
+  startDate: { precision: 'day', value: '2026-04-01' },
   japaneseLevel: 'business',
 };
 
@@ -28,7 +28,7 @@ const dummyEngineer: EngineerRecord = {
   desiredRateMax: 75,
   desiredLocations: ['東京都'],
   remoteDesired: true,
-  availableFrom: '2026-04-01',
+  availableFrom: { precision: 'day', value: '2026-04-01' },
   japaneseLevel: 'business',
 };
 

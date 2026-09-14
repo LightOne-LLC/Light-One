@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { dummyProjects } from '../../demo/dummyData';
+import { formatDateValue } from '../formatDateValue';
 
 export function ProjectsPage() {
   return (
@@ -35,7 +36,7 @@ export function ProjectsPage() {
             </div>
             <div className="card-row">
               <span>開始日</span>
-              <span>{project.startDate}</span>
+              <span>{formatDateValue(project.startDate)}</span>
             </div>
             <div className="card-row">
               <Link to={`/matching/${project.id}`}>候補を見る →</Link>

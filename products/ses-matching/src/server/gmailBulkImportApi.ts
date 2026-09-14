@@ -14,7 +14,28 @@ import { authenticate, getGmailService, getMessage, listMessages } from '../gmai
 import { toRawEmail } from '../gmail/parseMessage';
 import type { RawEmail } from '../gmail/types';
 import { parseEmail } from '../parser/parseEmail';
-import type { GmailBulkImportResult, GmailBulkMatchingSample } from './types';
+import type { DatePrecisionCounts, GmailBulkImportResult, GmailBulkMatchingSample } from './types';
+
+function emptyDatePrecisionCounts(): DatePrecisionCounts {
+  return { day: 0, month: 0, immediate: 0, unknown: 0, missing: 0 };
+}
+
+/** Parser候補(validation前)の日付フィールド(startDate/availableFrom)の
+ * precisionを集計用カウンタへ加算する。フィールド自体が存在しなければ
+ * missingとして数える(「記載が無い」と「記載はあったが不明」を区別する)。 */
+function addDatePrecision(counts: DatePrecisionCounts, candidate: Record<string, unknown>, field: string): void {
+  const dateValue = candidate[field];
+  if (typeof dateValue !== 'object' || dateValue === null || !('precision' in dateValue)) {
+    counts.missing++;
+    return;
+  }
+  const precision = (dateValue as { precision: unknown }).precision;
+  if (precision === 'day' || precision === 'month' || precision === 'immediate' || precision === 'unknown') {
+    counts[precision]++;
+  } else {
+    counts.missing++;
+  }
+}
 
 export const DEFAULT_LIMIT = 50;
 export const MAX_LIMIT = 100;
@@ -99,6 +120,8 @@ export async function performGmailBulkImport(
   const validationErrors: Record<string, number> = {};
   const validProjects: ProjectRecord[] = [];
   const validEngineers: EngineerRecord[] = [];
+  const projectDatePrecision = emptyDatePrecisionCounts();
+  const engineerDatePrecision = emptyDatePrecisionCounts();
 
   for (const email of emails) {
     const parsed = parseEmail(email);
@@ -110,6 +133,7 @@ export async function performGmailBulkImport(
 
     if (parsed.recordType === 'project') {
       projectTotal++;
+      addDatePrecision(projectDatePrecision, parsed.candidate, 'startDate');
       const validation = validateProjectRecord(parsed.candidate);
       if (validation.valid) {
         projectValid++;
@@ -122,6 +146,7 @@ export async function performGmailBulkImport(
     }
 
     engineerTotal++;
+    addDatePrecision(engineerDatePrecision, parsed.candidate, 'availableFrom');
     const validation = validateEngineerRecord(parsed.candidate);
     if (validation.valid) {
       engineerValid++;
@@ -147,8 +172,13 @@ export async function performGmailBulkImport(
     success: true,
     limit,
     fetched: emails.length,
-    project: { total: projectTotal, valid: projectValid, invalid: projectInvalid },
-    engineer: { total: engineerTotal, valid: engineerValid, invalid: engineerInvalid },
+    project: { total: projectTotal, valid: projectValid, invalid: projectInvalid, datePrecision: projectDatePrecision },
+    engineer: {
+      total: engineerTotal,
+      valid: engineerValid,
+      invalid: engineerInvalid,
+      datePrecision: engineerDatePrecision,
+    },
     unparsed: unparsedTotal,
     validationErrors,
     matching: {

@@ -11,7 +11,7 @@ const validEngineer: EngineerRecord = {
   desiredRateMax: 75,
   desiredLocations: ['東京都'],
   remoteDesired: true,
-  availableFrom: '2026-04-01',
+  availableFrom: { precision: 'day', value: '2026-04-01' },
   japaneseLevel: 'business',
 };
 
@@ -60,6 +60,33 @@ describe('validateEngineerRecord', () => {
 
   it('不正な日付文字列の場合は拒否する', () => {
     const result = validateEngineerRecord({ ...validEngineer, availableFrom: '2026-13-40' });
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors.some((e) => e.startsWith('availableFrom'))).toBe(true);
+    }
+  });
+
+  it('availableFromがmonth precisionでも受け付ける(2026-10はVALID)', () => {
+    const result = validateEngineerRecord({
+      ...validEngineer,
+      availableFrom: { precision: 'month', value: '2026-10' },
+    });
+    expect(result.valid).toBe(true);
+  });
+
+  it('availableFromがimmediate precisionでも受け付ける(即日)', () => {
+    const result = validateEngineerRecord({
+      ...validEngineer,
+      availableFrom: { precision: 'immediate', value: '' },
+    });
+    expect(result.valid).toBe(true);
+  });
+
+  it('availableFromがunknown precisionの場合は拒否する(勝手にPASS条件を緩めない)', () => {
+    const result = validateEngineerRecord({
+      ...validEngineer,
+      availableFrom: { precision: 'unknown', value: '' },
+    });
     expect(result.valid).toBe(false);
     if (!result.valid) {
       expect(result.errors.some((e) => e.startsWith('availableFrom'))).toBe(true);

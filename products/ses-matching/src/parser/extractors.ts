@@ -13,8 +13,11 @@
 //     含まれる場合も、その注釈込みでラベルの一部として扱う。実メールでは
 //     HTML由来で本文全体が1行に潰れ、複数の「・ラベル：値」が空白区切りで
 //     並ぶため、次の「・」または「■」または末尾までを値とする) — 追加
+//   - 「■ラベル■値」(■で開閉された見出し。株式会社キャリアビート形式の
+//     案件メールの「■期間■」「■場所■」等で使われる。次の■または末尾まで
+//     が値) — 追加
 
-import type { EngineerSkill, JapaneseLevel, RequiredSkill } from '../scoring/types';
+import type { DateValue, EngineerSkill, JapaneseLevel, RequiredSkill } from '../scoring/types';
 
 const SPLIT_PATTERN = /[、,・/]/;
 
@@ -84,15 +87,31 @@ function extractBulletColonValue(body: string, labels: string[]): string | undef
   return undefined;
 }
 
-/** 本文中から「ラベル: 値」「【ラベル】値」「■ラベル 値」「・ラベル：値」の
- * 値部分を探す。コロン形式 → 【】形式 → ■見出し形式 → ・箇条書き形式の順に
- * 試す(既存挙動を維持しつつ、より新しい/緩い形式は最後に試すことで
- * 誤検出のリスクを下げる)。 */
+/** 「■ラベル■値」形式(■で開閉された見出し)を本文全体から探す。次の■または
+ * 末尾までが値。株式会社キャリアビート形式の案件メールで観察された
+ * "■期間■\n2026年10月 ~ 2027年3月"等に対応する。単独の■(閉じ側が無い
+ * extractSectionValue)と区別するため、ラベル直後に必ず■を要求する。 */
+function extractDoubleMarkerSectionValue(body: string, labels: string[]): string | undefined {
+  for (const label of labels) {
+    const match = body.match(new RegExp(`■\\s*${escapeRegExp(label)}\\s*■\\s*([\\s\\S]*?)(?=■|$)`));
+    if (match) {
+      const value = match[1].replace(/\s+/g, ' ').trim();
+      if (value) return value;
+    }
+  }
+  return undefined;
+}
+
+/** 本文中から「ラベル: 値」「【ラベル】値」「■ラベル 値」「■ラベル■値」
+ * 「・ラベル：値」の値部分を探す。コロン形式 → 【】形式 → ■見出し形式(片側)
+ * → ■見出し形式(両側) → ・箇条書き形式の順に試す(既存挙動を維持しつつ、
+ * より新しい/緩い形式は最後に試すことで誤検出のリスクを下げる)。 */
 export function extractLabeledValue(body: string, labels: string[]): string | undefined {
   return (
     extractColonValue(body, labels) ??
     extractBracketValue(body, labels) ??
     extractSectionValue(body, labels) ??
+    extractDoubleMarkerSectionValue(body, labels) ??
     extractBulletColonValue(body, labels)
   );
 }
@@ -160,17 +179,52 @@ export function findRateInFreeText(text: string): { min: number; max: number } |
   return undefined;
 }
 
-/** "2026-04-01"(そのまま) または "2026年4月1日" を YYYY-MM-DD に正規化する。
- * 文字列中のどこにあってもよい(範囲表記の先頭日付等にも対応)。
- * どちらの形にも合わなければ undefined(月のみ等、日が無い場合は推測しない)。 */
-export function parseDateJa(value: string): string | undefined {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+const IMMEDIATE_PATTERN = /即日/;
+// "8月or9月"のように複数の月にまたがる曖昧な表記。どちらか一方に決め打ち
+// しない(根拠のない日付補完を避ける)ため、この表記が含まれる場合は
+// unknown(月精度にも解決できない)として扱う。
+const AMBIGUOUS_MULTI_MONTH_PATTERN = /\d{1,2}月\s*(?:or|または|、|,|\/)\s*\d{1,2}月/;
 
-  const match = value.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-  if (match) {
-    const [, y, m, d] = match;
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+/**
+ * メール本文中の稼働時期表記からDateValueを取り出す。
+ *
+ * 対応する形式(実メールで確認済みのもののみ):
+ *   - "2026-04-01"(そのまま) / "2026年4月1日" → day precision
+ *   - "2026-10"(そのまま) / "2026年10月"(日が無い) → month precision
+ *   - "即日" → immediate(相対表現。具体的な暦日へは変換しない —
+ *     現在時刻に依存させないため)
+ *   - "8月or9月"のように複数月にまたがる曖昧な表記、"10月"のように年が
+ *     無く年を特定できない表記 → unknown(日付らしい記載はあったが、
+ *     根拠なく1つに絞り込まない)
+ *
+ * 上記のいずれにも該当しない(日付らしい記載が全く無い)場合はundefinedを
+ * 返す — その場合、呼び出し側はフィールド自体を候補に含めない
+ * (「記載はあったが不明」なunknownと、「そもそも記載が無い」を区別するため)。
+ */
+export function parseDateValue(value: string): DateValue | undefined {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return { precision: 'day', value };
+
+  const dayMatch = value.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+  if (dayMatch) {
+    const [, y, m, d] = dayMatch;
+    return { precision: 'day', value: `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}` };
   }
+
+  if (IMMEDIATE_PATTERN.test(value)) return { precision: 'immediate', value: '' };
+
+  if (AMBIGUOUS_MULTI_MONTH_PATTERN.test(value)) return { precision: 'unknown', value: '' };
+
+  if (/^\d{4}-\d{2}$/.test(value)) return { precision: 'month', value };
+
+  const monthMatch = value.match(/(\d{4})年(\d{1,2})月/);
+  if (monthMatch) {
+    const [, y, m] = monthMatch;
+    return { precision: 'month', value: `${y}-${m.padStart(2, '0')}` };
+  }
+
+  // 年が無い"10月〜"等は、年を推測しないためunknown扱いとする。
+  if (/\d{1,2}月/.test(value)) return { precision: 'unknown', value: '' };
+
   return undefined;
 }
 

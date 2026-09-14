@@ -1,4 +1,5 @@
 import { dummyEngineers } from '../../demo/dummyData';
+import { formatDateValue } from '../formatDateValue';
 
 export function EngineersPage() {
   return (
@@ -33,7 +34,7 @@ export function EngineersPage() {
             </div>
             <div className="card-row">
               <span>稼働可能日</span>
-              <span>{engineer.availableFrom}</span>
+              <span>{formatDateValue(engineer.availableFrom)}</span>
             </div>
           </div>
         ))

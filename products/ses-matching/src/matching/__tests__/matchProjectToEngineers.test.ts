@@ -15,7 +15,7 @@ const project: ProjectRecord = {
   rateMax: 80,
   location: '東京都',
   remoteAllowed: true,
-  startDate: '2026-04-01',
+  startDate: { precision: 'day', value: '2026-04-01' },
   japaneseLevel: 'business',
 };
 
@@ -30,7 +30,7 @@ const engineerA: EngineerRecord = {
   desiredRateMax: 70,
   desiredLocations: ['東京都'],
   remoteDesired: true,
-  availableFrom: '2026-04-01',
+  availableFrom: { precision: 'day', value: '2026-04-01' },
   japaneseLevel: 'business',
 };
 
@@ -42,7 +42,7 @@ const engineerB: EngineerRecord = {
   desiredRateMax: 80,
   desiredLocations: ['東京都'],
   remoteDesired: false,
-  availableFrom: '2026-07-01',
+  availableFrom: { precision: 'day', value: '2026-07-01' },
   japaneseLevel: 'business',
 };
 
@@ -57,7 +57,7 @@ const engineerC: EngineerRecord = {
   desiredRateMax: 65,
   desiredLocations: ['東京都'],
   remoteDesired: true,
-  availableFrom: '2026-04-01',
+  availableFrom: { precision: 'day', value: '2026-04-01' },
   japaneseLevel: 'business',
 };
 
