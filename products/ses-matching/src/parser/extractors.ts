@@ -1,11 +1,13 @@
 // メール本文からのフィールド抽出ヘルパー。すべて決定論的な文字列処理のみで、
 // 抽出できない場合はundefinedを返す(値を推測して埋めない)。
 //
-// 実際のSES案件・要員メール25通の観察に基づき、以下の形式に対応する:
+// 実際のSES案件・要員メールの観察に基づき、以下の形式に対応する:
 //   - 「ラベル：値」(コロン区切り、改行区切り) — 既存
 //   - 「【ラベル】値」(全角カッコ区切り、コロンなし。次の【まで、または末尾まで
 //     が値。HTML由来で本文が改行なしの1行に潰れているケースでも動作する) — 追加
 //   - ラベル内に全角スペースが混じる表記("場 所" 等)の吸収 — 追加
+//   - 「■ラベル 値」(■のみの見出し、閉じカッコ無し。BP要員紹介メールの
+//     「■スキル」等で使われる。次の■または末尾までが値) — 追加
 
 import type { EngineerSkill, JapaneseLevel, RequiredSkill } from '../scoring/types';
 
@@ -46,10 +48,26 @@ function extractBracketValue(body: string, labels: string[]): string | undefined
   return undefined;
 }
 
-/** 本文中から「ラベル: 値」または「【ラベル】値」の値部分を探す。
- * コロン形式を優先し(既存挙動を維持)、見つからなければ【】形式を試す。 */
+/** 「■ラベル 値」形式(■のみで閉じカッコが無い見出し)を本文全体から探す。
+ * 次の■または末尾までが値。BP要員紹介メールで観察された
+ * "■スキル\n値"(改行区切り)と、HTML由来で1行に潰れた
+ * "■スキル 値 ■次の見出し"の両方に対応する。 */
+function extractSectionValue(body: string, labels: string[]): string | undefined {
+  for (const label of labels) {
+    const match = body.match(new RegExp(`■\\s*${escapeRegExp(label)}\\s*([\\s\\S]*?)(?=■|$)`));
+    if (match) {
+      const value = match[1].replace(/\s+/g, ' ').trim();
+      if (value) return value;
+    }
+  }
+  return undefined;
+}
+
+/** 本文中から「ラベル: 値」「【ラベル】値」「■ラベル 値」の値部分を探す。
+ * コロン形式 → 【】形式 → ■見出し形式の順に試す(既存挙動を維持しつつ、
+ * より新しい/緩い形式は最後に試すことで誤検出のリスクを下げる)。 */
 export function extractLabeledValue(body: string, labels: string[]): string | undefined {
-  return extractColonValue(body, labels) ?? extractBracketValue(body, labels);
+  return extractColonValue(body, labels) ?? extractBracketValue(body, labels) ?? extractSectionValue(body, labels);
 }
 
 /** 単価表記から{min,max}(万円)を取り出す。

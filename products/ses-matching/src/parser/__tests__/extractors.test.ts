@@ -45,6 +45,35 @@ describe('extractLabeledValue', () => {
   });
 });
 
+// BP要員紹介メールで観察された「■ラベル 値」形式(■のみの見出し、
+// 閉じカッコ無し)。次の■または末尾までが値になる。
+describe('extractLabeledValue (■見出し形式)', () => {
+  it('改行区切りの「■スキル」見出しから値を抽出できる', () => {
+    const body = '■スキル\nJava, Spring Boot, AWS\n■経験\n5年';
+    expect(extractLabeledValue(body, ['スキル'])).toBe('Java, Spring Boot, AWS');
+  });
+
+  it('HTML由来で1行に潰れた「■スキル 値 ■次の見出し」からも抽出できる', () => {
+    const body = '■スキル Java, Spring Boot, AWS ■経験 5年';
+    expect(extractLabeledValue(body, ['スキル'])).toBe('Java, Spring Boot, AWS');
+  });
+
+  it('全角カンマ区切りの値も抽出できる(分割自体はparseEngineerSkillList側の責務)', () => {
+    const body = '■スキル\nJava、Spring、AWS\n■経験\n3年';
+    expect(extractLabeledValue(body, ['スキル'])).toBe('Java、Spring、AWS');
+  });
+
+  it('既存の【スキル】形式は引き続き優先して動作する(■形式より先に試す)', () => {
+    const body = '【スキル】Java, AWS\n【経験】5年';
+    expect(extractLabeledValue(body, ['スキル'])).toBe('Java, AWS');
+  });
+
+  it('■見出しが無いメールでは従来通りundefinedを返す', () => {
+    const body = 'スキルシートを送付いたします。よろしくお願いいたします。';
+    expect(extractLabeledValue(body, ['スキル'])).toBeUndefined();
+  });
+});
+
 describe('parseRateRange', () => {
   it('範囲区切り"68〜80万円"を抽出する', () => {
     expect(parseRateRange('68〜80万円')).toEqual({ min: 68, max: 80 });

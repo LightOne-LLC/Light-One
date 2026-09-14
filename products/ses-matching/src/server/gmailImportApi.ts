@@ -22,6 +22,16 @@ function toValidationSummary(result: ValidationResult<unknown>): { valid: boolea
   return { valid: false, errors: result.errors };
 }
 
+/** Parser候補(validation前、型はunknown)からスキル名のみを安全に取り出す。
+ * 形が想定と違っても例外を投げず、取り出せた分だけ返す。 */
+function extractSkillNames(candidate: Record<string, unknown>): string[] | undefined {
+  if (!Array.isArray(candidate.skills)) return undefined;
+  const names = candidate.skills
+    .map((skill) => (skill && typeof skill === 'object' && 'name' in skill ? (skill as { name: unknown }).name : undefined))
+    .filter((name): name is string => typeof name === 'string' && name.length > 0);
+  return names.length > 0 ? names : undefined;
+}
+
 async function fetchLatestRawEmail(): Promise<RawEmail | null> {
   const auth = await authenticate();
   const service = getGmailService(auth);
@@ -92,6 +102,7 @@ export async function performGmailImport(
     ...base,
     type: 'engineer',
     extractedFields,
+    skillNames: extractSkillNames(parsed.candidate),
     validation: toValidationSummary(validation),
   };
 }

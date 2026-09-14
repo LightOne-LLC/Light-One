@@ -358,3 +358,45 @@ describe('parseEmail (BP要員メールの分類タイブレーク)', () => {
     expect(result.recordType).toBe('engineer');
   });
 });
+
+// BP-A形式(PR #22のタイブレークでengineerと判定されるようになったメール)
+// から、今回追加した■スキル見出しでスキルが取得できることを確認する。
+// 単金(税抜)・出社頻度・稼働はまだ対応していないため、それらが未取得の
+// ままであることも合わせて確認する(今回のスコープ外、既知の状態)。
+describe('parseEmail (BP-A要員メールからの■スキル抽出)', () => {
+  const bpEngineerWithSkillsSection: RawEmail = {
+    id: 'email-engineer-bp-skills-001',
+    subject: '個人事業主のご紹介',
+    bodyText: [
+      '■基本情報',
+      '・氏名：A.B（男性）',
+      '・最寄駅：渋谷駅',
+      '■希望条件',
+      '・稼働：10月〜',
+      '・出社頻度：フルリモート',
+      '・単金（税抜）：80万円',
+      '・ご経歴を拝見しご連絡いたしました',
+      '■スキル',
+      'Java, Spring Boot, AWS',
+      '■備考',
+      '本メールの配信を停止希望の方は募集フォームよりご連絡ください',
+    ].join('\n'),
+  };
+
+  it('■スキル見出しからskillsを抽出する(タイブレークでengineer判定されたBP-Aメール)', () => {
+    const result = parseEmail(bpEngineerWithSkillsSection);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'engineer') return;
+
+    expect(result.candidate.skills).toEqual([
+      { name: 'Java', years: 0 },
+      { name: 'Spring Boot', years: 0 },
+      { name: 'AWS', years: 0 },
+    ]);
+    // 単金(税抜)・出社頻度・稼働は今回未対応のため、まだ取得できない
+    // (Validationも今回はまだ通らない — スコープ外)。
+    expect(result.candidate.desiredRateMin).toBeUndefined();
+    expect(result.candidate.remoteDesired).toBeUndefined();
+    expect(result.candidate.availableFrom).toBeUndefined();
+  });
+});
