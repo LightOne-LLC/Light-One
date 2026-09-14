@@ -18,9 +18,9 @@ interface ConnectionCard {
 
 function KpiTile({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3 text-center">
-      <div className="text-xl font-bold text-slate-900">{value}</div>
-      <div className="mt-0.5 text-[11px] text-slate-500">{label}</div>
+    <div className="rounded-2xl border border-border bg-surface p-4 text-center shadow-card">
+      <div className="font-mincho text-[26px] font-semibold leading-none tabular-nums text-accent">{value}</div>
+      <div className="font-jp mt-1.5 text-[10.5px] leading-tight text-muted-foreground">{label}</div>
     </div>
   );
 }
@@ -88,92 +88,113 @@ export function HomePage() {
   const phaseCounts = PHASE_STEPS.map((s) => ({ ...s, count: activeMatches.filter((m) => m.phase === s.phase).length }));
 
   return (
-    <div className="mx-auto max-w-lg space-y-5 px-4 py-6">
-      <header>
-        <h1 className="text-lg font-bold text-slate-900">おかえりなさい{displayName ? `、${displayName}さん` : ''}</h1>
-        <p className="mt-1 text-sm text-slate-500">今日のご縁の状況をお知らせします。</p>
-      </header>
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto max-w-lg space-y-7 px-5 py-7">
+        <header className="animate-noren-rise">
+          <p className="font-jp text-[13px] text-muted-foreground">おかえりなさい</p>
+          {displayName && (
+            <h1 className="font-mincho mt-0.5 text-[24px] font-semibold leading-tight text-foreground">
+              {displayName}さん
+            </h1>
+          )}
+          <p className="font-jp mt-2 text-[13px] leading-relaxed text-muted-foreground">
+            今日のご縁の状況をお知らせします。
+          </p>
+        </header>
 
-      {error && <p className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700">{error}</p>}
+        {error && (
+          <p className="font-jp rounded-2xl border border-border bg-surface p-3 text-[12px] text-danger shadow-card">
+            {error}
+          </p>
+        )}
 
-      {loading ? (
-        <p className="text-sm text-slate-500">読み込み中...</p>
-      ) : !role ? (
-        <p className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500">
-          ロールが設定されていないため、表示できる情報がありません。
-        </p>
-      ) : (
-        <>
-          <section className="grid grid-cols-3 gap-3">
-            <KpiTile label="本日の候補" value={todaysCandidates} />
-            <KpiTile label="つながり中" value={connectingCount} />
-            <KpiTile label="メッセージ数" value={totalMessages} />
-          </section>
+        {loading ? (
+          <p className="font-jp text-[13px] text-muted-foreground">読み込み中...</p>
+        ) : !role ? (
+          <p className="font-jp rounded-2xl border border-border bg-surface p-4 text-[13px] text-muted-foreground shadow-card">
+            ロールが設定されていないため、表示できる情報がありません。
+          </p>
+        ) : (
+          <>
+            <section className="grid grid-cols-3 gap-3">
+              <KpiTile label="本日の候補" value={todaysCandidates} />
+              <KpiTile label="つながり中" value={connectingCount} />
+              <KpiTile label="メッセージ数" value={totalMessages} />
+            </section>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-4">
-            <h2 className="mb-3 text-sm font-semibold text-slate-900">ご縁の進捗</h2>
-            <div className="flex items-center">
-              {phaseCounts.map((s, i) => (
-                <div key={s.phase} className="flex flex-1 items-center">
-                  <div className="flex flex-1 flex-col items-center text-center">
-                    <div
-                      className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold ${
-                        s.count > 0 ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-500'
-                      }`}
-                    >
-                      {s.count}
-                    </div>
-                    <span className="mt-1 text-[11px] text-slate-600">{s.label}</span>
-                  </div>
-                  {i < phaseCounts.length - 1 && <div className="mb-4 h-px flex-1 bg-slate-300" />}
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section>
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-900">つながり一覧</h2>
-              <Link to="/matches" className="text-xs text-slate-500 underline">
-                すべて見る
-              </Link>
-            </div>
-            {connections.length === 0 ? (
-              <p className="text-sm text-slate-500">
-                進行中のつながりはまだありません。「マッチング」から候補を再計算してみましょう。
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {connections.map(({ match, counterpartName }) => (
-                  <div key={match.id} className="rounded-xl border border-slate-200 bg-white p-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-slate-900">{counterpartName}</span>
-                      <PhaseBadge phase={match.phase} status={match.status} />
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500">
-                      メッセージ {match.messageCount}件 / マッチ度 {Math.round(match.scoreBreakdown.currentTotal * 100)}%
-                    </p>
-                    <div className="mt-2 flex gap-2">
-                      <Link
-                        to={`/matches/${match.id}/chat`}
-                        className="flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-center text-xs font-medium hover:bg-slate-100"
+            <section className="rounded-2xl border border-border bg-surface p-5 shadow-card">
+              <h2 className="font-jp text-[13px] font-semibold text-foreground">ご縁の進捗</h2>
+              <div className="mt-5 flex items-center">
+                {phaseCounts.map((s, i) => (
+                  <div key={s.phase} className="flex flex-1 items-center">
+                    <div className="flex flex-1 flex-col items-center gap-1.5 text-center">
+                      <div
+                        className={`flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-semibold transition-colors ${
+                          s.count > 0
+                            ? 'bg-accent text-accent-foreground'
+                            : 'border border-border bg-surface-secondary text-muted-foreground'
+                        }`}
                       >
-                        メッセージ
-                      </Link>
-                      <Link
-                        to={`/matches/${match.id}/phase`}
-                        className="flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-center text-xs font-medium hover:bg-slate-100"
-                      >
-                        フェーズ管理
-                      </Link>
+                        {s.count}
+                      </div>
+                      <span className="font-jp whitespace-nowrap text-[11px] text-muted-foreground">{s.label}</span>
                     </div>
+                    {i < phaseCounts.length - 1 && <div className="mb-5 h-px flex-1 bg-border" />}
                   </div>
                 ))}
               </div>
-            )}
-          </section>
-        </>
-      )}
+            </section>
+
+            <section>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="font-mincho text-[17px] font-semibold text-foreground">つながり一覧</h2>
+                <Link
+                  to="/matches"
+                  className="font-jp text-[12px] text-muted-foreground underline-offset-4 hover:text-accent hover:underline"
+                >
+                  すべて見る
+                </Link>
+              </div>
+              {connections.length === 0 ? (
+                <div className="noren-stripes rounded-2xl border border-dashed border-border px-5 py-8 text-center">
+                  <p className="font-jp text-[13px] text-muted-foreground">
+                    進行中のつながりはまだありません。「マッチング」から候補を再計算してみましょう。
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {connections.map(({ match, counterpartName }) => (
+                    <div key={match.id} className="rounded-2xl border border-border bg-surface p-4 shadow-card">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mincho text-[15px] font-semibold text-foreground">{counterpartName}</span>
+                        <PhaseBadge phase={match.phase} status={match.status} />
+                      </div>
+                      <p className="font-jp mt-1.5 text-[12px] text-muted-foreground">
+                        メッセージ {match.messageCount}件 / マッチ度{' '}
+                        <span className="font-semibold text-gold">{Math.round(match.scoreBreakdown.currentTotal * 100)}%</span>
+                      </p>
+                      <div className="mt-3 flex gap-2">
+                        <Link
+                          to={`/matches/${match.id}/chat`}
+                          className="font-jp flex-1 rounded-full border border-border px-3 py-1.5 text-center text-[12px] font-medium text-foreground/80 transition-colors hover:bg-surface-secondary"
+                        >
+                          メッセージ
+                        </Link>
+                        <Link
+                          to={`/matches/${match.id}/phase`}
+                          className="font-jp flex-1 rounded-full border border-border px-3 py-1.5 text-center text-[12px] font-medium text-foreground/80 transition-colors hover:bg-surface-secondary"
+                        >
+                          フェーズ管理
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </>
+        )}
+      </div>
     </div>
   );
 }

@@ -17,8 +17,8 @@ interface CandidateEntry<T> {
 function ConnectionBadge({ connected }: { connected: boolean }) {
   return (
     <span
-      className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${
-        connected ? 'border-emerald-300 bg-emerald-100 text-emerald-800' : 'border-slate-300 bg-slate-100 text-slate-600'
+      className={`font-jp shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${
+        connected ? 'border-accent bg-surface-secondary text-accent-secondary' : 'border-border bg-surface text-muted-foreground'
       }`}
     >
       {connected ? 'つながり中' : '未接触'}
@@ -26,47 +26,51 @@ function ConnectionBadge({ connected }: { connected: boolean }) {
   );
 }
 
+function Tag({ children }: { children: string }) {
+  return (
+    <span className="font-jp rounded-full border border-border bg-surface-secondary/60 px-2.5 py-1 text-[11px] text-accent-secondary">
+      {children}
+    </span>
+  );
+}
+
 function TalentCard({ profile, connected }: CandidateEntry<Talent>) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="font-semibold text-slate-900">{profile.name}</h3>
+    <div className="rounded-2xl border border-border bg-surface p-5 shadow-card">
+      <div className="flex items-start justify-between gap-3">
+        <h3 className="font-mincho text-[16px] font-semibold text-foreground">{profile.name}</h3>
         <ConnectionBadge connected={connected} />
       </div>
-      <p className="mt-1 text-xs text-slate-500">
+      <p className="font-jp mt-1.5 text-[12px] text-muted-foreground">
         {profile.prefecture} / 週{profile.weeklyAvailableHours}時間 / {WORK_STYLE_LABEL[profile.workStyle]} / 承継関心度{' '}
         {profile.successionInterestLevel}/5
       </p>
-      <div className="mt-2 flex flex-wrap gap-1">
+      <div className="mt-3 flex flex-wrap gap-1.5">
         {profile.skills.map((s) => (
-          <span key={s} className="rounded-full bg-sky-100 px-2 py-0.5 text-xs text-sky-800">
-            {s}
-          </span>
+          <Tag key={s}>{s}</Tag>
         ))}
       </div>
-      {profile.bio && <p className="mt-2 text-sm text-slate-600">{profile.bio}</p>}
+      {profile.bio && <p className="font-jp mt-3 text-[13px] leading-relaxed text-foreground/80">{profile.bio}</p>}
     </div>
   );
 }
 
 function CompanyCard({ profile, connected }: CandidateEntry<Company>) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="font-semibold text-slate-900">{profile.name}</h3>
+    <div className="rounded-2xl border border-border bg-surface p-5 shadow-card">
+      <div className="flex items-start justify-between gap-3">
+        <h3 className="font-mincho text-[16px] font-semibold text-foreground">{profile.name}</h3>
         <ConnectionBadge connected={connected} />
       </div>
-      <p className="mt-1 text-xs text-slate-500">
+      <p className="font-jp mt-1.5 text-[12px] text-muted-foreground">
         {profile.industry} / {profile.prefecture}
       </p>
-      <div className="mt-2 flex flex-wrap gap-1">
+      <div className="mt-3 flex flex-wrap gap-1.5">
         {profile.wantedPersonaTags.map((t) => (
-          <span key={t} className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
-            {t}
-          </span>
+          <Tag key={t}>{t}</Tag>
         ))}
       </div>
-      {profile.overview && <p className="mt-2 text-sm text-slate-600">{profile.overview}</p>}
+      {profile.overview && <p className="font-jp mt-3 text-[13px] leading-relaxed text-foreground/80">{profile.overview}</p>}
     </div>
   );
 }
@@ -120,41 +124,47 @@ export function SearchPage() {
   }, [user, role]);
 
   return (
-    <div className="mx-auto max-w-lg space-y-4 px-4 py-6">
-      <header>
-        <h1 className="text-lg font-bold text-slate-900">さがす</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          {role === 'company' ? '副業から関わってくれる人材を探せます。' : '副業から始められる企業を探せます。'}
-        </p>
-      </header>
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto max-w-lg space-y-5 px-5 py-7">
+        <header className="animate-noren-rise">
+          <h1 className="font-mincho text-[24px] font-semibold leading-tight text-foreground">さがす</h1>
+          <p className="font-jp mt-2 text-[13px] leading-relaxed text-muted-foreground">
+            {role === 'company' ? '副業から関わってくれる人材を探せます。' : '副業から始められる企業を探せます。'}
+          </p>
+        </header>
 
-      {loading ? (
-        <p className="text-sm text-slate-500">読み込み中...</p>
-      ) : error ? (
-        <p className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700">{error}</p>
-      ) : !role ? (
-        <p className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500">
-          ロールが設定されていないため、表示できる情報がありません。
-        </p>
-      ) : role === 'company' ? (
-        talents && talents.length > 0 ? (
+        {loading ? (
+          <p className="font-jp text-[13px] text-muted-foreground">読み込み中...</p>
+        ) : error ? (
+          <p className="font-jp rounded-2xl border border-border bg-surface p-3 text-[12px] text-danger shadow-card">{error}</p>
+        ) : !role ? (
+          <p className="font-jp rounded-2xl border border-border bg-surface p-4 text-[13px] text-muted-foreground shadow-card">
+            ロールが設定されていないため、表示できる情報がありません。
+          </p>
+        ) : role === 'company' ? (
+          talents && talents.length > 0 ? (
+            <div className="space-y-3">
+              {talents.map((t) => (
+                <TalentCard key={t.id} profile={t} connected={connectedIds.has(t.id)} />
+              ))}
+            </div>
+          ) : (
+            <div className="noren-stripes rounded-2xl border border-dashed border-border px-5 py-8 text-center">
+              <p className="font-jp text-[13px] text-muted-foreground">登録されている人材がまだいません。</p>
+            </div>
+          )
+        ) : companies && companies.length > 0 ? (
           <div className="space-y-3">
-            {talents.map((t) => (
-              <TalentCard key={t.id} profile={t} connected={connectedIds.has(t.id)} />
+            {companies.map((c) => (
+              <CompanyCard key={c.id} profile={c} connected={connectedIds.has(c.id)} />
             ))}
           </div>
         ) : (
-          <p className="text-sm text-slate-500">登録されている人材がまだいません。</p>
-        )
-      ) : companies && companies.length > 0 ? (
-        <div className="space-y-3">
-          {companies.map((c) => (
-            <CompanyCard key={c.id} profile={c} connected={connectedIds.has(c.id)} />
-          ))}
-        </div>
-      ) : (
-        <p className="text-sm text-slate-500">登録されている企業がまだいません。</p>
-      )}
+          <div className="noren-stripes rounded-2xl border border-dashed border-border px-5 py-8 text-center">
+            <p className="font-jp text-[13px] text-muted-foreground">登録されている企業がまだいません。</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

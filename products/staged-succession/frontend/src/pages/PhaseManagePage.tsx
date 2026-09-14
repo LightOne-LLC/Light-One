@@ -15,6 +15,12 @@ const PHASE_LABEL: Record<number | string, string> = {
   completed: '承継成立',
 };
 
+const PHASE_STEPS: { phase: 1 | 2 | 3; label: string }[] = [
+  { phase: 1, label: '副業' },
+  { phase: 2, label: '関係深化' },
+  { phase: 3, label: '承継検討' },
+];
+
 function formatDate(ts: unknown): string {
   if (typeof ts === 'string') return new Date(ts).toLocaleString('ja-JP');
   return '-';
@@ -102,121 +108,172 @@ export function PhaseManagePage() {
     }
   }
 
-  if (!match) return <p className="p-6 text-sm text-slate-500">マッチが見つかりません。</p>;
+  if (!match)
+    return (
+      <div className="min-h-screen bg-background">
+        <p className="font-jp p-6 text-[13px] text-muted-foreground">マッチが見つかりません。</p>
+      </div>
+    );
 
   const myIntentGiven = role === 'talent' ? match.continuationIntent?.talent : match.continuationIntent?.company;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5 px-4 py-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold text-slate-900">フェーズ管理</h1>
-        <Link to={`/matches/${matchId}/chat`} className="text-xs text-slate-500 underline">
-          メッセージへ
-        </Link>
-      </div>
-
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <span className="text-sm text-slate-600">{match.talentId} × {match.companyId}</span>
-          <PhaseBadge phase={match.phase} status={match.status} />
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto max-w-2xl space-y-5 px-5 py-7">
+        <div className="animate-noren-rise flex items-center justify-between">
+          <h1 className="font-mincho text-[22px] font-semibold leading-tight text-foreground">フェーズ管理</h1>
+          <Link
+            to={`/matches/${matchId}/chat`}
+            className="font-jp text-[12px] text-muted-foreground underline-offset-4 hover:text-accent hover:underline"
+          >
+            メッセージへ
+          </Link>
         </div>
-        <ScoreBreakdown breakdown={match.scoreBreakdown} />
-      </div>
 
-      {match.status === 'active' && match.phase === 1 && (
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="mb-2 text-sm font-semibold text-slate-900">フェーズ2への昇格条件</h2>
-          <p className="mb-2 text-xs text-slate-500">
-            フェーズ1総合スコアが基準(60%)を超え、かつ双方が継続を希望すると昇格できます。
-          </p>
-          <div className="mb-3 flex gap-4 text-xs">
-            <span>人材の継続希望: {match.continuationIntent?.talent ? '✅' : '未表明'}</span>
-            <span>企業の継続希望: {match.continuationIntent?.company ? '✅' : '未表明'}</span>
+        {/* 現在地: どのフェーズにいるかを一目で分かるように */}
+        <div className="rounded-2xl border border-border bg-surface p-5 shadow-card">
+          <div className="flex items-center">
+            {PHASE_STEPS.map((s, i) => (
+              <div key={s.phase} className="flex flex-1 items-center">
+                <div className="flex flex-1 flex-col items-center gap-1.5 text-center">
+                  <div
+                    className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-semibold transition-colors ${
+                      match.phase === s.phase
+                        ? 'bg-gold text-accent-foreground'
+                        : match.phase > s.phase
+                          ? 'bg-accent text-accent-foreground'
+                          : 'border border-border bg-surface-secondary text-muted-foreground'
+                    }`}
+                  >
+                    {s.phase}
+                  </div>
+                  <span
+                    className={`font-jp whitespace-nowrap text-[10.5px] ${
+                      match.phase === s.phase ? 'font-semibold text-gold' : 'text-muted-foreground'
+                    }`}
+                  >
+                    {s.label}
+                  </span>
+                </div>
+                {i < PHASE_STEPS.length - 1 && <div className="mb-5 h-px flex-1 bg-border" />}
+              </div>
+            ))}
           </div>
-          {!myIntentGiven && (
-            <button
-              onClick={handleExpressIntent}
-              disabled={busy}
-              className="mr-2 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-100"
-            >
-              継続を希望する
-            </button>
-          )}
-        </div>
-      )}
 
-      {match.status === 'active' && match.phase === 2 && (
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="mb-2 text-sm font-semibold text-slate-900">相互レビュー（フェーズ3昇格スコアに反映）</h2>
-          <div className="flex items-center gap-3">
-            <StarRating value={rating} onChange={setRating} />
-            <button onClick={handleReview} disabled={busy} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-100">
-              レビューを送信
-            </button>
+          <div className="mt-5 flex items-center justify-between gap-2 border-t border-border pt-4">
+            <span className="font-jp truncate text-[11px] text-muted-foreground">
+              {match.talentId} × {match.companyId}
+            </span>
+            <PhaseBadge phase={match.phase} status={match.status} />
+          </div>
+          <div className="mt-4">
+            <ScoreBreakdown breakdown={match.scoreBreakdown} />
           </div>
         </div>
-      )}
 
-      {match.status === 'active' && (
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="mb-2 text-sm font-semibold text-slate-900">操作</h2>
-          <div className="flex flex-wrap gap-2">
-            {match.phase < 3 && (
+        {/* 現在の状態・必要なアクション */}
+        {match.status === 'active' && match.phase === 1 && (
+          <div className="rounded-2xl border border-border bg-surface p-5 shadow-card">
+            <h2 className="font-mincho text-[15px] font-semibold text-foreground">フェーズ2への昇格条件</h2>
+            <p className="font-jp mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+              フェーズ1総合スコアが基準(60%)を超え、かつ双方が継続を希望すると昇格できます。
+            </p>
+            <div className="font-jp mt-3 flex gap-4 text-[12px] text-foreground/80">
+              <span>人材の継続希望: {match.continuationIntent?.talent ? '✅' : '未表明'}</span>
+              <span>企業の継続希望: {match.continuationIntent?.company ? '✅' : '未表明'}</span>
+            </div>
+            {!myIntentGiven && (
               <button
-                onClick={handleEvaluate}
+                onClick={handleExpressIntent}
                 disabled={busy}
-                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-100"
+                className="font-jp mt-3 rounded-full border border-accent px-4 py-2 text-[12.5px] font-medium text-accent transition-colors hover:bg-surface-secondary disabled:opacity-50"
               >
-                昇格判定を確認
+                継続を希望する
               </button>
             )}
-            {match.phase < 3 && (
-              <button
-                onClick={() => handleAction('promote')}
-                disabled={busy}
-                className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-50"
-              >
-                次のフェーズへ昇格
-              </button>
-            )}
-            {match.phase === 3 && (
-              <button
-                onClick={() => handleAction('complete')}
-                disabled={busy}
-                className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-500 disabled:opacity-50"
-              >
-                承継成立にする
-              </button>
-            )}
-            <button
-              onClick={() => handleAction('decline')}
-              disabled={busy}
-              className="rounded-md border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
-            >
-              解消する
-            </button>
           </div>
-          {evalResult && (
-            <p className={`mt-2 text-xs ${evalResult.eligible ? 'text-emerald-600' : 'text-slate-500'}`}>{evalResult.reason}</p>
-          )}
-          {message && <p className="mt-2 text-xs text-slate-600">{message}</p>}
-        </div>
-      )}
+        )}
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-2 text-sm font-semibold text-slate-900">フェーズ変更履歴</h2>
-        {history.length === 0 && <p className="text-xs text-slate-400">履歴はまだありません。</p>}
-        <ol className="space-y-2">
-          {history.map((h) => (
-            <li key={h.id} className="border-l-2 border-slate-300 pl-3 text-xs text-slate-600">
-              <span className="font-medium text-slate-900">
-                {h.fromPhase ? PHASE_LABEL[h.fromPhase] : '開始'} → {PHASE_LABEL[h.toPhase]}
-              </span>
-              <span className="ml-2 text-slate-400">{formatDate(h.createdAt)}</span>
-              <p>{h.reason}</p>
-            </li>
-          ))}
-        </ol>
+        {match.status === 'active' && match.phase === 2 && (
+          <div className="rounded-2xl border border-border bg-surface p-5 shadow-card">
+            <h2 className="font-mincho text-[15px] font-semibold text-foreground">相互レビュー（フェーズ3昇格スコアに反映）</h2>
+            <div className="mt-3 flex items-center gap-3">
+              <StarRating value={rating} onChange={setRating} />
+              <button
+                onClick={handleReview}
+                disabled={busy}
+                className="font-jp rounded-full border border-accent px-4 py-2 text-[12.5px] font-medium text-accent transition-colors hover:bg-surface-secondary disabled:opacity-50"
+              >
+                レビューを送信
+              </button>
+            </div>
+          </div>
+        )}
+
+        {match.status === 'active' && (
+          <div className="rounded-2xl border border-border bg-surface p-5 shadow-card">
+            <h2 className="font-mincho text-[15px] font-semibold text-foreground">操作</h2>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {match.phase < 3 && (
+                <button
+                  onClick={handleEvaluate}
+                  disabled={busy}
+                  className="font-jp rounded-full border border-border px-3.5 py-2 text-[12.5px] font-medium text-foreground/80 transition-colors hover:bg-surface-secondary disabled:opacity-50"
+                >
+                  昇格判定を確認
+                </button>
+              )}
+              {match.phase < 3 && (
+                <button
+                  onClick={() => handleAction('promote')}
+                  disabled={busy}
+                  className="font-jp rounded-full bg-accent px-3.5 py-2 text-[12.5px] font-semibold text-accent-foreground shadow-card transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  次のフェーズへ昇格
+                </button>
+              )}
+              {match.phase === 3 && (
+                <button
+                  onClick={() => handleAction('complete')}
+                  disabled={busy}
+                  className="font-jp rounded-full bg-gold px-3.5 py-2 text-[12.5px] font-semibold text-accent-foreground shadow-card transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  承継成立にする
+                </button>
+              )}
+              <button
+                onClick={() => handleAction('decline')}
+                disabled={busy}
+                className="font-jp rounded-full border border-danger px-3.5 py-2 text-[12.5px] font-medium text-danger transition-colors hover:bg-surface-secondary disabled:opacity-50"
+              >
+                解消する
+              </button>
+            </div>
+            {evalResult && (
+              <p className={`font-jp mt-3 text-[12px] ${evalResult.eligible ? 'text-success' : 'text-muted-foreground'}`}>
+                {evalResult.reason}
+              </p>
+            )}
+            {message && <p className="font-jp mt-2 text-[12px] text-muted-foreground">{message}</p>}
+          </div>
+        )}
+
+        {/* 履歴 */}
+        <div className="rounded-2xl border border-border bg-surface p-5 shadow-card">
+          <h2 className="font-mincho text-[15px] font-semibold text-foreground">フェーズ変更履歴</h2>
+          {history.length === 0 && <p className="font-jp mt-2 text-[12px] text-muted-foreground">履歴はまだありません。</p>}
+          <ol className="mt-3 space-y-3">
+            {history.map((h) => (
+              <li key={h.id} className="border-l-2 border-border pl-3.5 text-[12px] text-muted-foreground">
+                <span className="font-jp font-medium text-foreground">
+                  {h.fromPhase ? PHASE_LABEL[h.fromPhase] : '開始'} → {PHASE_LABEL[h.toPhase]}
+                </span>
+                <span className="font-jp ml-2 text-muted-foreground/70">{formatDate(h.createdAt)}</span>
+                <p className="font-jp mt-0.5 text-foreground/70">{h.reason}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
       </div>
     </div>
   );

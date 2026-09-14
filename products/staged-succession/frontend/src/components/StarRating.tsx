@@ -15,8 +15,8 @@ export function StarRating({
           type="button"
           disabled={readOnly}
           onClick={() => onChange?.(n)}
-          className={`text-lg leading-none ${n <= value ? 'text-amber-500' : 'text-slate-300'} ${
-            readOnly ? 'cursor-default' : 'cursor-pointer hover:text-amber-400'
+          className={`text-lg leading-none transition-colors ${n <= value ? 'text-gold' : 'text-border'} ${
+            readOnly ? 'cursor-default' : 'cursor-pointer hover:text-accent'
           }`}
           aria-label={`${n}点`}
         >

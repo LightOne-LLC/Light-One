@@ -6,10 +6,13 @@ const PHASE_LABEL: Record<MatchPhase, string> = {
   3: 'フェーズ3: 承継検討',
 };
 
+// Phase depth is expressed as a quiet gradation (muted -> accent -> gold)
+// rather than unrelated hues, to match the NOREN "deepening relationship"
+// visual language instead of a SaaS-style rainbow status color scheme.
 const PHASE_COLOR: Record<MatchPhase, string> = {
-  1: 'bg-sky-100 text-sky-800 border-sky-300',
-  2: 'bg-violet-100 text-violet-800 border-violet-300',
-  3: 'bg-amber-100 text-amber-800 border-amber-300',
+  1: 'border-border bg-surface-secondary text-muted-foreground',
+  2: 'border-accent bg-surface-secondary text-accent-secondary',
+  3: 'border-gold bg-surface-secondary text-gold',
 };
 
 const STATUS_LABEL: Record<MatchStatus, string> = {
@@ -18,14 +21,20 @@ const STATUS_LABEL: Record<MatchStatus, string> = {
   completed: '承継成立',
 };
 
+const STATUS_COLOR: Record<MatchStatus, string> = {
+  active: 'border-border bg-surface text-muted-foreground',
+  declined: 'border-border bg-surface text-danger',
+  completed: 'border-border bg-surface text-success',
+};
+
 export function PhaseBadge({ phase, status }: { phase: MatchPhase; status?: MatchStatus }) {
   return (
     <div className="flex items-center gap-2">
-      <span className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${PHASE_COLOR[phase]}`}>
+      <span className={`font-jp rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${PHASE_COLOR[phase]}`}>
         {PHASE_LABEL[phase]}
       </span>
       {status && status !== 'active' && (
-        <span className="rounded-full border border-slate-300 bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
+        <span className={`font-jp rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${STATUS_COLOR[status]}`}>
           {STATUS_LABEL[status]}
         </span>
       )}

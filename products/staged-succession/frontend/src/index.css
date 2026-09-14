@@ -1,7 +1,93 @@
+@import url('https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 body {
   @apply bg-slate-50 text-slate-900;
+}
+
+/**
+ * NOREN design system tokens, ported from the v0 UI prototype
+ * (github.com/yuhl6666/noren-for-business). Purely additive: nothing above
+ * this point is touched, and no existing page currently references any of
+ * these variables/classes, so current screens are visually unchanged.
+ * Prefixed with --noren- to avoid colliding with any future token names.
+ */
+:root {
+  --noren-background: #f7f6f2;
+  --noren-surface: #ffffff;
+  --noren-surface-secondary: #edede6;
+  --noren-stripe: #f1f0ea;
+  --noren-foreground: #1c1c1b;
+  --noren-secondary-text: #6b685f;
+  --noren-border: #e3e0d6;
+  --noren-accent: #5b3a22;
+  --noren-accent-secondary: #7a5236;
+  --noren-accent-foreground: #f7f6f2;
+  --noren-gold: #ad8a2e;
+  --noren-danger: #b3432b;
+  --noren-success: #2f6f4e;
+}
+
+.dark {
+  --noren-background: #17150f;
+  --noren-surface: #201d16;
+  --noren-surface-secondary: #2a261d;
+  --noren-stripe: #1c1a13;
+  --noren-foreground: #f2f0e9;
+  --noren-secondary-text: #a8a296;
+  --noren-border: #38332748;
+  --noren-accent: #c89b6a;
+  --noren-accent-secondary: #a87f52;
+  --noren-accent-foreground: #1c1a13;
+  --noren-gold: #d4b25a;
+  --noren-danger: #d46a52;
+  --noren-success: #5fa37e;
+}
+
+@layer utilities {
+  /* Diagonal noren-inspired stripe texture */
+  .noren-stripes {
+    background-image: repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, var(--noren-accent) 4%, transparent) 0px,
+      color-mix(in srgb, var(--noren-accent) 4%, transparent) 1px,
+      transparent 1px,
+      transparent 11px
+    );
+  }
+
+  .noren-stripes-strong {
+    background-image: repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, var(--noren-accent) 8%, transparent) 0px,
+      color-mix(in srgb, var(--noren-accent) 8%, transparent) 1px,
+      transparent 1px,
+      transparent 9px
+    );
+  }
+
+  .noren-panel {
+    background-color: var(--noren-stripe);
+    background-image: repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, var(--noren-accent) 5%, transparent) 0px,
+      color-mix(in srgb, var(--noren-accent) 5%, transparent) 1px,
+      transparent 1px,
+      transparent 12px
+    );
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-noren-rise,
+  .animate-noren-scale-in,
+  .animate-noren-sheet-up,
+  .animate-noren-overlay-fade,
+  .animate-noren-shimmer {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
