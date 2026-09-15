@@ -65,6 +65,11 @@ function CandidateNote({ profile }: { profile: Candidate }) {
   return <p className="font-jp mt-3 text-[13px] leading-relaxed text-foreground/80">{note}</p>;
 }
 
+const SWIPE_THRESHOLD = 96;
+const FLY_DISTANCE = 640;
+const SNAP_BACK_TRANSITION = 'transform 0.32s cubic-bezier(0.16,1,0.3,1)';
+const FLY_TRANSITION = 'transform 0.32s cubic-bezier(0.16,1,0.3,1)';
+
 function SwipeCard({
   entry,
   stackIndex,
@@ -76,49 +81,102 @@ function SwipeCard({
   onDecision: (d: Decision) => void;
   busy: boolean;
 }) {
-  const [drag, setDrag] = useState({ x: 0, y: 0 });
+  // Drag position lives entirely in refs + direct DOM writes, not React
+  // state: updating React state on every pointermove forces a re-render per
+  // pixel of finger movement, which isn't guaranteed to land in the same
+  // frame as the browser's paint — that's what caused the "card lags a step
+  // behind the finger" feel. Only *gesture end* (leaving) touches state,
+  // since that happens once per swipe, not once per pixel.
   const [leaving, setLeaving] = useState<Decision | null>(null);
+  const cardRef = useRef<HTMLElement | null>(null);
+  const skipLabelRef = useRef<HTMLDivElement | null>(null);
+  const likeLabelRef = useRef<HTMLDivElement | null>(null);
   const start = useRef<{ x: number; y: number } | null>(null);
   const dragging = useRef(false);
+  const pos = useRef({ x: 0, y: 0 });
+  const rafId = useRef<number | null>(null);
   const isTop = stackIndex === 0;
-  const threshold = 96;
+
+  useEffect(() => {
+    return () => {
+      if (rafId.current !== null) cancelAnimationFrame(rafId.current);
+    };
+  }, []);
+
+  function paint() {
+    rafId.current = null;
+    const { x, y } = pos.current;
+    if (cardRef.current) cardRef.current.style.transform = `translate(${x}px, ${y}px) rotate(${x / 22}deg)`;
+    const strength = Math.min(Math.abs(x) / SWIPE_THRESHOLD, 1);
+    if (skipLabelRef.current) skipLabelRef.current.style.opacity = x < -40 ? String(strength) : '0';
+    if (likeLabelRef.current) likeLabelRef.current.style.opacity = x > 40 ? String(strength) : '0';
+  }
+
+  function schedulePaint() {
+    if (rafId.current !== null) return;
+    rafId.current = requestAnimationFrame(paint);
+  }
 
   function onPointerDown(e: React.PointerEvent) {
     if (!isTop || leaving || busy) return;
     if ((e.target as HTMLElement).closest('[data-no-drag]')) return;
     dragging.current = true;
     start.current = { x: e.clientX, y: e.clientY };
+    if (cardRef.current) cardRef.current.style.transition = 'none';
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }
 
   function onPointerMove(e: React.PointerEvent) {
     if (!dragging.current || !start.current) return;
-    setDrag({ x: e.clientX - start.current.x, y: (e.clientY - start.current.y) * 0.3 });
+    pos.current = { x: e.clientX - start.current.x, y: (e.clientY - start.current.y) * 0.3 };
+    schedulePaint();
   }
 
   function onPointerUp() {
     if (!dragging.current) return;
     dragging.current = false;
-    if (drag.x > threshold) return fly('like');
-    if (drag.x < -threshold) return fly('skip');
-    setDrag({ x: 0, y: 0 });
+    const { x } = pos.current;
+    if (x > SWIPE_THRESHOLD) return fly('like');
+    if (x < -SWIPE_THRESHOLD) return fly('skip');
+    // snap back to center
+    if (rafId.current !== null) {
+      cancelAnimationFrame(rafId.current);
+      rafId.current = null;
+    }
+    pos.current = { x: 0, y: 0 };
+    if (cardRef.current) {
+      cardRef.current.style.transition = SNAP_BACK_TRANSITION;
+      cardRef.current.style.transform = 'translate(0px, 0px) rotate(0deg)';
+    }
+    if (skipLabelRef.current) skipLabelRef.current.style.opacity = '0';
+    if (likeLabelRef.current) likeLabelRef.current.style.opacity = '0';
   }
 
   function fly(decision: Decision) {
     if (busy) return;
+    if (rafId.current !== null) {
+      cancelAnimationFrame(rafId.current);
+      rafId.current = null;
+    }
     setLeaving(decision);
-    setDrag({ x: decision === 'like' ? 640 : -640, y: drag.y });
+    if (cardRef.current) {
+      cardRef.current.style.transition = FLY_TRANSITION;
+      const x = decision === 'like' ? FLY_DISTANCE : -FLY_DISTANCE;
+      cardRef.current.style.transform = `translate(${x}px, ${pos.current.y}px) rotate(${x / 22}deg)`;
+    }
+    // Decision + advancing to the next card is handled by the caller and is
+    // intentionally decoupled from the api.likeOrSkip() network round trip
+    // (see SearchPage.handleDecision) so the fly-away animation and the next
+    // card's arrival aren't blocked waiting on Supabase.
     onDecision(decision);
   }
 
-  const rotation = drag.x / 22;
-  const intent = drag.x > 40 ? 'like' : drag.x < -40 ? 'skip' : null;
-  const intentStrength = Math.min(Math.abs(drag.x) / threshold, 1);
   const restingTransform = `translateY(${stackIndex * 10}px) scale(${1 - stackIndex * 0.04})`;
   const { profile, aiScore } = entry;
 
   return (
     <article
+      ref={cardRef as React.RefObject<HTMLElement>}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -126,25 +184,35 @@ function SwipeCard({
       className={`absolute inset-0 flex touch-none select-none flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-card ${
         isTop ? 'cursor-grab active:cursor-grabbing' : 'pointer-events-none'
       }`}
-      style={{
-        transform: isTop ? `translate(${drag.x}px, ${drag.y}px) rotate(${rotation}deg)` : restingTransform,
-        transition: dragging.current ? 'none' : 'transform 0.4s cubic-bezier(0.16,1,0.3,1)',
-        zIndex: 30 - stackIndex,
-        opacity: isTop ? 1 : stackIndex < 2 ? 1 : 0,
-      }}
+      // transform/transition for the top card are managed imperatively above
+      // (pointer handlers write directly to cardRef.current.style) so they're
+      // deliberately left out of this object — including them here would
+      // make React fight the imperative writes on every unrelated re-render.
+      style={
+        isTop
+          ? { zIndex: 30 - stackIndex, opacity: 1 }
+          : {
+              transform: restingTransform,
+              transition: 'transform 0.4s cubic-bezier(0.16,1,0.3,1)',
+              zIndex: 30 - stackIndex,
+              opacity: stackIndex < 2 ? 1 : 0,
+            }
+      }
       aria-hidden={!isTop}
     >
       {isTop && (
         <>
           <div
+            ref={skipLabelRef}
             className="pointer-events-none absolute left-4 top-4 z-20 rounded-lg border-2 border-danger px-3 py-1 font-mincho text-lg font-semibold text-danger"
-            style={{ opacity: intent === 'skip' ? intentStrength : 0, transform: 'rotate(-8deg)' }}
+            style={{ opacity: 0, transform: 'rotate(-8deg)' }}
           >
             Skip
           </div>
           <div
+            ref={likeLabelRef}
             className="pointer-events-none absolute right-4 top-4 z-20 rounded-lg border-2 border-accent px-3 py-1 font-mincho text-lg font-semibold text-accent"
-            style={{ opacity: intent === 'like' ? intentStrength : 0, transform: 'rotate(8deg)' }}
+            style={{ opacity: 0, transform: 'rotate(8deg)' }}
           >
             Like
           </div>
@@ -278,19 +346,29 @@ export function SearchPage() {
     };
   }, [user, role]);
 
-  async function handleDecision(entry: DeckEntry, decision: Decision) {
+  function handleDecision(entry: DeckEntry, decision: Decision) {
     if (busy) return;
     setBusy(true);
     setError(null);
-    try {
-      const { match } = await api.likeOrSkip(entry.profile.id, decision);
-      if (match) setMatchedNotice({ name: entry.profile.name, matchId: match.id });
-      setTimeout(() => setIndex((i) => i + 1), 260);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setTimeout(() => setBusy(false), 260);
-    }
+
+    // Advance to the next card as soon as the fly-away animation finishes —
+    // deliberately not waiting on the Supabase round trip here, so a slow
+    // network never stalls the swipe UI. api.likeOrSkip() still runs (and
+    // `busy` still blocks a new swipe until it resolves), so double
+    // Like/Skip is still prevented; it just no longer blocks *advancing*.
+    setTimeout(() => setIndex((i) => i + 1), 260);
+
+    api
+      .likeOrSkip(entry.profile.id, decision)
+      .then(({ match }) => {
+        if (match) setMatchedNotice({ name: entry.profile.name, matchId: match.id });
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => {
+        setBusy(false);
+      });
   }
 
   const remaining = deck ? deck.slice(index) : [];
