@@ -1,6 +1,55 @@
 @import "tailwindcss";
 
+/*
+  Premium UI design tokens.
+  金融プロダクトとしての信頼感を重視し、色数を絞った中立的なニュートラルスケール(slate)を基調に、
+  アクセント(indigo)・警告(amber)・危険(rose)・成功(emerald)のみを機能色として使う。
+*/
+@theme {
+  --color-surface: #ffffff;
+  --color-canvas: #f8fafc;
+  --font-display: "Inter", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+}
+
 body {
   margin: 0;
-  background-color: #f8fafc;
+  background-color: var(--color-canvas);
+  color: #0f172a;
+  font-feature-settings: "tnum" 1;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.25s ease-out;
+}
+
+/*
+  印刷/PDF用。診断レポート(#pdf-report)を紙面向けに整える。
+  折りたたみ済みの<details>は既定では中身が印刷されないため、summary以外を強制的に表示する。
+*/
+@media print {
+  body {
+    background: #ffffff;
+  }
+  #pdf-report {
+    max-width: 100%;
+  }
+  #pdf-report details:not([open]) > *:not(summary) {
+    display: block !important;
+  }
+  #pdf-report summary {
+    display: none;
+  }
+  #pdf-report section {
+    break-inside: avoid;
+    box-shadow: none !important;
+  }
 }
