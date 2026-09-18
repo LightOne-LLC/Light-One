@@ -1,8 +1,9 @@
 export { Card } from './Card';
-export { SectionHeader } from './SectionHeader';
+export type { CardVariant } from './Card';
 export { Button } from './Button';
-export { Badge } from './Badge';
-export { ChoiceCardGroup } from './ChoiceCard';
+export { Badge, StatusChip } from './Badge';
+export { SectionHeader, Eyebrow } from './SectionHeader';
+export { ChoiceCardGroup, ChoiceToggle } from './ChoiceCard';
 export { Metric } from './Metric';
 export { EmptyState, LoadingState } from './EmptyState';
 export { ResultHero } from './ResultHero';

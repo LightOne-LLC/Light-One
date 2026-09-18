@@ -1,5 +1,6 @@
 import type { DiagnosisInput } from '../../types/diagnosis';
-import { checkboxClass } from './FormField';
+import { FieldGroup } from './StepLayout';
+import { ChoiceToggle } from '../ui';
 
 interface Props {
   input: DiagnosisInput;
@@ -14,24 +15,17 @@ export function HealthStep({ input, onChange }: Props) {
 
   return (
     <div>
-      <h2 className="text-lg font-semibold tracking-tight text-navy mb-1">健康状態</h2>
-      <p className="text-sm text-ink-muted mb-5">既往歴は医療リスクの評価に使用します。詳細な病名の入力は不要です。</p>
-      <label
-        className={`flex items-center gap-3 min-h-[44px] px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors cursor-pointer ${
-          health.hasMedicalHistory ? 'border-navy bg-gold-soft text-navy-dark' : 'border-line text-ink-muted hover:border-line hover:bg-canvas'
-        }`}
-      >
-        <input
-          type="checkbox"
-          className={checkboxClass}
+      <FieldGroup title="Medical history" description="既往歴は医療リスクの評価に使用します。詳細な病名の入力は不要です。">
+        <ChoiceToggle
           checked={health.hasMedicalHistory}
-          onChange={(e) => update({ hasMedicalHistory: e.target.checked })}
+          onChange={(checked) => update({ hasMedicalHistory: checked })}
+          label="過去に大きな病気・入院歴などの既往歴がある"
+          hint="手術・入院を伴う治療歴、または継続的な通院歴がある場合はチェックしてください"
         />
-        過去に大きな病気・入院歴などの既往歴がある
-      </label>
-      <p className="text-xs text-ink-muted mt-2">
-        ここでは簡易チェックのみ行います。詳細な告知内容は実際の保険申込時に確認されます。
-      </p>
+        <p className="text-xs leading-relaxed text-ink-faint mt-4">
+          ここでは簡易チェックのみ行います。詳細な告知内容は実際の保険申込時に確認されます。
+        </p>
+      </FieldGroup>
     </div>
   );
 }

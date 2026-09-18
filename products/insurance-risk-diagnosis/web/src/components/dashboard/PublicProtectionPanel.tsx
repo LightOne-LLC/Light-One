@@ -33,16 +33,26 @@ export function PublicProtectionPanel({ basic }: { basic: DiagnosisInput['basic'
   ];
 
   return (
-    <Card as="section">
-      <SectionHeader title="Public Protection" description="職業や働き方によって、利用できる公的保障は異なります。" />
+    <Card as="section" variant="panel">
+      <SectionHeader
+        eyebrow="Before insurance"
+        title="Public Protection"
+        description="職業や働き方によって、利用できる公的保障は異なります。"
+      />
 
-      <ul className="divide-y divide-line">
+      <ul>
         {items.map((item) => (
-          <li key={item.label} className="flex items-start gap-3 py-3">
-            <span className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${item.available ? 'bg-emerald-500' : 'bg-line'}`} />
-            <div>
-              <p className="text-sm font-medium text-navy">{item.label}</p>
-              <p className="text-xs text-ink-muted">{item.note}</p>
+          <li key={item.label} className="grid grid-cols-[auto_1fr] gap-x-3 py-3 border-b border-line-soft last:border-0">
+            <span
+              className={`mt-[7px] w-4 h-px shrink-0 ${item.available ? 'bg-risk-low' : 'bg-line-strong'}`}
+              aria-hidden="true"
+            />
+            <div className="min-w-0">
+              <div className="flex items-baseline justify-between gap-3">
+                <p className={`text-[13px] font-medium ${item.available ? 'text-ink' : 'text-ink-faint'}`}>{item.label}</p>
+                {!item.available && <span className="text-[11px] text-ink-faint shrink-0">対象外</span>}
+              </div>
+              <p className="text-xs leading-relaxed text-ink-muted mt-0.5">{item.note}</p>
             </div>
           </li>
         ))}

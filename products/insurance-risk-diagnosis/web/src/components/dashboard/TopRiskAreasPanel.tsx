@@ -1,26 +1,44 @@
 import type { RiskCategoryResult } from '../../types/diagnosis';
 import { riskLevelStyle } from '../../lib/riskLevelStyle';
-import { Card, SectionHeader } from '../ui';
+import { Card, SectionHeader, StatusChip } from '../ui';
 
+/*
+  優先順位を示す面。カードを並べるのではなく、順位そのものを紙面の骨格にする。
+  大きな連番 → 領域名 → 判定 → 理由、という一方向の読み順を作り、
+  行の間は罫線のみで区切る(箱の中に箱を作らない)。
+*/
 export function TopRiskAreasPanel({ categories }: { categories: RiskCategoryResult[] }) {
   const ranked = categories.slice().sort((a, b) => b.score - a.score).slice(0, 3);
 
   return (
-    <Card as="section">
-      <SectionHeader title="Top Risk Areas" description="現在の入力条件では、この順番で確認すると家計への影響が大きいと考えられます。" />
-      <ol className="space-y-3">
+    <Card as="section" variant="feature">
+      <SectionHeader
+        variant="editorial"
+        eyebrow="Priority"
+        title="Top Risk Areas"
+        description="現在の入力条件では、この順番で確認すると家計への影響が大きいと考えられます。"
+      />
+      <ol>
         {ranked.map((c, i) => {
           const style = riskLevelStyle(c.level);
           return (
-            <li key={c.key} className="flex items-center gap-4 rounded-xl border border-line p-4">
-              <span className="flex items-center justify-center w-8 h-8 rounded-full bg-navy text-white text-sm font-semibold shrink-0">
-                {i + 1}
+            <li
+              key={c.key}
+              className="grid grid-cols-[auto_1fr] gap-x-4 sm:gap-x-6 py-5 first:pt-0 last:pb-0 border-b border-line-soft last:border-0"
+            >
+              <span className="font-display-num text-3xl sm:text-4xl font-bold leading-none text-line-strong tabular-nums pt-0.5" aria-hidden="true">
+                {String(i + 1).padStart(2, '0')}
               </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-navy">{c.label}リスク</p>
-                <p className="text-xs text-ink-muted truncate">{c.reasons[0]}</p>
+              <div className="min-w-0">
+                <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                  <h3 className="text-[17px] sm:text-lg font-semibold tracking-[-0.01em] text-ink">{c.label}リスク</h3>
+                  <div className="flex items-baseline gap-3 shrink-0">
+                    <span className="font-display-num text-xl font-bold tabular-nums text-ink">{c.score}</span>
+                    <StatusChip label={style.label} className={style.badgeClass} />
+                  </div>
+                </div>
+                {c.reasons[0] && <p className="mt-1.5 text-[13px] leading-relaxed text-ink-muted">{c.reasons[0]}</p>}
               </div>
-              <span className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium ${style.badgeClass}`}>{style.label}</span>
             </li>
           );
         })}

@@ -1,49 +1,78 @@
 import type { ReactNode } from 'react';
 
-interface FormFieldProps {
-  label: string;
-  children: ReactNode;
-  hint?: string;
-  required?: boolean;
-  error?: string;
-  unknownAction?: { label: string; onClick: () => void };
-}
+/*
+  入力欄の面。事務フォームの薄い枠線ではなく、白い面に静かな境界と
+  フォーカス時のリングを持たせる。数値は tabular-nums で桁を揃え、
+  金額としてまっすぐ読めるようにする。
+*/
+export const inputClass =
+  'w-full min-h-[48px] rounded-control border border-line bg-surface px-4 py-3 text-base sm:text-[15px] text-ink tabular-nums transition-all duration-200 placeholder:text-ink-faint/70 focus:outline-none focus:border-navy focus:ring-2 focus:ring-navy/15';
 
-export function FormField({ label, children, hint, required, error, unknownAction }: FormFieldProps) {
+/** 単位ラベルを重ねる入力欄用。右側に単位分の余白を確保する */
+export const inputUnitClass = `${inputClass} pr-16`;
+
+export const selectClass = inputClass;
+
+/*
+  設問の重み付け。primary はそのstepの主要な問いとして大きく、
+  default は付随条件として控えめに組む。すべて同じ大きさで並べると
+  「記入項目の一覧」になり、判断の順序が伝わらない。
+*/
+export function FormField({
+  label,
+  unit,
+  required,
+  hint,
+  error,
+  children,
+  unknownAction,
+  emphasis = 'default',
+}: {
+  label: string;
+  unit?: string;
+  required?: boolean;
+  hint?: string;
+  error?: string;
+  children: ReactNode;
+  unknownAction?: { label: string; onClick: () => void };
+  emphasis?: 'primary' | 'default';
+}) {
   return (
     <label className="block mb-6">
-      <div className="flex items-baseline justify-between gap-2 mb-1.5">
-        <span className="text-sm font-medium text-navy">
-          {label}
+      <span className="flex items-baseline justify-between gap-3 mb-2">
+        <span className="flex items-baseline gap-2 min-w-0">
+          <span className={emphasis === 'primary' ? 'text-[17px] font-semibold tracking-[-0.01em] text-ink' : 'text-sm font-medium text-ink'}>
+            {label}
+          </span>
           {required ? (
-            <span className="ml-1.5 text-[10px] font-semibold tracking-wide text-rose-500 align-middle">必須</span>
+            <span className="text-[10px] font-semibold tracking-[0.1em] uppercase text-risk-critical shrink-0">必須</span>
           ) : (
-            <span className="ml-1.5 text-[10px] font-medium tracking-wide text-ink-muted align-middle">任意</span>
+            <span className="text-[10px] font-medium tracking-[0.1em] uppercase text-ink-faint shrink-0">任意</span>
           )}
         </span>
         {unknownAction && (
           <button
             type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              unknownAction.onClick();
-            }}
-            className="text-xs text-navy hover:text-navy-dark shrink-0 py-0.5"
+            onClick={unknownAction.onClick}
+            className="shrink-0 text-[11px] text-ink-muted hover:text-navy underline underline-offset-2 decoration-line-strong py-1"
           >
             {unknownAction.label}
           </button>
         )}
-      </div>
-      {children}
-      {error && <p className="text-xs text-rose-600 mt-1.5" role="alert">{error}</p>}
-      {!error && hint && <span className="block text-xs text-ink-muted mt-1.5">{hint}</span>}
+      </span>
+
+      <span className="relative block">
+        {children}
+        {unit && (
+          <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-[13px] text-ink-faint">{unit}</span>
+        )}
+      </span>
+
+      {error ? (
+        <span className="block text-xs text-risk-critical mt-1.5">{error}</span>
+      ) : hint ? (
+        <span className="block text-xs leading-relaxed text-ink-faint mt-1.5">{hint}</span>
+      ) : null}
     </label>
   );
 }
-
-export const inputClass =
-  'w-full min-h-[44px] rounded-lg border border-line px-3.5 py-2.5 text-base sm:text-sm text-navy transition-colors focus:outline-none focus:ring-2 focus:ring-navy/30 focus:border-navy';
-export const inputErrorClass =
-  'w-full min-h-[44px] rounded-lg border border-rose-300 px-3.5 py-2.5 text-base sm:text-sm text-navy transition-colors focus:outline-none focus:ring-2 focus:ring-rose-500/40 focus:border-rose-500';
-export const selectClass = inputClass;
-export const checkboxClass = 'w-5 h-5 rounded border-line text-navy focus:ring-navy/30 shrink-0';
