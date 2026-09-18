@@ -1,5 +1,6 @@
 import type { RiskCategoryResult } from '../../types/diagnosis';
 import { formatManYen } from '../../lib/riskLevelStyle';
+import { Card, SectionHeader } from '../ui';
 
 function GapRow({ label, value, emphasis }: { label: string; value: number; emphasis?: boolean }) {
   return (
@@ -31,16 +32,16 @@ export function FinancialGapPanel({ categories }: { categories: RiskCategoryResu
   const withGap = categories.filter((c) => c.gap);
   if (withGap.length === 0) return null;
   return (
-    <section className="bg-surface rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
-      <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-1">Financial Gap</h2>
-      <p className="text-sm text-slate-500 mb-6">
-        必要な資金から、公的保障・自己資産・既存の保険を差し引いた、いま確認しておきたい不足額です。
-      </p>
+    <Card as="section">
+      <SectionHeader
+        title="Financial Gap"
+        description="必要な資金から、公的保障・自己資産・既存の保険を差し引いた、いま確認しておきたい不足額です。"
+      />
       <div className="grid gap-4 sm:grid-cols-2">
         {withGap.map((c) => (
           <GapCard key={c.key} category={c} />
         ))}
       </div>
-    </section>
+    </Card>
   );
 }

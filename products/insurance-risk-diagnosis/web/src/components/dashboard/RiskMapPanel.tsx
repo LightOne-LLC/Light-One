@@ -1,11 +1,11 @@
 import type { RiskCategoryResult } from '../../types/diagnosis';
 import { riskLevelStyle } from '../../lib/riskLevelStyle';
+import { Card, SectionHeader } from '../ui';
 
 export function RiskMapPanel({ categories }: { categories: RiskCategoryResult[] }) {
   return (
-    <section className="bg-surface rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
-      <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-1">Risk Map</h2>
-      <p className="text-sm text-slate-500 mb-6">7つの領域ごとに、現在の備えに対する不足度を評価しています。</p>
+    <Card as="section">
+      <SectionHeader title="Risk Map" description="7つの領域ごとに、現在の備えに対する不足度を評価しています。" />
 
       <div className="space-y-5 sm:space-y-4">
         {categories.map((c) => {
@@ -31,6 +31,6 @@ export function RiskMapPanel({ categories }: { categories: RiskCategoryResult[] 
           );
         })}
       </div>
-    </section>
+    </Card>
   );
 }

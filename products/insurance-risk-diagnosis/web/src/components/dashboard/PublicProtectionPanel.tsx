@@ -1,4 +1,5 @@
 import type { DiagnosisInput } from '../../types/diagnosis';
+import { Card, SectionHeader } from '../ui';
 
 export function PublicProtectionPanel({ basic }: { basic: DiagnosisInput['basic'] }) {
   const isEmployee = basic.occupationType !== 'self_employed';
@@ -32,9 +33,8 @@ export function PublicProtectionPanel({ basic }: { basic: DiagnosisInput['basic'
   ];
 
   return (
-    <section className="bg-surface rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
-      <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-1">Public Protection</h2>
-      <p className="text-sm text-slate-500 mb-6">職業や働き方によって、利用できる公的保障は異なります。</p>
+    <Card as="section">
+      <SectionHeader title="Public Protection" description="職業や働き方によって、利用できる公的保障は異なります。" />
 
       <ul className="divide-y divide-slate-100">
         {items.map((item) => (
@@ -47,6 +47,6 @@ export function PublicProtectionPanel({ basic }: { basic: DiagnosisInput['basic'
           </li>
         ))}
       </ul>
-    </section>
+    </Card>
   );
 }

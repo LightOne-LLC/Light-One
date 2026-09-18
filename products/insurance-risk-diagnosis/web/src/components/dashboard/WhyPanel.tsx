@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { RiskCategoryResult } from '../../types/diagnosis';
 import { riskLevelStyle, formatManYen } from '../../lib/riskLevelStyle';
 import { NEXT_STEPS } from '../../lib/nextSteps';
+import { Card, SectionHeader } from '../ui';
 
 function WhyItem({ category, defaultOpen }: { category: RiskCategoryResult; defaultOpen: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -55,14 +56,13 @@ function WhyItem({ category, defaultOpen }: { category: RiskCategoryResult; defa
 export function WhyPanel({ categories }: { categories: RiskCategoryResult[] }) {
   const sorted = categories.slice().sort((a, b) => b.score - a.score);
   return (
-    <section className="bg-surface rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
-      <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-1">Why?</h2>
-      <p className="text-sm text-slate-500 mb-6">各リスクについて、入力内容からどのように判定したか、次に何を確認すべきかを確認できます。</p>
+    <Card as="section">
+      <SectionHeader title="Why?" description="各リスクについて、入力内容からどのように判定したか、次に何を確認すべきかを確認できます。" />
       <div className="space-y-3">
         {sorted.map((c, i) => (
           <WhyItem key={c.key} category={c} defaultOpen={i === 0} />
         ))}
       </div>
-    </section>
+    </Card>
   );
 }

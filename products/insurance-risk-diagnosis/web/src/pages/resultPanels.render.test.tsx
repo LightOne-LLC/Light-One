@@ -22,6 +22,7 @@ import { HealthStep } from '../components/steps/HealthStep';
 import { RetirementStep } from '../components/steps/RetirementStep';
 import { FormField } from '../components/steps/FormField';
 import { NEXT_STEPS } from '../lib/nextSteps';
+import { Card, Button, Badge, SectionHeader, ChoiceCardGroup } from '../components/ui';
 
 function richInput(): DiagnosisInput {
   return {
@@ -197,5 +198,55 @@ describe('FormField - required/unknownAction拡張', () => {
     );
     expect(html).toContain('エラー文');
     expect(html).not.toContain('ヒント文');
+  });
+});
+
+describe('ui kit - Card/Button/Badge/SectionHeader/ChoiceCardGroup', () => {
+  test('Cardはas="section"でsection要素をレンダリングする', () => {
+    const html = renderToStaticMarkup(<Card as="section">内容</Card>);
+    expect(html).toMatch(/^<section/);
+    expect(html).toContain('内容');
+  });
+
+  test('Cardは既定でdiv要素をレンダリングする', () => {
+    const html = renderToStaticMarkup(<Card>内容</Card>);
+    expect(html).toMatch(/^<div/);
+  });
+
+  test('Buttonのvariant/sizeでクラスが変わる', () => {
+    const primary = renderToStaticMarkup(<Button variant="primary">送信</Button>);
+    const danger = renderToStaticMarkup(<Button variant="danger">削除</Button>);
+    expect(primary).toContain('bg-indigo-600');
+    expect(danger).toContain('border-rose-200');
+  });
+
+  test('Badgeはtoneに応じたクラスを持つ', () => {
+    const html = renderToStaticMarkup(<Badge tone="success">OK</Badge>);
+    expect(html).toContain('bg-emerald-50');
+    expect(html).toContain('OK');
+  });
+
+  test('SectionHeaderはtitleとdescriptionを表示する', () => {
+    const html = renderToStaticMarkup(<SectionHeader title="タイトル" description="説明文" />);
+    expect(html).toContain('タイトル');
+    expect(html).toContain('説明文');
+  });
+
+  test('ChoiceCardGroupは選択中の値にaria-pressed=trueを付与する', () => {
+    const html = renderToStaticMarkup(
+      <ChoiceCardGroup
+        label="雇用形態"
+        required
+        value="employee"
+        onChange={() => {}}
+        options={[
+          { value: 'employee', label: '会社員' },
+          { value: 'self_employed', label: '自営業' },
+        ]}
+      />,
+    );
+    expect(html).toContain('会社員');
+    expect(html).toContain('aria-pressed="true"');
+    expect(html).toContain('aria-pressed="false"');
   });
 });

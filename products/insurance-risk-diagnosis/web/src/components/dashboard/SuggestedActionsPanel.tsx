@@ -1,5 +1,6 @@
 import type { RiskCategoryResult } from '../../types/diagnosis';
 import { NEXT_STEPS } from '../../lib/nextSteps';
+import { Card, SectionHeader } from '../ui';
 
 export function SuggestedActionsPanel({ categories, productTypes }: { categories: RiskCategoryResult[]; productTypes: string[] }) {
   const priority = categories
@@ -11,11 +12,11 @@ export function SuggestedActionsPanel({ categories, productTypes }: { categories
   const checklist = priority.length > 0 ? priority : categories.slice().sort((a, b) => b.score - a.score).slice(0, 1);
 
   return (
-    <section className="bg-surface rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
-      <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-1">Suggested Actions</h2>
-      <p className="text-sm text-slate-500 mb-6">
-        「保険に入る」ことではなく、「不足しているかもしれないリスクを確認する」ことを次の一歩にしてください。
-      </p>
+    <Card as="section">
+      <SectionHeader
+        title="Suggested Actions"
+        description="「保険に入る」ことではなく、「不足しているかもしれないリスクを確認する」ことを次の一歩にしてください。"
+      />
 
       <div className="space-y-5">
         {checklist.map((c) => (
@@ -48,6 +49,6 @@ export function SuggestedActionsPanel({ categories, productTypes }: { categories
           </p>
         </details>
       )}
-    </section>
+    </Card>
   );
 }
