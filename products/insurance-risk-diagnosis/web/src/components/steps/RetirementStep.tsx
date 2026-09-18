@@ -15,7 +15,7 @@ export function RetirementStep({ input, onChange }: Props) {
   return (
     <div>
       <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-5">老後の希望</h2>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
         <FormField label="希望する退職年齢">
           <input
             type="number"

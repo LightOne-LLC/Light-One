@@ -25,7 +25,7 @@ export function BasicInfoStep({ input, onChange }: Props) {
     <div>
       <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-5">基本情報</h2>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
         <FormField label="年齢">
           <input
             type="number"

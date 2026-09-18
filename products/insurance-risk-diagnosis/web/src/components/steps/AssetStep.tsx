@@ -15,7 +15,7 @@ export function AssetStep({ input, onChange }: Props) {
   return (
     <div>
       <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-5">資産・負債</h2>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
         <FormField label="貯蓄額(万円)" hint="現金・預金等、すぐに使える資産">
           <input
             type="number"
