@@ -1,12 +1,7 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { DatePrecisionCounts, GmailBulkImportResult } from '../../server/types';
 import { scoreColorClass } from '../scoreColor';
 import { useWorkspace } from '../workspaceContext';
-
-type Status = 'idle' | 'loading' | 'done' | 'error';
-
-const DEFAULT_LIMIT = 50;
 
 function DatePrecisionRow({ label, counts }: { label: string; counts: DatePrecisionCounts }) {
   return (
@@ -19,11 +14,14 @@ function DatePrecisionRow({ label, counts }: { label: string; counts: DatePrecis
   );
 }
 
+/**
+ * 取得成功時の集計結果表示。呼び出し側(GmailBulkImport本体)がすでに
+ * status==='success'(つまりresult.success===true)の場合のみ描画するため、
+ * 失敗時の分岐は持たない — result.reason(内部のエラー文言)をそのまま
+ * 画面に出す経路を作らないための境界。失敗表示は本体側の安全な汎用
+ * メッセージのみで行う。
+ */
 function ResultView({ result }: { result: GmailBulkImportResult }) {
-  if (!result.success) {
-    return <p className="empty-note">取得失敗: {result.reason ?? '不明なエラー'}</p>;
-  }
-
   return (
     <>
       <div className="card-row">
@@ -113,44 +111,27 @@ function ResultView({ result }: { result: GmailBulkImportResult }) {
 }
 
 /**
- * DashboardのGmail一括取り込みUI。既存のGmailImport(1件取得)とは別に、
- * サーバー側API(/api/gmail/fetch)を叩き、直近N件を分類・validation・
- * (可能なら)マッチングまで通した集計結果のみを表示する。Gmail認証情報や
- * メール本文/氏名/メールアドレスはここには一切来ない。
+ * Dashboardの取り込み状況表示 + 手動再取得UI。実データの取得自体は
+ * WorkspaceProviderがPWA起動時(マウント時)に自動実行するため、ここでは
+ * 共有state(workspaceContext)をそのまま表示するだけで、fetchロジックは
+ * 一切重複実装しない。「最新データを取得」ボタンも同じrefresh()を呼ぶ
+ * (初回の自動取得と手動再取得で、データフローを完全に統一する)。
  */
 export function GmailBulkImport() {
-  const [status, setStatus] = useState<Status>('idle');
-  const [result, setResult] = useState<GmailBulkImportResult | null>(null);
-  const workspace = useWorkspace();
-
-  const handleClick = async () => {
-    setStatus('loading');
-    setResult(null);
-    try {
-      const res = await fetch(`/api/gmail/fetch?limit=${DEFAULT_LIMIT}`);
-      const data: GmailBulkImportResult = await res.json();
-      setResult(data);
-      // Projects/Matching/Engineer Detailページからも同じ取り込み結果を
-      // 参照できるよう、共有state(workspaceContext)へも保存する。
-      workspace.setResult(data);
-      setStatus('done');
-    } catch {
-      setResult({ success: false, reason: 'API呼び出しに失敗しました。' });
-      setStatus('error');
-    }
-  };
+  const { result, status, refresh } = useWorkspace();
 
   return (
     <div className="card">
-      <div className="card-title">Gmail Import (直近{DEFAULT_LIMIT}件)</div>
-      <button type="button" onClick={handleClick} disabled={status === 'loading'}>
-        直近{DEFAULT_LIMIT}件を取得
+      <div className="card-title">Gmail Import (最新データ)</div>
+      <button type="button" onClick={() => void refresh()} disabled={status === 'loading'}>
+        最新データを取得
       </button>
       <div className="card-row">
         <span>Status</span>
         <span>{status === 'idle' ? '未実行' : status === 'loading' ? '取得中…' : status === 'error' ? 'エラー' : '完了'}</span>
       </div>
-      {result && <ResultView result={result} />}
+      {status === 'error' && <p className="empty-note">実データを取得できませんでした</p>}
+      {status === 'success' && result?.success && <ResultView result={result} />}
     </div>
   );
 }

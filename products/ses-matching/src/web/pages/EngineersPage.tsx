@@ -1,16 +1,28 @@
 import { dummyEngineers } from '../../demo/dummyData';
 import { formatDateValue } from '../formatDateValue';
+import { useWorkspace } from '../workspaceContext';
 
 export function EngineersPage() {
+  const { result, dataReady } = useWorkspace();
+  // 取得に成功した後は、たとえ0件でもdummy dataへは戻さない
+  // (dataReadyで判断する。件数では判断しない)。EngineerRecordの形は
+  // dummy dataと実データで完全に同じため、表示ロジック自体は共通化する。
+  const usingReal = dataReady && result?.success === true;
+  const engineers = usingReal ? (result.validEngineers ?? []) : dummyEngineers;
+
   return (
     <>
       <h1>Engineers</h1>
-      <p className="empty-note">要員一覧(ダミーデータ)</p>
+      <p className="empty-note">
+        {usingReal
+          ? '実Gmail取り込み結果の要員一覧です(Validation PASSしたBP Engineerのみ)。'
+          : '要員一覧(ダミーデータ)'}
+      </p>
 
-      {dummyEngineers.length === 0 ? (
+      {engineers.length === 0 ? (
         <p className="empty-note">要員がいません。</p>
       ) : (
-        dummyEngineers.map((engineer) => (
+        engineers.map((engineer) => (
           <div key={engineer.id} className="card">
             <div className="card-title">{engineer.id}</div>
             <div>

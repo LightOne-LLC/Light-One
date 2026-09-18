@@ -100,8 +100,8 @@ describe('Matching Workspace(実データがWorkspace全体を経由してEngine
       </MemoryRouter>,
     );
 
-    // Dashboardで一括取得を実行する
-    fireEvent.click(screen.getByRole('button', { name: '直近50件を取得' }));
+    // PWA起動時にWorkspaceProviderが自動で一括取得を行うため、
+    // ボタンクリックは不要(手動再取得と同じrefresh()を使うのみ)。
     await waitFor(() => expect(screen.getByText('実データMatching:')).toBeTruthy());
 
     // Workspace(Projects)へ移動すると、dummyではなく実データの案件が表示される
@@ -142,7 +142,6 @@ describe('Matching Workspace(実データがWorkspace全体を経由してEngine
         <App />
       </MemoryRouter>,
     );
-    fireEvent.click(screen.getByRole('button', { name: '直近50件を取得' }));
     await waitFor(() => expect(screen.getByText(/この結果をWorkspaceで見る/)).toBeTruthy());
     fireEvent.click(screen.getByText(/この結果をWorkspaceで見る/));
     await waitFor(() => expect(screen.getByText('候補を見る →')).toBeTruthy());
@@ -193,7 +192,6 @@ describe('Matching Workspace(実データがWorkspace全体を経由してEngine
         <App />
       </MemoryRouter>,
     );
-    fireEvent.click(screen.getByRole('button', { name: '直近50件を取得' }));
     await waitFor(() => expect(screen.getByText(/この結果をWorkspaceで見る/)).toBeTruthy());
 
     fireEvent.click(screen.getByText(/この結果をWorkspaceで見る/));
@@ -204,22 +202,30 @@ describe('Matching Workspace(実データがWorkspace全体を経由してEngine
     expect(screen.queryByText('候補を見る →')).toBeNull();
   });
 
-  it('実データが無い場合は既存dummy dataでのMatching(regression)が維持される', () => {
+  it('実データが無い場合は既存dummy dataでのMatching(regression)が維持される', async () => {
+    // 自動読み込み自体は常に実行されるが、失敗させてdataReady=falseのまま
+    // dummy dataへフォールバックさせる(取得成功時の実データ表示は
+    // 上記のテストで別途検証済み)。
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network error')));
+
     render(
       <MemoryRouter initialEntries={['/projects']}>
         <App />
       </MemoryRouter>,
     );
-    // Bulk Importを一度も実行していないため、既存のdummy data表示のまま
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
     expect(screen.getByText('案件一覧(ダミーデータ)')).toBeTruthy();
   });
 
-  it('存在しない案件/候補者のEngineer Detailは「見つかりません」を表示する', () => {
+  it('存在しない案件/候補者のEngineer Detailは「見つかりません」を表示する', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network error')));
+
     render(
       <MemoryRouter initialEntries={['/matching/no-such-project/engineer/no-such-engineer']}>
         <App />
       </MemoryRouter>,
     );
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
     expect(screen.getByText('案件または候補者が見つかりません。')).toBeTruthy();
   });
 });
