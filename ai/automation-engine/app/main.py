@@ -1,3 +1,4 @@
+import json
 import sys
 
 from app.evaluator import Evaluator
@@ -6,6 +7,7 @@ from app.planner import Planner, Task
 from app.recommender import Recommender
 from app.repair import AIRepair
 from app.router import ToolRouter
+from app.tool_contract import build_tool_contracts, validate_arguments
 
 MAX_RETRY = 1
 
@@ -37,25 +39,46 @@ def run_llm_task(user_input: str) -> tuple[Task, str]:
     return _run_planned_task(task)
 
 
-def _run_planned_task(task: Task) -> tuple[Task, str]:
-    """The Router -> Executor -> Evaluator -> Repair/Retry(max 1) portion
-    of the pipeline, shared by every Planner (rule-based or LLM) so it's
-    implemented exactly once."""
-    router = ToolRouter()
+def _execute_validated(routed_tool: str, task: Task, contracts: dict) -> str:
+    """Tool Contract validation, then (only if valid) the actual Executor
+    call — arguments that don't satisfy the routed Tool's contract never
+    reach ToolExecutor.execute()/`tool(**parameters)` at all.
+
+    Returns a result string in exactly the same two failure shapes
+    ToolExecutor itself already produces ("Unknown tool", or a JSON string
+    with an "error" key), so Evaluator needs no changes to recognize a
+    validation failure as a failure."""
+    contract = contracts.get(routed_tool)
+    if contract is None:
+        return "Unknown tool"
+
+    validation = validate_arguments(contract, task.parameters)
+    if not validation.valid:
+        return json.dumps({"error": f"Invalid arguments: {validation.error}"}, ensure_ascii=False)
+
     executor = ToolExecutor()
+    return executor.execute(routed_tool, task.instruction, task.parameters)
+
+
+def _run_planned_task(task: Task) -> tuple[Task, str]:
+    """The Router -> Tool Contract validation -> Executor -> Evaluator ->
+    Repair/Retry(max 1) portion of the pipeline, shared by every Planner
+    (rule-based or LLM) so it's implemented exactly once."""
+    router = ToolRouter()
     evaluator = Evaluator()
     repair = AIRepair()
+    contracts = build_tool_contracts()
 
     task.status = "running"
 
     routed_tool = router.route(task.tool)
-    result = executor.execute(routed_tool, task.instruction, task.parameters)
+    result = _execute_validated(routed_tool, task, contracts)
     evaluation = evaluator.evaluate(result)
 
     while not evaluation.success and task.retry_count < MAX_RETRY:
         task.retry_count += 1
         routed_tool = repair.repair(routed_tool)
-        result = executor.execute(routed_tool, task.instruction, task.parameters)
+        result = _execute_validated(routed_tool, task, contracts)
         evaluation = evaluator.evaluate(result)
 
     if evaluation.success:

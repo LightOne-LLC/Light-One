@@ -14,6 +14,13 @@ already used by Recommender) rather than inventing a new connection
 method or reaching into ai/llm-platform — that package is a separate
 Node/TypeScript project with no Python bridge today, and wiring one is
 out of scope for this minimal change.
+
+The Tool list (and each Tool's arguments) shown in the prompt comes from
+app.tool_contract.build_tool_contracts()/describe_tools_for_prompt() — the
+exact same Tool Contract that app.main._run_planned_task() validates
+arguments against before Executor runs. One contract, two consumers, so
+the LLM is never shown a spec that validation then judges it against
+differently.
 """
 
 import json
@@ -21,12 +28,16 @@ import json
 from app.llm import LLMProvider, OllamaProvider
 from app.planner import Task
 from app.registry import ToolRegistry
+from app.tool_contract import build_tool_contracts, describe_tools_for_prompt
 
 _PROMPT_TEMPLATE = """あなたはタスクプランナーです。ユーザーの指示を読み、
 以下のツールの中から最も適切な1つを選び、必要な引数とともにJSON形式のみで
 返してください。説明文やコードブロックは不要です。JSON以外は出力しないこと。
+各ツールの引数名・型・必須かどうかは以下の仕様に厳密に従うこと。存在しない
+引数名を作らないこと。
 
-利用可能なツール: {tool_names}
+利用可能なツール:
+{tool_specs}
 
 出力形式（このJSON形式のみを出力すること）:
 {{"tool_name": "<ツール名>", "arguments": {{}}}}
@@ -41,7 +52,13 @@ class LLMPlanner:
     or hallucinated tool name, or malformed JSON, becomes tool="unknown" —
     the same value the rule-based Planner already returns for "no match" —
     so Router/Evaluator/Repair handle it exactly the same way, with no new
-    failure-handling logic needed."""
+    failure-handling logic needed.
+
+    Note: this only rejects a tool_name that isn't a real Tool. Whether
+    `arguments` actually satisfies that Tool's contract (required fields,
+    types, no unknown keys) is checked later, in
+    app.main._run_planned_task(), against the same Tool Contract this
+    class's prompt was built from — see app.tool_contract."""
 
     def __init__(self, llm: LLMProvider | None = None):
         # qwen2.5:0.5b, not qwen3:0.6b (Recommender's model, left untouched):
@@ -52,14 +69,14 @@ class LLMPlanner:
         self.registry = ToolRegistry()
 
     def plan(self, user_input: str) -> Task:
-        tool_names = sorted(self.registry.tools.keys())
+        contracts = build_tool_contracts(self.registry)
         prompt = _PROMPT_TEMPLATE.format(
-            tool_names=", ".join(tool_names),
+            tool_specs=describe_tools_for_prompt(contracts),
             instruction=user_input,
         )
 
         raw_response = self.llm.generate(prompt)
-        tool_name, arguments = self._parse(raw_response, tool_names)
+        tool_name, arguments = self._parse(raw_response, sorted(contracts))
 
         return Task(
             instruction=user_input,
