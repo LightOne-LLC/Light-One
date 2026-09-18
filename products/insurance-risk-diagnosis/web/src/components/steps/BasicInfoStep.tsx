@@ -23,7 +23,7 @@ export function BasicInfoStep({ input, onChange }: Props) {
 
   return (
     <div>
-      <h2 className="text-lg font-semibold text-slate-800 mb-4">基本情報</h2>
+      <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-5">基本情報</h2>
 
       <div className="grid grid-cols-2 gap-4">
         <FormField label="年齢">
@@ -106,6 +106,29 @@ export function BasicInfoStep({ input, onChange }: Props) {
             />
           </FormField>
         )}
+
+        {basic.hasSpouse && (
+          <FormField label="配偶者の年収(万円)" hint="0の場合は収入なしとして計算します">
+            <input
+              type="number"
+              min={0}
+              className={inputClass}
+              value={basic.spouseAnnualIncome ?? 0}
+              onChange={(e) => updateBasic({ spouseAnnualIncome: Number(e.target.value) })}
+            />
+          </FormField>
+        )}
+
+        <FormField label="月間生活費(万円)" hint="未入力の場合は年収から簡易的に概算します">
+          <input
+            type="number"
+            min={0}
+            className={inputClass}
+            placeholder="未入力の場合は自動概算"
+            value={basic.monthlyLivingExpense ?? ''}
+            onChange={(e) => updateBasic({ monthlyLivingExpense: e.target.value === '' ? undefined : Number(e.target.value) })}
+          />
+        </FormField>
       </div>
 
       <div className="mt-2 mb-4">

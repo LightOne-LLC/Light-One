@@ -14,9 +14,9 @@ export function AssetStep({ input, onChange }: Props) {
 
   return (
     <div>
-      <h2 className="text-lg font-semibold text-slate-800 mb-4">資産・負債</h2>
+      <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-5">資産・負債</h2>
       <div className="grid grid-cols-2 gap-4">
-        <FormField label="貯蓄額(万円)">
+        <FormField label="貯蓄額(万円)" hint="現金・預金等、すぐに使える資産">
           <input
             type="number"
             min={0}
@@ -26,13 +26,23 @@ export function AssetStep({ input, onChange }: Props) {
           />
         </FormField>
 
-        <FormField label="保有資産(万円)" hint="住宅以外の投資・保険積立等">
+        <FormField label="投資性資産(万円)" hint="投資信託・株式等">
           <input
             type="number"
             min={0}
             className={inputClass}
             value={asset.otherAssets}
             onChange={(e) => updateAsset({ otherAssets: Number(e.target.value) })}
+          />
+        </FormField>
+
+        <FormField label="不動産評価額(万円)" hint="自宅等の時価の目安。相続財産の概算にも使用します">
+          <input
+            type="number"
+            min={0}
+            className={inputClass}
+            value={asset.realEstateValue}
+            onChange={(e) => updateAsset({ realEstateValue: Number(e.target.value) })}
           />
         </FormField>
 
@@ -58,6 +68,16 @@ export function AssetStep({ input, onChange }: Props) {
             </select>
           </FormField>
         )}
+
+        <FormField label="その他借入残高(万円)" hint="住宅ローン以外の借入(自動車ローン・カードローン等)">
+          <input
+            type="number"
+            min={0}
+            className={inputClass}
+            value={asset.otherLoanBalance}
+            onChange={(e) => updateAsset({ otherLoanBalance: Number(e.target.value) })}
+          />
+        </FormField>
       </div>
     </div>
   );

@@ -10,20 +10,23 @@ export function calcRequiredDeathCoverage(input: DiagnosisInput): DeathCoverageR
   const living = calcSurvivorLivingCost(basic);
   const education = calcRemainingEducationCost(basic.children, basic.educationCourse);
   const pension = calcSurvivorPensionTotal(basic);
-  const mortgageAddOn = asset.hasMortgageLifeInsurance ? 0 : asset.mortgageBalance;
+  const loanAddOn = (asset.hasMortgageLifeInsurance ? 0 : asset.mortgageBalance) + asset.otherLoanBalance;
 
   const reasons: string[] = [
     ...living.reasons,
     ...education.reasons,
     `葬儀費用等の一時費用: ${FUNERAL_AND_MISC_COST}万円`,
   ];
-  if (mortgageAddOn > 0) {
-    reasons.push(`団体信用生命保険未加入のため住宅ローン残高${mortgageAddOn}万円を上乗せ`);
+  if (loanAddOn > 0) {
+    const parts: string[] = [];
+    if (!asset.hasMortgageLifeInsurance && asset.mortgageBalance > 0) parts.push(`団信未加入の住宅ローン残高${asset.mortgageBalance}万円`);
+    if (asset.otherLoanBalance > 0) parts.push(`その他借入残高${asset.otherLoanBalance}万円`);
+    reasons.push(`負債の上乗せ: ${parts.join(' + ')} = ${loanAddOn}万円`);
   }
   reasons.push(...pension.reasons);
   reasons.push(`控除: 貯蓄${asset.savings}万円 + 保有資産${asset.otherAssets}万円 + 既存死亡保険金${existingInsurance.deathCoverage}万円`);
 
-  const grossNeed = living.phaseA + living.phaseB + education.total + FUNERAL_AND_MISC_COST + mortgageAddOn;
+  const grossNeed = living.phaseA + living.phaseB + education.total + FUNERAL_AND_MISC_COST + loanAddOn;
   const deductions = pension.total + asset.savings + asset.otherAssets + existingInsurance.deathCoverage;
   const rawNeeded = grossNeed - deductions;
   const requiredAmount = Math.max(0, rawNeeded);
@@ -43,7 +46,7 @@ export function calcRequiredDeathCoverage(input: DiagnosisInput): DeathCoverageR
       educationTotal: education.total,
       educationBreakdown: education.breakdown,
       funeralCost: FUNERAL_AND_MISC_COST,
-      mortgageAddOn,
+      mortgageAddOn: loanAddOn,
       survivorPensionTotal: pension.total,
       savings: asset.savings,
       otherAssets: asset.otherAssets,

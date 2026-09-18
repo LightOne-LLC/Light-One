@@ -12,14 +12,14 @@ function Header() {
   const { user, signOut } = useAuth();
   if (!user) return null;
   return (
-    <header className="border-b border-slate-200 bg-white">
-      <div className="max-w-3xl mx-auto px-4 py-3 flex justify-between items-center">
-        <Link to="/diagnosis" className="font-semibold text-slate-800">
-          保険リスク診断ツール
+    <header className="border-b border-slate-200 bg-surface/80 backdrop-blur supports-[backdrop-filter]:bg-surface/60">
+      <div className="max-w-3xl mx-auto px-4 py-4 flex justify-between items-center">
+        <Link to="/diagnosis" className="font-semibold tracking-tight text-slate-900">
+          Financial Risk Diagnosis
         </Link>
         <div className="flex items-center gap-4 text-sm">
-          <span className="text-slate-500">{user.email}</span>
-          <button onClick={() => signOut()} className="text-indigo-600 hover:underline">
+          <span className="text-slate-400 hidden sm:inline">{user.email}</span>
+          <button onClick={() => signOut()} className="text-slate-500 hover:text-slate-800 transition-colors">
             ログアウト
           </button>
         </div>

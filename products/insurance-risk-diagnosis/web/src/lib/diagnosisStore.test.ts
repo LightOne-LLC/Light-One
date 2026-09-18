@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach } from 'vitest';
 import { runDiagnosis, listDiagnosisHistory, getDiagnosisDetail, deleteDiagnosisHistory, saveDraft, loadDraft, clearDraft } from './diagnosisStore';
-import type { DiagnosisInput } from '../types/diagnosis';
+import type { DiagnosisInput, DiagnosisResult } from '../types/diagnosis';
 
 class MemoryStorage {
   private store = new Map<string, string>();
@@ -32,9 +32,13 @@ function sampleInput(): DiagnosisInput {
       children: [],
       educationCourse: 'all_public',
     },
-    asset: { savings: 200, otherAssets: 0, hasMortgageLifeInsurance: true, mortgageBalance: 0 },
-    existingInsurance: { deathCoverage: 0, hasMedicalCoverage: false, hasDisabilityCoverage: false, hasSavingsTypeCoverage: false },
+    asset: { savings: 200, otherAssets: 0, realEstateValue: 0, hasMortgageLifeInsurance: true, mortgageBalance: 0, otherLoanBalance: 0 },
+    existingInsurance: {
+      deathCoverage: 0, hasMedicalCoverage: false, hasDisabilityCoverage: false, hasSavingsTypeCoverage: false,
+      hasCancerCoverage: false, hasCareCoverage: false, hasPersonalPension: false, monthlyPremiumTotal: 0,
+    },
     health: { hasMedicalHistory: false },
+    retirement: { desiredRetirementAge: 65, expectedSeverancePay: 0 },
   };
 }
 
@@ -70,6 +74,44 @@ describe('diagnosisStore', () => {
     const list = await listDiagnosisHistory();
     expect(list).toHaveLength(1);
     expect(list[0].id).toBe(id);
+  });
+});
+
+describe('diagnosisStore - 旧バージョンの履歴データとの互換性', () => {
+  beforeEach(() => {
+    (globalThis as any).localStorage.clear();
+  });
+
+  test('categories/overallScoreを持たない旧形式の結果でも一覧・詳細取得でエラーにならない', async () => {
+    const legacyResult: Partial<DiagnosisResult> = {
+      deathCoverage: {
+        requiredAmount: 100, grossNeed: 100, riskScore: 40,
+        breakdown: {
+          phaseALivingCost: 0, phaseAYears: 0, phaseBLivingCost: 0, phaseBYears: 0,
+          educationTotal: 0, educationBreakdown: [], funeralCost: 0, mortgageAddOn: 0,
+          survivorPensionTotal: 0, savings: 0, otherAssets: 0, existingDeathCoverage: 0,
+        },
+        reasons: [],
+      },
+      medicalRisk: { score: 20, reasons: [] },
+      disabilityRisk: { score: 30, reasons: [] },
+      assetFormation: { score: 50, reasons: [] },
+      suggestedProductTypes: [],
+      calculatedAt: new Date().toISOString(),
+    };
+    (globalThis as any).localStorage.setItem(
+      'insurance-risk-diagnosis:history',
+      JSON.stringify([{ id: 'legacy-1', input: sampleInput(), result: legacyResult, createdAt: new Date().toISOString() }]),
+    );
+
+    const list = await listDiagnosisHistory();
+    expect(list).toHaveLength(1);
+    expect(list[0].overallScore).toBeGreaterThanOrEqual(0);
+    expect(list[0].topRisks.length).toBeGreaterThan(0);
+
+    const detail = await getDiagnosisDetail('legacy-1');
+    expect(detail.result.categories.length).toBeGreaterThan(0);
+    expect(detail.result.overallScore).toBe(Math.round((40 + 20 + 30 + 50) / 4));
   });
 });
 

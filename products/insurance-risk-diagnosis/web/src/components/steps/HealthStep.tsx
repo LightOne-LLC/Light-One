@@ -1,4 +1,5 @@
 import type { DiagnosisInput } from '../../types/diagnosis';
+import { checkboxLabelClass, checkboxClass } from './FormField';
 
 interface Props {
   input: DiagnosisInput;
@@ -13,10 +14,11 @@ export function HealthStep({ input, onChange }: Props) {
 
   return (
     <div>
-      <h2 className="text-lg font-semibold text-slate-800 mb-4">健康状態</h2>
-      <label className="flex items-center gap-2 text-sm text-slate-700">
+      <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-5">健康状態</h2>
+      <label className={checkboxLabelClass}>
         <input
           type="checkbox"
+          className={checkboxClass}
           checked={health.hasMedicalHistory}
           onChange={(e) => update({ hasMedicalHistory: e.target.checked })}
         />

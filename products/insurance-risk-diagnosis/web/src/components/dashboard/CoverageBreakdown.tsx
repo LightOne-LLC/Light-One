@@ -7,9 +7,9 @@ function fmt(n: number) {
 export function CoverageBreakdown({ deathCoverage }: { deathCoverage: DeathCoverageResult }) {
   const b = deathCoverage.breakdown;
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-      <h3 className="text-base font-semibold text-slate-800 mb-1">必要死亡保障額</h3>
-      <p className="text-3xl font-bold text-indigo-700 mb-4">{fmt(deathCoverage.requiredAmount)}</p>
+    <div className="bg-surface rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
+      <h3 className="text-sm font-semibold text-slate-700 mb-1">死亡リスクの内訳詳細</h3>
+      <p className="text-3xl font-bold tracking-tight text-slate-900 mb-4">{fmt(deathCoverage.requiredAmount)}</p>
 
       <table className="w-full text-sm">
         <tbody>
