@@ -21,8 +21,13 @@ import { InsuranceStep } from '../components/steps/InsuranceStep';
 import { HealthStep } from '../components/steps/HealthStep';
 import { RetirementStep } from '../components/steps/RetirementStep';
 import { FormField } from '../components/steps/FormField';
+import { ConfirmStep } from '../components/steps/ConfirmStep';
+import { StepIntro, FieldGroup } from '../components/steps/StepLayout';
 import { NEXT_STEPS } from '../lib/nextSteps';
-import { Card, Button, Badge, SectionHeader, ChoiceCardGroup, Metric, EmptyState, LoadingState, ResultHero, NumberField } from '../components/ui';
+import {
+  Card, Button, Badge, SectionHeader, Eyebrow, ChoiceCardGroup, ChoiceToggle,
+  Metric, EmptyState, LoadingState, ResultHero, NumberField,
+} from '../components/ui';
 
 function richInput(): DiagnosisInput {
   return {
@@ -216,13 +221,18 @@ describe('ui kit - Card/Button/Badge/SectionHeader/ChoiceCardGroup', () => {
   test('Buttonのvariant/sizeでクラスが変わる', () => {
     const primary = renderToStaticMarkup(<Button variant="primary">送信</Button>);
     const danger = renderToStaticMarkup(<Button variant="danger">削除</Button>);
-    expect(primary).toContain('bg-navy');
-    expect(danger).toContain('border-rose-200');
+    // primaryは単色塗りではなくmaterial-navyの面として描画される
+    expect(primary).toContain('material-navy');
+    expect(danger).toContain('border-risk-critical-ring');
+    const sm = renderToStaticMarkup(<Button size="sm">小</Button>);
+    const lg = renderToStaticMarkup(<Button size="lg">大</Button>);
+    expect(sm).toContain('min-h-[38px]');
+    expect(lg).toContain('min-h-[52px]');
   });
 
   test('Badgeはtoneに応じたクラスを持つ', () => {
     const html = renderToStaticMarkup(<Badge tone="success">OK</Badge>);
-    expect(html).toContain('bg-emerald-50');
+    expect(html).toContain('bg-risk-low-soft');
     expect(html).toContain('OK');
   });
 
@@ -298,6 +308,171 @@ describe('FinancialGapPanel - 積み上げバーの安全性', () => {
     const categories = [{ key: 'asset' as const, label: '資産', score: 10, level: 'low' as const, reasons: [] }];
     const html = renderToStaticMarkup(<FinancialGapPanel categories={categories} />);
     expect(html).toBe('');
+  });
+});
+
+describe('Card - 情報の重要度ごとにvariantが別の面を持つ', () => {
+  test('heroはnavy material、featureはplatinum materialで描画される', () => {
+    const hero = renderToStaticMarkup(<Card variant="hero">h</Card>);
+    const feature = renderToStaticMarkup(<Card variant="feature">f</Card>);
+    expect(hero).toContain('material-navy');
+    expect(hero).toContain('rounded-hero');
+    expect(feature).toContain('material-platinum');
+    expect(feature).not.toContain('material-navy');
+  });
+
+  test('quietは影を持たず、panelとは異なる角丸を使う', () => {
+    const quiet = renderToStaticMarkup(<Card variant="quiet">q</Card>);
+    const panel = renderToStaticMarkup(<Card variant="panel">p</Card>);
+    expect(quiet).not.toContain('shadow-');
+    expect(quiet).toContain('rounded-panel');
+    expect(panel).toContain('rounded-card');
+    expect(panel).toContain('shadow-quiet');
+  });
+
+  test('全variantが互いに異なるクラスを生成する(単一デザインの使い回しではない)', () => {
+    const variants = ['hero', 'feature', 'panel', 'quiet', 'inset'] as const;
+    const rendered = variants.map((v) => renderToStaticMarkup(<Card variant={v}>x</Card>));
+    expect(new Set(rendered).size).toBe(variants.length);
+  });
+});
+
+describe('SectionHeader - 見出しの役割が分化している', () => {
+  test('editorialはeyebrowとh2、罫線を持つ', () => {
+    const html = renderToStaticMarkup(
+      <SectionHeader variant="editorial" eyebrow="Priority" title="Top Risk Areas" description="説明" />,
+    );
+    expect(html).toContain('Priority');
+    expect(html).toContain('<h2');
+    expect(html).toContain('rule-fade');
+  });
+
+  test('compactはh3のラベルとして描画され、h2にはならない', () => {
+    const html = renderToStaticMarkup(<SectionHeader variant="compact" title="これまでの記録" />);
+    expect(html).toContain('<h3');
+    expect(html).not.toContain('<h2');
+  });
+
+  test('Eyebrowはtoneで文字色が変わる', () => {
+    expect(renderToStaticMarkup(<Eyebrow tone="light">L</Eyebrow>)).toContain('text-white/55');
+    expect(renderToStaticMarkup(<Eyebrow tone="accent">A</Eyebrow>)).toContain('text-platinum');
+  });
+});
+
+describe('Metric - 数値のhierarchy', () => {
+  test('sizeごとに異なる文字サイズが適用される', () => {
+    const display = renderToStaticMarkup(<Metric value={72} size="display" />);
+    const md = renderToStaticMarkup(<Metric value={72} size="md" />);
+    expect(display).toContain('text-[64px]');
+    expect(md).toContain('text-2xl');
+  });
+
+  test('navy面の上ではlight toneで白い数値になる', () => {
+    const html = renderToStaticMarkup(<Metric value={72} unit="/ 100" label="Overall" tone="light" />);
+    expect(html).toContain('text-white');
+    expect(html).toContain('Overall');
+  });
+});
+
+describe('ChoiceToggle - 複数選択の共通表現', () => {
+  test('checked時はcheckedのinputと選択済みの面クラスを持つ', () => {
+    const on = renderToStaticMarkup(<ChoiceToggle checked onChange={() => {}} label="医療保険" hint="入院給付" />);
+    const off = renderToStaticMarkup(<ChoiceToggle checked={false} onChange={() => {}} label="医療保険" />);
+    expect(on).toContain('checked');
+    expect(on).toContain('bg-platinum-soft');
+    expect(on).toContain('入院給付');
+    expect(off).not.toContain('bg-platinum-soft');
+  });
+});
+
+describe('ConfirmStep - Financial Profileとしての確認画面', () => {
+  const input = richInput();
+
+  test('カテゴリ単位で構造化され、各カテゴリに編集導線がある', () => {
+    const html = renderToStaticMarkup(<ConfirmStep input={input} onEditStep={() => {}} />);
+    for (const eyebrow of ['Basic profile', 'Family', 'Assets', 'Insurance', 'Health', 'Retirement']) {
+      expect(html).toContain(eyebrow);
+    }
+    // 6カテゴリそれぞれに「編集」ボタンが存在する(単純な行リストではない)
+    expect(html.match(/編集/g)?.length).toBe(6);
+  });
+
+  test('カテゴリの代表値がMetricとして大きく表示される', () => {
+    const html = renderToStaticMarkup(<ConfirmStep input={input} onEditStep={() => {}} />);
+    expect(html).toContain('font-display-num');
+    expect(html).toContain('年収');
+    expect(html).toContain('貯蓄額');
+  });
+
+  test('未入力(自動概算)の項目が壊れずに表示される', () => {
+    const sparse = { ...input, basic: { ...input.basic, monthlyLivingExpense: undefined } };
+    const html = renderToStaticMarkup(<ConfirmStep input={sparse} onEditStep={() => {}} />);
+    expect(html).toContain('自動概算');
+  });
+});
+
+describe('StepLayout - 診断stepの章構造', () => {
+  test('StepIntroはeyebrow・見出し・導入文を持つ', () => {
+    const html = renderToStaticMarkup(<StepIntro eyebrow="Step 01 — Profile" title="あなたについて" lead="導入文" />);
+    expect(html).toContain('Step 01');
+    expect(html).toContain('あなたについて');
+    expect(html).toContain('導入文');
+    expect(html).toContain('rule-fade');
+  });
+
+  test('FieldGroupは設問のまとまりに小見出しを与える', () => {
+    const html = renderToStaticMarkup(
+      <FieldGroup title="Assets" description="説明">
+        <span>field</span>
+      </FieldGroup>,
+    );
+    expect(html).toContain('Assets');
+    expect(html).toContain('説明');
+    expect(html).toContain('field');
+  });
+});
+
+describe('Resultパネル - 新しい情報構造', () => {
+  test('ResultHeroはポジションラベルを表示する', () => {
+    const html = renderToStaticMarkup(
+      <ResultHero overallScore={80} message="m" date="2026年9月19日" topDomains={['死亡']} positionLabel="要対応" />,
+    );
+    expect(html).toContain('要対応');
+    expect(html).toContain('80');
+  });
+
+  test('TopRiskAreasPanelは順位を連番で明示する', () => {
+    const html = renderToStaticMarkup(<TopRiskAreasPanel categories={result.categories} />);
+    expect(html).toContain('01');
+    expect(html).toContain('02');
+    expect(html).toContain('03');
+  });
+
+  test('FinancialGapPanelは最も大きい不足額を見出しとして提示する', () => {
+    const html = renderToStaticMarkup(<FinancialGapPanel categories={result.categories} />);
+    expect(html).toContain('最も大きい不足額');
+    // 合計ではなく最大値を採用している(領域ごとの不足額は単純合算できないため)
+    const maxShortfall = Math.max(...result.categories.filter((c) => c.gap).map((c) => c.gap!.shortfall));
+    expect(html).toContain(Math.round(maxShortfall).toLocaleString('ja-JP'));
+  });
+
+  test('RiskMapPanelは列見出しを持つ読み取り表として描画される', () => {
+    const html = renderToStaticMarkup(<RiskMapPanel categories={result.categories} />);
+    expect(html).toContain('Domain');
+    expect(html).toContain('Score');
+    expect(html).toContain('Level');
+  });
+
+  test('SuggestedActionsPanelは各アクションの目的を併記する', () => {
+    const html = renderToStaticMarkup(<SuggestedActionsPanel categories={result.categories} productTypes={result.suggestedProductTypes} />);
+    expect(html).toContain('目的');
+    expect(html).toContain('確認すること');
+  });
+
+  test('AssumptionsPanelは影を持たないquiet variantで描画される', () => {
+    const html = renderToStaticMarkup(<AssumptionsPanel assumptions={result.assumptions} />);
+    expect(html).toContain('rounded-panel');
+    expect(html).not.toContain('shadow-');
   });
 });
 

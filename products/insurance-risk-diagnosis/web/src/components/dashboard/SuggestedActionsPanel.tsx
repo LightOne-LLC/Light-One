@@ -1,6 +1,19 @@
-import type { RiskCategoryResult } from '../../types/diagnosis';
+import type { RiskCategoryResult, RiskCategoryKey } from '../../types/diagnosis';
 import { NEXT_STEPS } from '../../lib/nextSteps';
-import { Card, SectionHeader } from '../ui';
+import { riskLevelStyle } from '../../lib/riskLevelStyle';
+import { Card, SectionHeader, StatusChip, Eyebrow } from '../ui';
+
+// 各アクションが「何を達成するための確認なのか」。手順だけを並べると作業リストになり、
+// 判断材料にならないため、目的を1行で併記する。
+const PURPOSE: Record<RiskCategoryKey, string> = {
+  death: '万一のときに、家族の生活費と教育費が途切れない状態にする。',
+  medical: '治療が長引いても、手元の現金が尽きない状態にする。',
+  disability: '働けない期間に生じる収入の空白を埋める。',
+  retirement: '退職後の生活費が、資産の取り崩しだけに依存しない状態にする。',
+  care: '介護が始まったときに、現役世代の家計が圧迫されない状態にする。',
+  asset: '資産が物価上昇に対して目減りしない形で積み上がる状態にする。',
+  inheritance: '相続時に、納税資金と分け方で家族が困らない状態にする。',
+};
 
 export function SuggestedActionsPanel({ categories, productTypes }: { categories: RiskCategoryResult[]; productTypes: string[] }) {
   const sorted = categories.slice().sort((a, b) => b.score - a.score);
@@ -9,42 +22,66 @@ export function SuggestedActionsPanel({ categories, productTypes }: { categories
   const rest = sorted.filter((c) => !checklist.includes(c));
 
   return (
-    <Card as="section">
+    <Card as="section" variant="feature">
       <SectionHeader
+        variant="editorial"
+        eyebrow="Next Steps"
         title="Suggested Actions"
         description="「保険に入る」ことではなく、「不足しているかもしれないリスクを確認する」ことを次の一歩にしてください。"
       />
 
-      <p className="text-[11px] font-semibold tracking-[0.2em] uppercase text-gold mb-4">Priority</p>
-      <ol className="divide-y divide-line">
-        {checklist.map((c, i) => (
-          <li key={c.key} className="py-5 first:pt-0 last:pb-0">
-            <div className="flex items-baseline gap-4">
-              <span className="font-display-num text-2xl font-bold text-line shrink-0">{String(i + 1).padStart(2, '0')}</span>
-              <div>
-                <p className="text-base font-semibold text-navy mb-2">{c.label}の確認</p>
-                <ul className="space-y-1.5">
-                  {NEXT_STEPS[c.key].map((step) => (
-                    <li key={step} className="flex items-start gap-2 text-sm text-ink-muted">
-                      <span className="mt-1.5 w-1 h-1 rounded-full bg-gold shrink-0" aria-hidden="true" />
-                      <span>{step}</span>
-                    </li>
-                  ))}
-                </ul>
+      <ol className="space-y-7">
+        {checklist.map((c, i) => {
+          const style = riskLevelStyle(c.level);
+          return (
+            <li key={c.key} className="grid grid-cols-[auto_1fr] gap-x-4 sm:gap-x-6">
+              <span className="font-display-num text-2xl sm:text-3xl font-bold leading-none text-line-strong tabular-nums pt-1" aria-hidden="true">
+                {String(i + 1).padStart(2, '0')}
+              </span>
+
+              <div className="min-w-0">
+                <div className="flex items-baseline gap-3 flex-wrap mb-2">
+                  <h3 className="text-[17px] font-semibold tracking-[-0.01em] text-ink">{c.label}の確認</h3>
+                  <StatusChip label={style.label} className={style.badgeClass} />
+                </div>
+
+                {c.reasons[0] && (
+                  <p className="text-[13px] leading-relaxed text-ink-muted mb-4">
+                    <span className="text-ink-faint">なぜ — </span>
+                    {c.reasons[0]}
+                  </p>
+                )}
+
+                <div className="material-brushed border border-line-soft rounded-panel p-4 sm:p-5">
+                  <Eyebrow className="mb-3">確認すること</Eyebrow>
+                  <ul className="space-y-2">
+                    {NEXT_STEPS[c.key].map((step) => (
+                      <li key={step} className="flex items-start gap-2.5 text-[13px] leading-relaxed text-ink">
+                        <span className="mt-[7px] w-3 h-px bg-platinum shrink-0" aria-hidden="true" />
+                        <span className="min-w-0">{step}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <hr className="rule-fade my-4" />
+                  <p className="text-xs leading-relaxed text-ink-muted">
+                    <span className="eyebrow text-ink-faint mr-2">目的</span>
+                    {PURPOSE[c.key]}
+                  </p>
+                </div>
               </div>
-            </div>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ol>
 
       {rest.length > 0 && (
-        <details className="mt-6 pt-5 border-t border-line">
-          <summary className="cursor-pointer text-sm text-ink-muted hover:text-navy select-none">その他に確認しておきたいこと</summary>
-          <ul className="mt-3 space-y-2">
+        <details className="mt-8 pt-6 border-t border-line">
+          <summary className="cursor-pointer text-[13px] text-ink-muted hover:text-ink select-none">その他に確認しておきたいこと</summary>
+          <ul className="mt-4 space-y-2.5">
             {rest.map((c) => (
-              <li key={c.key} className="flex items-start gap-2.5 text-sm text-ink-muted">
-                <span className="mt-0.5 w-4 h-4 rounded border border-line shrink-0" aria-hidden="true" />
-                <span>{c.label}: {NEXT_STEPS[c.key][0]}</span>
+              <li key={c.key} className="flex items-start gap-3 text-[13px] leading-relaxed text-ink-muted">
+                <span className="mt-[7px] w-3 h-px bg-line-strong shrink-0" aria-hidden="true" />
+                <span><span className="font-medium text-ink">{c.label}</span>: {NEXT_STEPS[c.key][0]}</span>
               </li>
             ))}
           </ul>
@@ -53,15 +90,15 @@ export function SuggestedActionsPanel({ categories, productTypes }: { categories
 
       {productTypes.length > 0 && (
         <details className="mt-4 pt-4 border-t border-line">
-          <summary className="cursor-pointer text-sm text-navy hover:underline select-none">検討の参考になる保障の種類を見る</summary>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <summary className="cursor-pointer text-[13px] text-navy hover:underline select-none">検討の参考になる保障の種類を見る</summary>
+          <div className="mt-4 flex flex-wrap gap-2">
             {productTypes.map((t) => (
-              <span key={t} className="px-3 py-1.5 rounded-full bg-gold-soft text-navy-dark text-sm font-medium ring-1 ring-inset ring-gold-ring">
+              <span key={t} className="px-3 py-1.5 rounded-full bg-platinum-soft text-navy text-[13px] font-medium ring-1 ring-inset ring-platinum-ring">
                 {t}
               </span>
             ))}
           </div>
-          <p className="text-xs text-ink-muted mt-3">
+          <p className="text-xs leading-relaxed text-ink-faint mt-3">
             ※特定の保険商品・保険会社を推奨するものではありません。保障の「種類」の目安としてご活用ください。
           </p>
         </details>

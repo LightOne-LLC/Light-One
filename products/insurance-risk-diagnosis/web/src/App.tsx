@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { RequireAuth } from './components/auth/RequireAuth';
+import { LoadingState } from './components/ui';
 
 const LoginPage = lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.LoginPage })));
 const DiagnosisFormPage = lazy(() => import('./pages/DiagnosisFormPage').then((m) => ({ default: m.DiagnosisFormPage })));
@@ -13,21 +14,41 @@ const PAGE_LABEL: Record<string, string> = {
   '/history': '履歴',
 };
 
+/*
+  ヘッダーは機能を増やさず、ブランドの署名として振る舞わせる。
+  ワードマーク・製品名・現在地を細い罫線で区切って一列に置き、
+  ユーザー情報は右端に最小限の重みで添える。
+*/
 function Header() {
   const { user, signOut } = useAuth();
   const location = useLocation();
   if (!user) return null;
   const pageLabel = PAGE_LABEL[location.pathname] ?? (location.pathname.startsWith('/result') ? '診断結果' : undefined);
+
   return (
-    <header className="print:hidden border-b border-line bg-surface/85 backdrop-blur supports-[backdrop-filter]:bg-surface/70">
-      <div className="max-w-3xl mx-auto px-4 py-4 flex justify-between items-center">
-        <Link to="/diagnosis" className="flex items-baseline gap-2.5">
-          <span className="font-semibold tracking-[0.15em] text-sm text-navy">LIGHT ONE</span>
-          {pageLabel && <span className="text-xs text-ink-muted hidden sm:inline">/ {pageLabel}</span>}
-        </Link>
-        <div className="flex items-center gap-4 text-sm">
-          <span className="text-ink-muted hidden sm:inline">{user.email}</span>
-          <button onClick={() => signOut()} className="text-ink-muted hover:text-navy transition-colors">
+    <header className="print:hidden sticky top-0 z-30 border-b border-line bg-canvas/85 backdrop-blur-md supports-[backdrop-filter]:bg-canvas/70">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+          <Link to="/history" className="text-[13px] font-semibold tracking-[0.26em] text-navy whitespace-nowrap">
+            LIGHT ONE
+          </Link>
+          <span className="hidden sm:block w-px h-3.5 bg-line-strong shrink-0" aria-hidden="true" />
+          <span className="hidden sm:block eyebrow text-ink-faint whitespace-nowrap">Financial Risk Intelligence</span>
+          {pageLabel && (
+            <>
+              <span className="block sm:hidden w-px h-3.5 bg-line-strong shrink-0" aria-hidden="true" />
+              <span className="text-[11px] text-ink-muted whitespace-nowrap sm:hidden">{pageLabel}</span>
+            </>
+          )}
+        </div>
+
+        <div className="flex items-center gap-4 sm:gap-5 min-w-0">
+          {pageLabel && <span className="hidden sm:block text-[11px] text-ink-muted whitespace-nowrap">{pageLabel}</span>}
+          <span className="hidden md:block text-[11px] text-ink-faint truncate max-w-[14rem]">{user.email}</span>
+          <button
+            onClick={() => signOut()}
+            className="text-[11px] text-ink-muted hover:text-navy transition-colors whitespace-nowrap min-h-[44px] px-1"
+          >
             ログアウト
           </button>
         </div>
@@ -36,15 +57,11 @@ function Header() {
   );
 }
 
-function PageFallback() {
-  return <p className="text-center text-ink-muted py-8">読み込み中...</p>;
-}
-
 export default function App() {
   return (
-    <div className="min-h-screen bg-canvas">
+    <div className="min-h-screen page-ground">
       <Header />
-      <Suspense fallback={<PageFallback />}>
+      <Suspense fallback={<LoadingState message="読み込み中" />}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route
