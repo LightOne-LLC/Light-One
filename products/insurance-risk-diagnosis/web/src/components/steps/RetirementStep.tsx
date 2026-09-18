@@ -14,8 +14,8 @@ export function RetirementStep({ input, onChange }: Props) {
 
   return (
     <div>
-      <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-1">老後の希望</h2>
-      <p className="text-sm text-slate-500 mb-5">老後・介護・相続は将来推計のため、ここでの入力は「概算」として扱われます。</p>
+      <h2 className="text-lg font-semibold tracking-tight text-navy mb-1">老後の希望</h2>
+      <p className="text-sm text-ink-muted mb-5">老後・介護・相続は将来推計のため、ここでの入力は「概算」として扱われます。</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
         <FormField label="希望する退職年齢" required>
           <input

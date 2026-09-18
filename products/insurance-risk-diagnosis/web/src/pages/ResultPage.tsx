@@ -65,13 +65,13 @@ export function ResultPage() {
   if (!data) return <LoadingState message="診断結果を読み込んでいます..." />;
 
   const { result } = data;
-  const topCategory = result.categories.slice().sort((a, b) => b.score - a.score)[0];
+  const topDomains = result.categories.slice().sort((a, b) => b.score - a.score).slice(0, 3).map((c) => c.label);
   const diagnosisDate = new Date(data.createdAt).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
 
   return (
     <div className="max-w-3xl mx-auto py-6 sm:py-12 px-4 space-y-6">
       <div className="flex items-center justify-between gap-2 flex-wrap print:hidden">
-        <Link to="/history" className="text-sm text-slate-500 hover:text-slate-700 transition-colors py-2">
+        <Link to="/history" className="text-sm text-ink-muted hover:text-navy transition-colors py-2">
           ← 履歴一覧
         </Link>
         <div className="flex gap-2 flex-wrap">
@@ -90,11 +90,9 @@ export function ResultPage() {
         <div className="space-y-2">
           <ResultHero
             overallScore={result.overallScore}
-            topLevel={topCategory?.level ?? 'low'}
-            topLabel={topCategory?.label}
-            topScore={topCategory?.score}
             message={overallMessage(result.overallScore)}
             date={diagnosisDate}
+            topDomains={topDomains}
           />
           <TopRiskAreasPanel categories={result.categories} />
         </div>
@@ -105,9 +103,9 @@ export function ResultPage() {
         {/* Level 2-3: 詳細データ・計算根拠。既定では折りたたみ、印刷時は既存のprint CSSにより自動展開される */}
         <details className="group">
           <summary className="cursor-pointer list-none">
-            <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-surface px-6 py-4 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+            <div className="flex items-center justify-between rounded-2xl border border-line bg-surface px-6 py-4 text-sm font-medium text-ink-muted hover:bg-canvas transition-colors">
               <span>詳細データを見る(7領域のスコア内訳・不足額の計算・公的保障の詳細など)</span>
-              <span className="text-slate-400 group-open:rotate-180 transition-transform">▾</span>
+              <span className="text-ink-muted group-open:rotate-180 transition-transform">▾</span>
             </div>
           </summary>
           <div className="space-y-5 sm:space-y-6 mt-5">
@@ -116,7 +114,7 @@ export function ResultPage() {
             <FinancialGapPanel categories={result.categories} />
 
             <details>
-              <summary className="cursor-pointer text-sm text-indigo-600 hover:underline select-none py-1">死亡リスクの計算根拠を詳しく見る</summary>
+              <summary className="cursor-pointer text-sm text-navy hover:underline select-none py-1">死亡リスクの計算根拠を詳しく見る</summary>
               <div className="mt-4">
                 <CoverageBreakdown deathCoverage={result.deathCoverage} />
               </div>

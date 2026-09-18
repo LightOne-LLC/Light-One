@@ -67,31 +67,31 @@ export function DiagnosisFormPage() {
 
   return (
     <div className="max-w-2xl mx-auto py-6 sm:py-12 px-4 pb-28 sm:pb-12">
-      <h1 className="text-2xl font-bold tracking-tight text-slate-900 mb-6">保険リスク診断</h1>
+      <h1 className="text-2xl font-bold tracking-tight text-navy mb-6">保険リスク診断</h1>
 
       <div className="mb-6">
         <div className="flex items-baseline justify-between mb-2">
-          <span className="text-xs font-semibold tracking-wide text-slate-500">
+          <span className="text-xs font-semibold tracking-wide text-ink-muted">
             STEP {step + 1} / {STEPS.length}
           </span>
-          <span className="text-sm font-medium text-slate-700">{STEPS[step]}</span>
+          <span className="text-sm font-medium text-navy">{STEPS[step]}</span>
         </div>
-        <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden" role="progressbar" aria-valuenow={step + 1} aria-valuemin={1} aria-valuemax={STEPS.length}>
-          <div className="h-full rounded-full bg-indigo-600 transition-all duration-300" style={{ width: `${progressPercent}%` }} />
+        <div className="h-1.5 rounded-full bg-line overflow-hidden" role="progressbar" aria-valuenow={step + 1} aria-valuemin={1} aria-valuemax={STEPS.length}>
+          <div className="h-full rounded-full bg-navy transition-all duration-300" style={{ width: `${progressPercent}%` }} />
         </div>
         <div className="flex justify-between mt-2" aria-hidden="true">
           {STEPS.map((label, i) => (
             <span
               key={label}
               className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                i < step ? 'bg-indigo-400' : i === step ? 'bg-indigo-600' : 'bg-slate-200'
+                i < step ? 'bg-gold' : i === step ? 'bg-navy' : 'bg-line'
               }`}
             />
           ))}
         </div>
       </div>
 
-      <div className="bg-surface rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8">
+      <div className="bg-surface rounded-2xl shadow-sm border border-line p-6 sm:p-8">
         {step === 0 && <BasicInfoStep input={input} onChange={update} />}
         {step === 1 && <AssetStep input={input} onChange={update} />}
         {step === 2 && <InsuranceStep input={input} onChange={update} />}
@@ -102,7 +102,7 @@ export function DiagnosisFormPage() {
         {error && <p className="text-sm text-rose-600 mt-4" role="alert">{error}</p>}
 
         {/* モバイルでは画面下部に固定し、長いフォームでもスクロールせず操作できるようにする */}
-        <div className="mt-8 -mx-6 sm:-mx-8 -mb-6 sm:-mb-8 px-6 sm:px-8 py-4 border-t border-slate-100 flex justify-between gap-3 sticky bottom-0 [padding-bottom:max(1rem,env(safe-area-inset-bottom))] bg-surface/95 backdrop-blur rounded-b-2xl">
+        <div className="mt-8 -mx-6 sm:-mx-8 -mb-6 sm:-mb-8 px-6 sm:px-8 py-4 border-t border-line flex justify-between gap-3 sticky bottom-0 [padding-bottom:max(1rem,env(safe-area-inset-bottom))] bg-surface/95 backdrop-blur rounded-b-2xl">
           <Button variant="secondary" disabled={step === 0} onClick={goBack}>
             戻る
           </Button>
@@ -125,8 +125,8 @@ export function DiagnosisFormPage() {
 function ConfirmStep({ input, onEditStep }: { input: DiagnosisInput; onEditStep: (step: number) => void }) {
   return (
     <div>
-      <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-1">入力内容の確認</h2>
-      <p className="text-sm text-slate-500 mb-5">この内容で診断します。各項目の「編集」から該当ステップへ移動できます。</p>
+      <h2 className="text-lg font-semibold tracking-tight text-navy mb-1">入力内容の確認</h2>
+      <p className="text-sm text-ink-muted mb-5">この内容で診断します。各項目の「編集」から該当ステップへ移動できます。</p>
 
       <ConfirmSection title="基本情報" onEdit={() => onEditStep(0)}>
         <Row label="年齢" value={`${input.basic.age}歳`} />
@@ -171,21 +171,21 @@ function ConfirmSection({ title, children, last, onEdit }: { title: string; chil
   return (
     <div className={last ? 'mb-0' : 'mb-5'}>
       <div className="flex items-center justify-between mb-1.5">
-        <h3 className="text-xs font-semibold tracking-wide text-slate-400">{title}</h3>
-        <button type="button" onClick={onEdit} className="text-xs text-indigo-600 hover:underline py-1 px-1 min-h-[32px]">
+        <h3 className="text-xs font-semibold tracking-wide text-ink-muted">{title}</h3>
+        <button type="button" onClick={onEdit} className="text-xs text-navy hover:underline py-1 px-1 min-h-[32px]">
           編集
         </button>
       </div>
-      <dl className="text-sm text-slate-700">{children}</dl>
+      <dl className="text-sm text-navy">{children}</dl>
     </div>
   );
 }
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between gap-4 border-b border-slate-100 py-2">
-      <dt className="text-slate-500 shrink-0">{label}</dt>
-      <dd className="font-medium text-slate-900 text-right">{value}</dd>
+    <div className="flex justify-between gap-4 border-b border-line py-2">
+      <dt className="text-ink-muted shrink-0">{label}</dt>
+      <dd className="font-medium text-navy text-right">{value}</dd>
     </div>
   );
 }

@@ -16,13 +16,13 @@ export function CurrentProtectionPanel({ existingInsurance }: { existingInsuranc
     <Card as="section">
       <SectionHeader title="Current Protection" description="現在加入している保障の状況です。" />
 
-      <div className="flex justify-between items-baseline mb-4 pb-4 border-b border-slate-100">
-        <span className="text-sm text-slate-500">現在の死亡保障額</span>
-        <span className="text-lg font-semibold tabular-nums text-slate-900">{formatManYen(existingInsurance.deathCoverage)}</span>
+      <div className="flex justify-between items-baseline mb-4 pb-4 border-b border-line">
+        <span className="text-sm text-ink-muted">現在の死亡保障額</span>
+        <span className="text-lg font-semibold tabular-nums text-navy">{formatManYen(existingInsurance.deathCoverage)}</span>
       </div>
-      <div className="flex justify-between items-baseline mb-4 pb-4 border-b border-slate-100">
-        <span className="text-sm text-slate-500">月額保険料の合計目安</span>
-        <span className="text-lg font-semibold tabular-nums text-slate-900">{existingInsurance.monthlyPremiumTotal.toLocaleString('ja-JP')}万円/月</span>
+      <div className="flex justify-between items-baseline mb-4 pb-4 border-b border-line">
+        <span className="text-sm text-ink-muted">月額保険料の合計目安</span>
+        <span className="text-lg font-semibold tabular-nums text-navy">{existingInsurance.monthlyPremiumTotal.toLocaleString('ja-JP')}万円/月</span>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -30,7 +30,7 @@ export function CurrentProtectionPanel({ existingInsurance }: { existingInsuranc
           <span
             key={item.label}
             className={`px-3 py-1 rounded-full text-xs font-medium ${
-              item.active ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200' : 'bg-slate-50 text-slate-400 ring-1 ring-inset ring-slate-200'
+              item.active ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200' : 'bg-canvas text-ink-muted ring-1 ring-inset ring-line'
             }`}
           >
             {item.active ? '✓ ' : ''}{item.label}

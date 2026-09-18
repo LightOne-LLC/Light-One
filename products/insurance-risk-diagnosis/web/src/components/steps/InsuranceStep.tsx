@@ -27,8 +27,8 @@ export function InsuranceStep({ input, onChange }: Props) {
 
   return (
     <div>
-      <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-1">既存保険</h2>
-      <p className="text-sm text-slate-500 mb-5">現在加入している保険を確認します。加入していないものは未チェックのままで構いません。</p>
+      <h2 className="text-lg font-semibold tracking-tight text-navy mb-1">既存保険</h2>
+      <p className="text-sm text-ink-muted mb-5">現在加入している保険を確認します。加入していないものは未チェックのままで構いません。</p>
 
       <FormField
         label="既存の死亡保障額の合計(万円)"
@@ -67,7 +67,7 @@ export function InsuranceStep({ input, onChange }: Props) {
             <label
               key={opt.key}
               className={`flex items-center gap-3 min-h-[44px] px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors cursor-pointer ${
-                checked ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                checked ? 'border-navy bg-gold-soft text-navy-dark' : 'border-line text-ink-muted hover:border-line hover:bg-canvas'
               }`}
             >
               <input

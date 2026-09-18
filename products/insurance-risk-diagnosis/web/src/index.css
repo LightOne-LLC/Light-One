@@ -1,25 +1,41 @@
 @import "tailwindcss";
 
 /*
-  Premium UI design tokens.
-  金融プロダクトとしての信頼感を重視し、色数を絞った中立的なニュートラルスケール(slate)を基調に、
-  アクセント(indigo)・警告(amber)・危険(rose)・成功(emerald)のみを機能色として使う。
+  LIGHT ONE — Financial Risk Intelligence design tokens.
+  "Quiet Luxury": warm ivory/white over cold gray, deep navy as the
+  primary/executive color, muted gold as the sole accent. No indigo,
+  no purple "AI" gradients, no gold-overload. Risk colors stay but are
+  desaturated so they read as an executive report status, not alarms.
 */
 @theme {
-  --color-surface: #ffffff;
-  --color-canvas: #f8fafc;
+  --color-canvas: #faf7f1;       /* warm ivory page background */
+  --color-surface: #ffffff;      /* card surface */
+  --color-navy: #16233f;         /* primary / CTA / headings */
+  --color-navy-dark: #0b1526;    /* hover / deepest navy */
+  --color-ink-muted: #5c6472;    /* secondary text, warm-neutral */
+  --color-line: #e7e1d2;         /* warm neutral border, replaces cold gray */
+  --color-gold: #a1813f;         /* muted gold accent (icons, bullets) */
+  --color-gold-soft: #f5efdd;    /* soft gold background for badges */
+  --color-gold-ring: #e3d3a9;    /* ring/border for gold accents */
   --font-display: "Inter", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
 }
 
 body {
   margin: 0;
   background-color: var(--color-canvas);
-  color: #0f172a;
+  color: var(--color-navy);
   font-feature-settings: "tnum" 1;
+  -webkit-font-smoothing: antialiased;
 }
 
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+/* 数字そのものをUIとして扱う: スコア・金額などの大きな数値に使う */
+.font-display-num {
+  font-feature-settings: "tnum" 1, "ss01" 1;
+  letter-spacing: -0.02em;
 }
 
 @keyframes fade-in {
@@ -28,7 +44,7 @@ body {
 }
 
 .animate-fade-in {
-  animation: fade-in 0.25s ease-out;
+  animation: fade-in 0.3s ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {

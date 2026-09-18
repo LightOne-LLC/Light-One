@@ -15,8 +15,8 @@ export function AssetStep({ input, onChange }: Props) {
 
   return (
     <div>
-      <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-1">資産・負債</h2>
-      <p className="text-sm text-slate-500 mb-5">いま手元にある資産と、返済中の負債を整理します。おおよその金額で構いません。</p>
+      <h2 className="text-lg font-semibold tracking-tight text-navy mb-1">資産・負債</h2>
+      <p className="text-sm text-ink-muted mb-5">いま手元にある資産と、返済中の負債を整理します。おおよその金額で構いません。</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
         <FormField
           label="貯蓄額(万円)"

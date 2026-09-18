@@ -9,8 +9,8 @@ export function CoverageBreakdown({ deathCoverage }: { deathCoverage: DeathCover
   const b = deathCoverage.breakdown;
   return (
     <Card>
-      <h3 className="text-sm font-semibold text-slate-700 mb-1">死亡リスクの内訳詳細</h3>
-      <p className="text-3xl font-bold tracking-tight text-slate-900 mb-4">{fmt(deathCoverage.requiredAmount)}</p>
+      <h3 className="text-sm font-semibold text-navy mb-1">死亡リスクの内訳詳細</h3>
+      <p className="text-3xl font-bold tracking-tight text-navy mb-4">{fmt(deathCoverage.requiredAmount)}</p>
 
       <table className="w-full text-sm table-fixed">
         <tbody>
@@ -27,8 +27,8 @@ export function CoverageBreakdown({ deathCoverage }: { deathCoverage: DeathCover
       </table>
 
       <details className="mt-4">
-        <summary className="text-sm text-indigo-600 cursor-pointer">計算根拠の詳細を見る</summary>
-        <ul className="mt-2 space-y-1 text-xs text-slate-600 list-disc list-inside">
+        <summary className="text-sm text-navy cursor-pointer">計算根拠の詳細を見る</summary>
+        <ul className="mt-2 space-y-1 text-xs text-ink-muted list-disc list-inside">
           {deathCoverage.reasons.map((r, i) => (
             <li key={i}>{r}</li>
           ))}
@@ -40,9 +40,9 @@ export function CoverageBreakdown({ deathCoverage }: { deathCoverage: DeathCover
 
 function Row({ label, value }: { label: string; value: number }) {
   return (
-    <tr className="border-b border-slate-100">
-      <td className="py-1 text-slate-600">{label}</td>
-      <td className={`py-1 text-right font-medium ${value < 0 ? 'text-emerald-600' : 'text-slate-800'}`}>
+    <tr className="border-b border-line">
+      <td className="py-1 text-ink-muted">{label}</td>
+      <td className={`py-1 text-right font-medium ${value < 0 ? 'text-emerald-600' : 'text-navy'}`}>
         {value < 0 ? '−' : ''}
         {fmt(Math.abs(value))}
       </td>

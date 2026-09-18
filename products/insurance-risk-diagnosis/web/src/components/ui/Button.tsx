@@ -4,11 +4,11 @@ type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dark';
 type Size = 'md' | 'sm';
 
 const VARIANT_CLASS: Record<Variant, string> = {
-  primary: 'bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40',
-  dark: 'bg-slate-900 text-white hover:bg-slate-700 disabled:opacity-40',
-  secondary: 'border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-40',
-  ghost: 'text-slate-500 hover:text-slate-800 disabled:opacity-40',
-  danger: 'border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-40',
+  primary: 'bg-navy text-white hover:bg-navy-dark disabled:opacity-40',
+  dark: 'bg-navy-dark text-white hover:bg-navy disabled:opacity-40',
+  secondary: 'border border-line text-ink-muted hover:bg-canvas disabled:opacity-40',
+  ghost: 'text-ink-muted hover:text-navy disabled:opacity-40',
+  danger: 'border border-rose-200/80 text-rose-700 hover:bg-rose-50/60 disabled:opacity-40',
 };
 
 const SIZE_CLASS: Record<Size, string> = {
@@ -26,7 +26,7 @@ export function Button({ variant = 'secondary', size = 'md', className = '', ...
   return (
     <button
       {...props}
-      className={`inline-flex items-center justify-center rounded-lg font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 focus-visible:ring-offset-1 ${VARIANT_CLASS[variant]} ${SIZE_CLASS[size]} ${className}`}
+      className={`inline-flex items-center justify-center rounded-lg font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy/40 focus-visible:ring-offset-1 ${VARIANT_CLASS[variant]} ${SIZE_CLASS[size]} ${className}`}
     />
   );
 }
