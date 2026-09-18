@@ -9,13 +9,13 @@ export function Metric({
   tone?: 'default' | 'danger';
 }) {
   const valueClass = size === 'lg' ? 'text-5xl sm:text-6xl' : 'text-2xl';
-  const colorClass = tone === 'danger' ? 'text-rose-600' : 'text-slate-900';
+  const colorClass = tone === 'danger' ? 'text-rose-600' : 'text-navy';
   return (
     <div>
-      {label && <p className="text-xs text-slate-500 mb-1">{label}</p>}
+      {label && <p className="text-xs text-ink-muted mb-1">{label}</p>}
       <p className={`font-bold tracking-tight tabular-nums ${valueClass} ${colorClass}`}>
         {value}
-        {unit && <span className={size === 'lg' ? 'text-xl sm:text-2xl font-medium text-slate-400 ml-1' : 'text-sm font-medium text-slate-400 ml-1'}>{unit}</span>}
+        {unit && <span className={size === 'lg' ? 'text-xl sm:text-2xl font-medium text-ink-muted ml-1' : 'text-sm font-medium text-ink-muted ml-1'}>{unit}</span>}
       </p>
     </div>
   );

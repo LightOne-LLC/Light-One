@@ -216,7 +216,7 @@ describe('ui kit - Card/Button/Badge/SectionHeader/ChoiceCardGroup', () => {
   test('Buttonのvariant/sizeでクラスが変わる', () => {
     const primary = renderToStaticMarkup(<Button variant="primary">送信</Button>);
     const danger = renderToStaticMarkup(<Button variant="danger">削除</Button>);
-    expect(primary).toContain('bg-indigo-600');
+    expect(primary).toContain('bg-navy');
     expect(danger).toContain('border-rose-200');
   });
 
@@ -268,14 +268,18 @@ describe('ui kit - Card/Button/Badge/SectionHeader/ChoiceCardGroup', () => {
     expect(html).toContain('読み込み中です');
   });
 
-  test('ResultHeroは総合スコア・最重要リスク・日付を表示する', () => {
+  test('ResultHeroは総合スコア・重点確認領域・日付を表示する', () => {
     const html = renderToStaticMarkup(
-      <ResultHero overallScore={72} topLevel="high" topLabel="就業不能" topScore={81} message="確認が必要です" date="2026年9月18日" />,
+      <ResultHero overallScore={72} message="確認が必要です" date="2026年9月18日" topDomains={['就業不能', '老後', '介護']} />,
     );
     expect(html).toContain('72');
     expect(html).toContain('就業不能');
     expect(html).toContain('2026年9月18日');
-    expect(html).toContain('診断完了');
+    expect(html).toContain('LIGHT ONE');
+  });
+
+  test('ResultHeroはtopDomainsが空でもクラッシュしない', () => {
+    expect(() => renderToStaticMarkup(<ResultHero overallScore={0} message="" date="" topDomains={[]} />)).not.toThrow();
   });
 });
 

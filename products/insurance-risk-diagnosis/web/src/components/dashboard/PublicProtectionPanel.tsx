@@ -36,13 +36,13 @@ export function PublicProtectionPanel({ basic }: { basic: DiagnosisInput['basic'
     <Card as="section">
       <SectionHeader title="Public Protection" description="職業や働き方によって、利用できる公的保障は異なります。" />
 
-      <ul className="divide-y divide-slate-100">
+      <ul className="divide-y divide-line">
         {items.map((item) => (
           <li key={item.label} className="flex items-start gap-3 py-3">
-            <span className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${item.available ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+            <span className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${item.available ? 'bg-emerald-500' : 'bg-line'}`} />
             <div>
-              <p className="text-sm font-medium text-slate-900">{item.label}</p>
-              <p className="text-xs text-slate-500">{item.note}</p>
+              <p className="text-sm font-medium text-navy">{item.label}</p>
+              <p className="text-xs text-ink-muted">{item.note}</p>
             </div>
           </li>
         ))}

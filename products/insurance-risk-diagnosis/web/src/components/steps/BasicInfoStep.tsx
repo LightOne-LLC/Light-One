@@ -24,8 +24,8 @@ export function BasicInfoStep({ input, onChange }: Props) {
 
   return (
     <div>
-      <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-1">基本情報</h2>
-      <p className="text-sm text-slate-500 mb-5">年齢・世帯構成・収入は、すべてのリスク計算の土台になります。</p>
+      <h2 className="text-lg font-semibold tracking-tight text-navy mb-1">基本情報</h2>
+      <p className="text-sm text-ink-muted mb-5">年齢・世帯構成・収入は、すべてのリスク計算の土台になります。</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
         <FormField label="年齢" required>
@@ -76,7 +76,7 @@ export function BasicInfoStep({ input, onChange }: Props) {
         ]}
         columns={3}
       />
-      <p className="text-xs text-slate-400 -mt-4 mb-6">公的保障(傷病手当金・厚生年金等)の有無に影響します</p>
+      <p className="text-xs text-ink-muted -mt-4 mb-6">公的保障(傷病手当金・厚生年金等)の有無に影響します</p>
 
       <ChoiceCardGroup
         label="職業危険度区分"
@@ -154,16 +154,16 @@ export function BasicInfoStep({ input, onChange }: Props) {
 
       <div className="mt-2 mb-4">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-slate-700">子供の人数と年齢</span>
-          <button type="button" onClick={addChild} className="text-sm text-indigo-600 hover:underline py-1.5 px-1">
+          <span className="text-sm font-medium text-navy">子供の人数と年齢</span>
+          <button type="button" onClick={addChild} className="text-sm text-navy hover:underline py-1.5 px-1">
             + 子供を追加
           </button>
         </div>
-        {basic.children.length === 0 && <p className="text-sm text-slate-400">子供はいません</p>}
+        {basic.children.length === 0 && <p className="text-sm text-ink-muted">子供はいません</p>}
         <div className="space-y-2">
           {basic.children.map((child, index) => (
             <div key={index} className="flex items-center gap-2">
-              <span className="text-sm text-slate-600 w-14 shrink-0">第{index + 1}子</span>
+              <span className="text-sm text-ink-muted w-14 shrink-0">第{index + 1}子</span>
               <input
                 type="number"
                 min={0}
@@ -173,7 +173,7 @@ export function BasicInfoStep({ input, onChange }: Props) {
                 value={child.currentAge}
                 onChange={(e) => updateChildAge(index, Number(e.target.value))}
               />
-              <span className="text-sm text-slate-500 shrink-0">歳</span>
+              <span className="text-sm text-ink-muted shrink-0">歳</span>
               <button
                 type="button"
                 onClick={() => removeChild(index)}

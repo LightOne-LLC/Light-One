@@ -1,40 +1,39 @@
-import type { RiskLevelLabel } from '../../types/diagnosis';
-import { riskLevelStyle } from '../../lib/riskLevelStyle';
-import { Metric } from './Metric';
-
-// Result画面の最上部。「診断完了 → 総合的な状態 → 数値 → 短い説明 → 最重要リスク」の順で視線誘導する。
+// Result画面の最上部。深いネイビー地にアイボリーの数字を大胆に見せる、プロダクトの「顔」となるHero。
+// 視線誘導: ブランド → ラベル → 総合スコア(主役) → 短い説明 → 重点確認領域(gold区切り線の下)
 export function ResultHero({
-  overallScore, topLevel, topLabel, topScore, message, date,
+  overallScore, message, date, topDomains,
 }: {
   overallScore: number;
-  topLevel: RiskLevelLabel;
-  topLabel?: string;
-  topScore?: number;
   message: string;
   date: string;
+  topDomains: string[];
 }) {
-  const style = riskLevelStyle(topLevel);
   return (
-    <header className={`rounded-2xl border p-6 sm:p-10 ${style.badgeClass}`}>
-      <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
-        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
-          診断完了
-        </span>
-        <span className="text-xs text-slate-400">{date}</span>
+    <header className="rounded-3xl bg-navy text-white p-8 sm:p-12">
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-8 sm:mb-10">
+        <p className="text-xs font-semibold tracking-[0.2em] text-gold-ring">LIGHT ONE</p>
+        <p className="text-xs text-white/50">{date}</p>
       </div>
 
-      <p className="text-xs font-semibold tracking-widest uppercase text-slate-500 mb-1">Your Financial Risk Profile</p>
-      <Metric value={overallScore} unit="/ 100" size="lg" />
-      <p className="mt-3 text-sm text-slate-600 max-w-md">{message}</p>
+      <p className="text-[11px] font-medium tracking-[0.25em] uppercase text-white/50 mb-2">Financial Risk Profile</p>
+      <p className="text-sm text-white/70 mb-3">現在のポジション</p>
+      <p className="font-display-num text-7xl sm:text-8xl font-bold text-white leading-none">
+        {overallScore}
+        <span className="text-2xl sm:text-3xl font-medium text-white/40 ml-2">/ 100</span>
+      </p>
+      <p className="mt-4 text-sm text-white/70 max-w-md">{message}</p>
 
-      {topLabel && (
-        <div className="mt-5 pt-5 border-t border-white/40 flex items-center gap-3">
-          <span className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium ${style.badgeClass} ring-1 ring-inset ring-white/50`}>{style.label}</span>
-          <p className="text-sm text-slate-700">
-            最も注意すべき領域: <span className="font-semibold">{topLabel}</span>
-            {topScore !== undefined && <span className="text-slate-500">({topScore}点)</span>}
-          </p>
+      {topDomains.length > 0 && (
+        <div className="mt-8 sm:mt-10 pt-6 border-t border-gold/30">
+          <p className="text-[11px] font-medium tracking-[0.2em] uppercase text-gold-ring mb-3">重点確認領域</p>
+          <ol className="flex flex-wrap gap-x-6 gap-y-2">
+            {topDomains.map((label, i) => (
+              <li key={label} className="text-sm text-white/90 flex items-baseline gap-2">
+                <span className="text-xs text-gold-ring font-medium tabular-nums">{String(i + 1).padStart(2, '0')}</span>
+                {label}
+              </li>
+            ))}
+          </ol>
         </div>
       )}
     </header>

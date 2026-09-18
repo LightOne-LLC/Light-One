@@ -25,11 +25,11 @@ export function ChoiceCardGroup<T extends string>({
   return (
     <div className="mb-6">
       <div className="flex items-baseline gap-1.5 mb-2">
-        <span className="text-sm font-medium text-slate-700">{label}</span>
+        <span className="text-sm font-medium text-navy">{label}</span>
         {required ? (
           <span className="text-[10px] font-semibold tracking-wide text-rose-500">必須</span>
         ) : (
-          <span className="text-[10px] font-medium tracking-wide text-slate-400">任意</span>
+          <span className="text-[10px] font-medium tracking-wide text-ink-muted">任意</span>
         )}
       </div>
       <div className={`grid gap-2 ${gridColsClass(Math.min(columns, options.length))}`}>
@@ -41,16 +41,16 @@ export function ChoiceCardGroup<T extends string>({
               type="button"
               onClick={() => onChange(opt.value)}
               aria-pressed={selected}
-              className={`relative min-h-[44px] rounded-xl border px-3 py-2.5 pr-7 text-sm font-medium text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 ${
+              className={`relative min-h-[44px] rounded-xl border px-3 py-2.5 pr-7 text-sm font-medium text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy/40 ${
                 selected
-                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                  : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                  ? 'border-navy bg-gold-soft text-navy-dark'
+                  : 'border-line text-ink-muted hover:border-line hover:bg-canvas'
               }`}
             >
               <span className="block">{opt.label}</span>
-              {opt.hint && <span className={`block text-xs mt-0.5 ${selected ? 'text-indigo-500' : 'text-slate-400'}`}>{opt.hint}</span>}
+              {opt.hint && <span className={`block text-xs mt-0.5 ${selected ? 'text-navy' : 'text-ink-muted'}`}>{opt.hint}</span>}
               {selected && (
-                <span className="absolute top-2 right-2 flex items-center justify-center w-4 h-4 rounded-full bg-indigo-600 text-white text-[10px] leading-none" aria-hidden="true">
+                <span className="absolute top-2 right-2 flex items-center justify-center w-4 h-4 rounded-full bg-navy text-white text-[10px] leading-none" aria-hidden="true">
                   ✓
                 </span>
               )}
