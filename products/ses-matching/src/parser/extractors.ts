@@ -207,7 +207,12 @@ export function findRateInFreeText(text: string): { min: number; max: number } |
   return undefined;
 }
 
-const IMMEDIATE_PATTERN = /即日/;
+// "即日"(今日から/ASAP)と"随時"(いつでも/都度応相談)は表現こそ違うが、
+// どちらも具体的な暦日を持たない・特定の日付制約を課さないという点で同じ
+// 意味を持つ(実際のキャリアビート形式の案件メールで観測)。どちらも
+// immediateとして扱い、現在時刻には一切依存させない(具体的な暦日への
+// 変換はしない)。
+const IMMEDIATE_PATTERN = /即日|随時/;
 // "8月or9月"のように複数の月にまたがる曖昧な表記。どちらか一方に決め打ち
 // しない(根拠のない日付補完を避ける)ため、この表記が含まれる場合は
 // unknown(月精度にも解決できない)として扱う。
@@ -219,7 +224,7 @@ const AMBIGUOUS_MULTI_MONTH_PATTERN = /\d{1,2}月\s*(?:or|または|、|,|\/)\s*
  * 対応する形式(実メールで確認済みのもののみ):
  *   - "2026-04-01"(そのまま) / "2026年4月1日" → day precision
  *   - "2026-10"(そのまま) / "2026年10月"(日が無い) → month precision
- *   - "即日" → immediate(相対表現。具体的な暦日へは変換しない —
+ *   - "即日" / "随時" → immediate(相対表現。具体的な暦日へは変換しない —
  *     現在時刻に依存させないため)
  *   - "8月or9月"のように複数月にまたがる曖昧な表記、"10月"のように年が
  *     無く年を特定できない表記 → unknown(日付らしい記載はあったが、
@@ -283,6 +288,40 @@ export function parseRequiredSkillList(value: string, required: boolean): Requir
     const { name, years } = parseNameAndExperience(token);
     return { name, minYears: years ?? 0, required };
   });
+}
+
+/** 「<<必須>>」/「<<尚可>>」(稀に【必須】【尚可】)のサブ見出しで必須/尚可が
+ * 分かれた「■スキル■」セクション内から、それぞれの生テキストを取り出す。
+ * 株式会社キャリアビート形式の案件メールで観察された。extractLabeledValue
+ * が既に本文の空白を1つずつのスペースへ正規化した後の値を受け取る前提。 */
+export function extractNestedSkillSections(skillSectionValue: string): { required?: string; preferred?: string } {
+  const requiredMatch = skillSectionValue.match(/(?:<<\s*必須\s*>>|【\s*必須\s*】)([\s\S]*?)(?=<<|【|$)/);
+  const preferredMatch = skillSectionValue.match(/(?:<<\s*尚可\s*>>|【\s*尚可\s*】)([\s\S]*?)(?=<<|【|$)/);
+  const required = requiredMatch?.[1]?.trim();
+  const preferred = preferredMatch?.[1]?.trim();
+  return { required: required || undefined, preferred: preferred || undefined };
+}
+
+/** 「・」始まりの箇条書き(1行1要件)を、行内の中点(例:"法令・規格対応")と
+ * 区別して分割する。extractLabeledValueの時点で改行は既に1つのスペースへ
+ * 正規化されているため、「・」が空白(元は改行)の直後にある場合のみ
+ * 項目区切りとみなし、語句内部の「・」(直前が空白でない)は区切らない。
+ * 通常のparseRequiredSkillList/splitListが想定する「Java、AWS」のような
+ * 短いカンマ区切り列挙とは異なり、各要件が長い自然文であることが多い
+ * ため専用の分割ロジックを用いる。 */
+function splitBulletRequirementLines(value: string): string[] {
+  return value
+    .split(/(?:^|\s)・/)
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+}
+
+/** 「■スキル■」内の「<<必須>>」「<<尚可>>」から取り出した箇条書きの要件文
+ * (自然文であることが多く、"Java(3年以上)"のような短い技術名の列挙とは
+ * 限らない)を、そのまま案件側のRequiredSkill[]へ変換する。経験年数の
+ * 明示的な抽出はしない(自然文からの年数推測になり得るため)。 */
+export function parseNestedRequirementList(value: string, required: boolean): RequiredSkill[] {
+  return splitBulletRequirementLines(value).map((name) => ({ name, minYears: 0, required }));
 }
 
 /** 要員側のスキル列挙("Java(5年)、JavaScript(70ヶ月)")をEngineerSkill[]へ変換する。 */

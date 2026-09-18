@@ -1,10 +1,12 @@
 import {
   extractBulletValueNoColonNumeric,
   extractLabeledValue,
+  extractNestedSkillSections,
   findRateInFreeText,
   findRemoteInFreeText,
   parseDateValue,
   parseEngineerSkillList,
+  parseNestedRequirementList,
   parseRateRange,
   parseRequiredSkillList,
   parseYesNo,
@@ -244,6 +246,14 @@ describe('parseDateValue', () => {
     expect(parseDateValue('即日~長期')).toEqual({ precision: 'immediate', value: '' });
   });
 
+  it('"随時"も即日と同様にimmediate precisionとして取得する(具体的な暦日へは変換しない)', () => {
+    expect(parseDateValue('随時')).toEqual({ precision: 'immediate', value: '' });
+  });
+
+  it('"随時 ～ 長期"のような補足付きでもimmediate precisionとして取得する', () => {
+    expect(parseDateValue('随時 ～ 長期')).toEqual({ precision: 'immediate', value: '' });
+  });
+
   it('年が無い"10月〜"は年を推測しないためunknown precisionとして扱う', () => {
     expect(parseDateValue('10月〜')).toEqual({ precision: 'unknown', value: '' });
   });
@@ -304,5 +314,54 @@ describe('stripNoteSuffix', () => {
 
   it('"※"が無ければ元の文字列をそのまま返す', () => {
     expect(stripNoteSuffix('渋谷駅')).toBe('渋谷駅');
+  });
+});
+
+// 実案件メールで観察された「■スキル■」+「<<必須>>」/「<<尚可>>」ネスト構造
+// (稀に【必須】【尚可】表記も見られる)。
+describe('extractNestedSkillSections', () => {
+  it('"<<必須>>"と"<<尚可>>"それぞれの生テキストを取り出す', () => {
+    const section = '<<必須>> ・Javaでの開発経験 ・AWSの実務経験 <<尚可>> ・Terraformの利用経験';
+    expect(extractNestedSkillSections(section)).toEqual({
+      required: '・Javaでの開発経験 ・AWSの実務経験',
+      preferred: '・Terraformの利用経験',
+    });
+  });
+
+  it('"<<尚可>>"が無い場合はrequiredのみを返す', () => {
+    const section = '<<必須>> ・Cisco L2SW/L3SWの経験 ・クラウド周りの経験';
+    const result = extractNestedSkillSections(section);
+    expect(result.required).toBe('・Cisco L2SW/L3SWの経験 ・クラウド周りの経験');
+    expect(result.preferred).toBeUndefined();
+  });
+
+  it('稀な表記"【必須】"/"【尚可】"にも対応する', () => {
+    const section = '【必須】 ・Java ・AWS 【尚可】 ・Terraform';
+    expect(extractNestedSkillSections(section)).toEqual({
+      required: '・Java ・AWS',
+      preferred: '・Terraform',
+    });
+  });
+
+  it('該当するサブ見出しが無ければ両方undefinedを返す', () => {
+    expect(extractNestedSkillSections('特に指定なし')).toEqual({ required: undefined, preferred: undefined });
+  });
+});
+
+describe('parseNestedRequirementList', () => {
+  it('行内の中点(例:"法令・規格対応")を区切りとして誤分割しない', () => {
+    const value = '・セキュリティ法令・規格対応の経験(CRA/ISO 27001等) ・コミュニケーションスキル';
+    expect(parseNestedRequirementList(value, true)).toEqual([
+      { name: 'セキュリティ法令・規格対応の経験(CRA/ISO 27001等)', minYears: 0, required: true },
+      { name: 'コミュニケーションスキル', minYears: 0, required: true },
+    ]);
+  });
+
+  it('短い技術名の箇条書きも1項目ずつ取り出せる', () => {
+    expect(parseNestedRequirementList('・Java ・AWS ・Terraform', false)).toEqual([
+      { name: 'Java', minYears: 0, required: false },
+      { name: 'AWS', minYears: 0, required: false },
+      { name: 'Terraform', minYears: 0, required: false },
+    ]);
   });
 });

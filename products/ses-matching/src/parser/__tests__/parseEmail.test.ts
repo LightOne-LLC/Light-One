@@ -721,3 +721,96 @@ describe('parseEmail (単独■見出し・コロン無し・最寄り駅表記�
     expect(result.candidate.desiredRateMax).toBe(85);
   });
 });
+
+// 実案件メール(株式会社キャリアビート形式)で観察された「■スキル■」+
+// 「<<必須>>」/「<<尚可>>」ネスト構造。既存の「必須スキル」ラベルが無い
+// 案件メールでも、この形式からrequiredSkillsを取得できることを確認する。
+describe('parseEmail (■スキル■ + <<必須>>/<<尚可>>ネスト形式の案件メール)', () => {
+  const nestedSkillProjectEmail: RawEmail = {
+    id: 'email-project-nested-skill-001',
+    subject: '案件のご紹介',
+    bodyText: [
+      '■スキル■',
+      '<<必須>>',
+      '・Javaでの開発経験',
+      '・AWSでのインフラ構築経験',
+      '<<尚可>>',
+      '・Terraformの利用経験',
+      '■単価■',
+      '60万円~80万円',
+      '■場所■',
+      '東京都',
+      '■期間■',
+      '即日~長期',
+    ].join('\n'),
+  };
+
+  it('<<必須>>側をrequired:true、<<尚可>>側をrequired:falseとしてrequiredSkillsへ取得する', () => {
+    const result = parseEmail(nestedSkillProjectEmail);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'project') return;
+
+    expect(result.candidate.requiredSkills).toEqual([
+      { name: 'Javaでの開発経験', minYears: 0, required: true },
+      { name: 'AWSでのインフラ構築経験', minYears: 0, required: true },
+      { name: 'Terraformの利用経験', minYears: 0, required: false },
+    ]);
+  });
+
+  it('■期間■の"即日~長期"はimmediate precisionとして取得できる(随時と同じ扱い)', () => {
+    const result = parseEmail(nestedSkillProjectEmail);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'project') return;
+
+    expect(result.candidate.startDate).toEqual({ precision: 'immediate', value: '' });
+  });
+
+  it('rate/locationも既存の■ラベル■形式でそのまま取得でき、validationを通過する', () => {
+    const result = parseEmail(nestedSkillProjectEmail);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'project') return;
+
+    expect(result.candidate.rateMin).toBe(60);
+    expect(result.candidate.rateMax).toBe(80);
+    expect(result.candidate.location).toBe('東京都');
+
+    // remoteAllowedの記載が無いためvalidationはそこだけFAILする(推測しない)。
+    const validation = validateProjectRecord(result.candidate);
+    expect(validation.valid).toBe(false);
+    if (validation.valid) return;
+    expect(validation.errors).toEqual(['remoteAllowed: 真偽値である必要があります']);
+  });
+
+  it('明示的な"必須スキル"ラベルがある場合はネスト形式より優先される(既存挙動を維持)', () => {
+    const email: RawEmail = {
+      id: 'email-project-explicit-label-priority-001',
+      subject: '案件のご紹介',
+      bodyText: [
+        '必須スキル: Python',
+        '■スキル■',
+        '<<必須>>',
+        '・Javaでの開発経験',
+      ].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'project') return;
+
+    expect(result.candidate.requiredSkills).toEqual([{ name: 'Python', minYears: 0, required: true }]);
+  });
+
+  it('<<必須>>/<<尚可>>が無い通常の■スキル■(単純な技術名の列挙)でも壊れない(該当なしでrequiredSkillsは空のまま)', () => {
+    const email: RawEmail = {
+      id: 'email-project-plain-skill-section-001',
+      subject: '案件のご紹介',
+      bodyText: ['■スキル■', 'Java、AWS', '■単価■', '70万円'].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'project') return;
+
+    // <<必須>>/<<尚可>>の見出しが無いため、根拠なく「必須」に仕分けせず
+    // requiredSkills自体を取得しない(捏造しない)。
+    expect(result.candidate.requiredSkills).toBeUndefined();
+  });
+});
