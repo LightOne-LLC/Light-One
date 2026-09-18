@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router-dom';
 import { NavBar } from './components/NavBar';
 import { UpdateBanner } from './components/UpdateBanner';
+import { WorkspaceStatusBanner } from './components/WorkspaceStatusBanner';
 import { DashboardPage } from './pages/DashboardPage';
 import { EngineerDetailPage } from './pages/EngineerDetailPage';
 import { EngineersPage } from './pages/EngineersPage';
@@ -13,6 +14,7 @@ export function App() {
     <WorkspaceProvider>
       <UpdateBanner />
       <main>
+        <WorkspaceStatusBanner />
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/projects" element={<ProjectsPage />} />

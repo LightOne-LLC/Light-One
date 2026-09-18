@@ -1,35 +1,42 @@
 import { Link } from 'react-router-dom';
-import { dummyEngineers, dummyProjects } from '../../demo/dummyData';
 import { matchProjectToEngineers } from '../../matching/matchProjectToEngineers';
 import { GmailBulkImport } from '../components/GmailBulkImport';
 import { GmailImport } from '../components/GmailImport';
 import { scoreColorClass } from '../scoreColor';
+import { useMatchingPools } from '../useMatchingPools';
 
 export function DashboardPage() {
-  const latestProject = dummyProjects[0];
-  const topCandidate = latestProject
-    ? matchProjectToEngineers(latestProject, dummyEngineers)[0]
-    : undefined;
+  const { projectList, engineerPool, useReal } = useMatchingPools();
+  const latestProject = projectList[0];
+  const topCandidate = latestProject ? matchProjectToEngineers(latestProject, engineerPool)[0] : undefined;
 
   return (
     <>
       <h1>SES Matching</h1>
-      <p className="empty-note">案件と要員のマッチング状況の概要です(現在はダミーデータ)。</p>
+      <p className="empty-note">
+        {useReal
+          ? '実Gmail取り込み結果に基づく案件と要員のマッチング状況です。'
+          : '案件と要員のマッチング状況の概要です(現在はダミーデータ)。'}
+      </p>
 
       <div className="stat-row">
         <div className="stat-box">
-          <div className="stat-value">{dummyProjects.length}</div>
+          <div className="stat-value">{projectList.length}</div>
           <div className="stat-label">案件数</div>
         </div>
         <div className="stat-box">
-          <div className="stat-value">{dummyEngineers.length}</div>
+          <div className="stat-value">{engineerPool.length}</div>
           <div className="stat-label">要員数</div>
         </div>
       </div>
 
       <h2>最新マッチング</h2>
       {latestProject && topCandidate ? (
-        <Link to={`/matching/${latestProject.id}`} className="card" style={{ display: 'block', color: 'inherit', textDecoration: 'none' }}>
+        <Link
+          to={`/matching/${latestProject.id}`}
+          className="card"
+          style={{ display: 'block', color: 'inherit', textDecoration: 'none' }}
+        >
           <div className="card-title">{latestProject.id}</div>
           <div className="card-row">
             <span>1位候補</span>

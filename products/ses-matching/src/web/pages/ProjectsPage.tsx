@@ -5,15 +5,18 @@ import { formatDateValue } from '../formatDateValue';
 import { useWorkspace } from '../workspaceContext';
 
 export function ProjectsPage() {
-  const { result } = useWorkspace();
-  const realProjects = result?.success ? result.projects : undefined;
+  const { result, dataReady } = useWorkspace();
+  // 取得に成功した後は、たとえ0件でもdummy dataへは戻さない
+  // (dataReadyで判断する。件数では判断しない)。
+  const realProjects = dataReady && result?.success ? (result.projects ?? []) : undefined;
 
-  if (realProjects && realProjects.length > 0) {
+  if (realProjects) {
     return (
       <>
         <h1>Projects</h1>
         <p className="empty-note">実Gmail取り込み結果の案件一覧です。</p>
 
+        {realProjects.length === 0 && <p className="empty-note">案件がありません。</p>}
         {realProjects.map((project) => (
           <div key={project.id} className="card">
             <div className="card-title">{project.title ?? project.id}</div>

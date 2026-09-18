@@ -15,6 +15,9 @@ function mockFetchOnce(result: GmailBulkImportResult) {
 
 // GmailBulkImportはWorkspace state(Context)とWorkspaceへのリンク(Link)を
 // 使うため、MatchingPage等と同じくRouter/Providerでラップして描画する。
+// WorkspaceProviderはマウント時に自動でfetchするため、レンダリングした
+// 時点で既に取得が始まっている(このモジュールの各テストは、その自動取得
+// 自体をアサーションの対象として使う)。
 function renderComponent() {
   return render(
     <MemoryRouter>
@@ -30,23 +33,35 @@ afterEach(() => {
 });
 
 describe('GmailBulkImport', () => {
-  it('取得ボタンが表示される', () => {
-    renderComponent();
-    expect(screen.getByRole('button', { name: '直近50件を取得' })).toBeTruthy();
-  });
-
-  it('クリックすると/api/gmail/fetchをlimit付きで呼ぶ', async () => {
+  it('取得ボタンが表示される', async () => {
     mockFetchOnce({ success: true, fetched: 0 });
     renderComponent();
-    fireEvent.click(screen.getByRole('button', { name: '直近50件を取得' }));
+    expect(screen.getByRole('button', { name: '最新データを取得' })).toBeTruthy();
+    // マウント時の自動fetchが完了するのを待ってからテストを終える
+    // (act()警告を避けるため)。
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+  });
 
-    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/gmail/fetch?limit=50'));
+  it('マウント時に自動で/api/gmail/fetchをlimit=100付きで呼ぶ(手動クリック不要)', async () => {
+    mockFetchOnce({ success: true, fetched: 0 });
+    renderComponent();
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/gmail/fetch?limit=100'));
+  });
+
+  it('「最新データを取得」ボタンをクリックすると再度同じAPIを呼ぶ', async () => {
+    mockFetchOnce({ success: true, fetched: 0 });
+    renderComponent();
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole('button', { name: '最新データを取得' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
   });
 
   it('集計結果(件数・分類・Validation PASS/FAIL・マッチング可能数)を表示する', async () => {
     mockFetchOnce({
       success: true,
-      limit: 50,
+      limit: 100,
       fetched: 50,
       project: { total: 10, valid: 3, invalid: 7 },
       engineer: { total: 31, valid: 5, invalid: 26 },
@@ -56,7 +71,6 @@ describe('GmailBulkImport', () => {
     });
 
     renderComponent();
-    fireEvent.click(screen.getByRole('button', { name: '直近50件を取得' }));
 
     await waitFor(() => expect(screen.getByText('50')).toBeTruthy());
     expect(screen.getByText('10', { exact: true })).toBeTruthy();
@@ -91,7 +105,6 @@ describe('GmailBulkImport', () => {
     });
 
     renderComponent();
-    fireEvent.click(screen.getByRole('button', { name: '直近50件を取得' }));
 
     await waitFor(() => expect(screen.getByText('案件: 開始時期')).toBeTruthy());
     expect(screen.getByText('要員: 稼働可能時期')).toBeTruthy();
@@ -112,7 +125,6 @@ describe('GmailBulkImport', () => {
     });
 
     renderComponent();
-    fireEvent.click(screen.getByRole('button', { name: '直近50件を取得' }));
 
     await waitFor(() => expect(screen.getByText('実データMatching:')).toBeTruthy());
     expect(screen.queryByText(/Validation FAIL理由/)).toBeNull();
@@ -130,7 +142,6 @@ describe('GmailBulkImport', () => {
     });
 
     renderComponent();
-    fireEvent.click(screen.getByRole('button', { name: '直近50件を取得' }));
 
     await waitFor(() =>
       expect(screen.getByText('実メール上で有効なProjectとEngineerの同時成立なし')).toBeTruthy(),
@@ -160,7 +171,6 @@ describe('GmailBulkImport', () => {
     });
 
     renderComponent();
-    fireEvent.click(screen.getByRole('button', { name: '直近50件を取得' }));
 
     await waitFor(() => expect(screen.getByText('実データMatching:')).toBeTruthy());
     expect(screen.getByText('email-project-1')).toBeTruthy();
@@ -183,26 +193,25 @@ describe('GmailBulkImport', () => {
     });
 
     renderComponent();
-    fireEvent.click(screen.getByRole('button', { name: '直近50件を取得' }));
 
     await waitFor(() => expect(screen.getByText(/この結果をWorkspaceで見る/)).toBeTruthy());
   });
 
-  it('取得失敗時はエラーメッセージを表示する', async () => {
-    mockFetchOnce({ success: false, reason: 'mailbox is empty' });
+  it('サーバーがsuccess:falseを返した場合は安全な汎用メッセージのみ表示する(理由は出さない)', async () => {
+    mockFetchOnce({ success: false, reason: 'Gmail credentials are not configured. token.json missing.' });
 
     renderComponent();
-    fireEvent.click(screen.getByRole('button', { name: '直近50件を取得' }));
 
-    await waitFor(() => expect(screen.getByText(/mailbox is empty/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('実データを取得できませんでした')).toBeTruthy());
+    expect(screen.queryByText(/credentials|token\.json/)).toBeNull();
   });
 
-  it('API呼び出し自体が失敗した場合もエラー表示し画面を壊さない', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network error')));
+  it('API呼び出し自体が失敗した場合も安全な汎用メッセージを表示し画面を壊さない', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network error: 10.0.0.1 unreachable')));
 
     renderComponent();
-    fireEvent.click(screen.getByRole('button', { name: '直近50件を取得' }));
 
-    await waitFor(() => expect(screen.getByText(/API呼び出しに失敗/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('実データを取得できませんでした')).toBeTruthy());
+    expect(screen.queryByText(/network error|10\.0\.0\.1/)).toBeNull();
   });
 });
