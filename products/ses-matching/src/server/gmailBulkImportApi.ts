@@ -14,7 +14,12 @@ import { authenticate, getGmailService, getMessage, listMessages } from '../gmai
 import { toRawEmail } from '../gmail/parseMessage';
 import type { RawEmail } from '../gmail/types';
 import { parseEmail } from '../parser/parseEmail';
-import type { DatePrecisionCounts, GmailBulkImportResult, GmailBulkMatchingSample } from './types';
+import type {
+  DatePrecisionCounts,
+  GmailBulkImportResult,
+  GmailBulkMatchingSample,
+  MatchingWorkspaceProject,
+} from './types';
 
 function emptyDatePrecisionCounts(): DatePrecisionCounts {
   return { day: 0, month: 0, immediate: 0, unknown: 0, missing: 0 };
@@ -61,6 +66,45 @@ function addError(counts: Record<string, number>, message: string): void {
   counts[field] = (counts[field] ?? 0) + 1;
 }
 
+/** Parser候補(validation前、型はunknown)からMatching Workspace表示用の
+ * 最小限のview modelを組み立てる。validでもinvalidでも(欠けている項目が
+ * あっても)そのまま組み立てられるよう、値の有無だけを見て安全に取り出す
+ * (無い値を推測して埋めない)。 */
+function buildWorkspaceProject(
+  subject: string | undefined,
+  candidate: Record<string, unknown>,
+  validation: { valid: boolean; errors: string[] },
+): MatchingWorkspaceProject {
+  const requiredSkills = Array.isArray(candidate.requiredSkills) ? candidate.requiredSkills : [];
+  const skills = requiredSkills
+    .map((skill) => (skill && typeof skill === 'object' && 'name' in skill ? (skill as { name: unknown }).name : undefined))
+    .filter((name): name is string => typeof name === 'string' && name.length > 0);
+
+  const rateMin = typeof candidate.rateMin === 'number' ? candidate.rateMin : undefined;
+  const rateMax = typeof candidate.rateMax === 'number' ? candidate.rateMax : undefined;
+  const location = typeof candidate.location === 'string' ? candidate.location : undefined;
+  const remoteAllowed = typeof candidate.remoteAllowed === 'boolean' ? candidate.remoteAllowed : undefined;
+  const startDate =
+    typeof candidate.startDate === 'object' && candidate.startDate !== null && 'precision' in candidate.startDate
+      ? (candidate.startDate as MatchingWorkspaceProject['startDate'])
+      : undefined;
+
+  return {
+    id: typeof candidate.id === 'string' ? candidate.id : '',
+    title: subject,
+    skills,
+    rateMin,
+    rateMax,
+    location,
+    remoteAllowed,
+    startDate,
+    validation: {
+      valid: validation.valid,
+      errors: Array.from(new Set(validation.errors.map(extractErrorField))),
+    },
+  };
+}
+
 const CONCURRENCY = 10;
 
 /** listで得たmessage idを固定の並列数でバッチ取得する(Gmail APIへの
@@ -90,9 +134,11 @@ async function fetchRecentRawEmails(limit: number): Promise<RawEmail[]> {
 
 /**
  * Gmailの直近`limit`件(clamp後)を取得し、既存のParser/Validation/Matchingへ
- * 流して集計結果を返す。RawEmailの本文/from/subjectはこの結果に一切含めない
- * (集計値と、validation失敗のフィールド名別件数、可能ならマッチング
- * サンプル1件分のみ)。
+ * 流して集計結果を返す。RawEmailの本文/fromはこの結果に一切含めない
+ * (集計値、validation失敗のフィールド名別件数、Matching Workspace用の
+ * 案件一覧(projects)とvalidation済みレコード(validProjects/validEngineers)
+ * のみ)。案件のsubjectは案件名相当の表示用途として例外的にtitleへ含める
+ * (PIIではないため)。
  *
  * `fetchRawEmails`は差し替え可能(テストではsyntheticなRawEmail[]を返す
  * 関数を注入し、実Gmail/OAuthに触れずに動作を検証する)。
@@ -120,6 +166,7 @@ export async function performGmailBulkImport(
   const validationErrors: Record<string, number> = {};
   const validProjects: ProjectRecord[] = [];
   const validEngineers: EngineerRecord[] = [];
+  const workspaceProjects: MatchingWorkspaceProject[] = [];
   const projectDatePrecision = emptyDatePrecisionCounts();
   const engineerDatePrecision = emptyDatePrecisionCounts();
 
@@ -138,9 +185,13 @@ export async function performGmailBulkImport(
       if (validation.valid) {
         projectValid++;
         validProjects.push(validation.value);
+        workspaceProjects.push(buildWorkspaceProject(email.subject, parsed.candidate, { valid: true, errors: [] }));
       } else {
         projectInvalid++;
         validation.errors.forEach((err) => addError(validationErrors, err));
+        workspaceProjects.push(
+          buildWorkspaceProject(email.subject, parsed.candidate, { valid: false, errors: validation.errors }),
+        );
       }
       continue;
     }
@@ -187,5 +238,12 @@ export async function performGmailBulkImport(
       matchableProjects,
       sample,
     },
+    // Matching Workspace用。projectsは valid/invalid 問わず全件、
+    // validProjects/validEngineersは検証済みでそのままmatchProjectToEngineers()
+    // へ渡せる既存の型(クライアント側でも既存Matching Engineをそのまま呼ぶ
+    // だけで、scoringロジックはコピーしない)。
+    projects: workspaceProjects,
+    validProjects,
+    validEngineers,
   };
 }

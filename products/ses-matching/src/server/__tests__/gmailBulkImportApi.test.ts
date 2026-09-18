@@ -285,3 +285,48 @@ describe('performGmailBulkImport', () => {
     });
   });
 });
+
+describe('performGmailBulkImport (Matching Workspace用のview model)', () => {
+  it('validな案件・要員はvalidProjects/validEngineersとしてそのまま返す(既存matchProjectToEngineers()にそのまま渡せる型)', async () => {
+    const result = await performGmailBulkImport(50, async () => [validProjectEmail, validEngineerEmail]);
+
+    expect(result.validProjects).toHaveLength(1);
+    expect(result.validProjects?.[0].id).toBe('email-project-valid');
+    expect(result.validEngineers).toHaveLength(1);
+    expect(result.validEngineers?.[0].id).toBe('email-engineer-valid');
+  });
+
+  it('projectsには件名をtitleとして含み、valid/invalidを問わず全件を返す', async () => {
+    const result = await performGmailBulkImport(50, async () => [validProjectEmail, incompleteProjectEmail]);
+
+    expect(result.projects).toHaveLength(2);
+    const valid = result.projects?.find((p) => p.id === 'email-project-valid');
+    expect(valid?.title).toBe('【新規案件】Javaエンジニア募集');
+    expect(valid?.skills).toEqual(['Java']);
+    expect(valid?.rateMin).toBe(60);
+    expect(valid?.rateMax).toBe(80);
+    expect(valid?.location).toBe('東京都');
+    expect(valid?.remoteAllowed).toBe(true);
+    expect(valid?.startDate).toEqual({ precision: 'day', value: '2026-04-01' });
+    expect(valid?.validation).toEqual({ valid: true, errors: [] });
+
+    const invalid = result.projects?.find((p) => p.id === 'email-project-incomplete');
+    expect(invalid?.validation.valid).toBe(false);
+    // フィールド名のみ(個別メールの本文/内容は含めない)、重複は除去される。
+    expect(invalid?.validation.errors).toContain('rateMin');
+    expect(invalid?.validation.errors).toContain('location');
+    expect(invalid?.validation.errors).toContain('startDate');
+  });
+
+  it('projects/validProjects/validEngineersにも本文(bodyText)・from・件名以外の個人情報を含めない', async () => {
+    const result = await performGmailBulkImport(50, async () => [
+      validProjectEmail,
+      validEngineerEmail,
+      incompleteProjectEmail,
+    ]);
+
+    const json = JSON.stringify({ projects: result.projects, validProjects: result.validProjects, validEngineers: result.validEngineers });
+    expect(json).not.toContain(SECRET_BODY_MARKER);
+    expect(json).not.toContain('agency@example.test');
+  });
+});
