@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import type { DiagnosisInput, DiagnosisResult } from '../types/diagnosis';
-import { getDiagnosisDetail } from '../lib/diagnosisStore';
+import { getDiagnosisDetail, deleteDiagnosisHistory } from '../lib/diagnosisStore';
 import { RadarChartPanel } from '../components/dashboard/RadarChartPanel';
 import { CoverageBreakdown } from '../components/dashboard/CoverageBreakdown';
 import { ScoreReasons } from '../components/dashboard/ScoreReasons';
@@ -10,9 +10,11 @@ import { exportElementToPdf } from '../lib/pdf';
 
 export function ResultPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [data, setData] = useState<{ input: DiagnosisInput; result: DiagnosisResult; createdAt: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -27,6 +29,19 @@ export function ResultPage() {
       await exportElementToPdf('pdf-report', `診断レポート_${id}.pdf`);
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!id) return;
+    if (!window.confirm('この診断結果を削除しますか?')) return;
+    setDeleting(true);
+    try {
+      await deleteDiagnosisHistory(id);
+      navigate('/history', { replace: true });
+    } catch (e: any) {
+      setError(e?.message ?? '削除に失敗しました。');
+      setDeleting(false);
     }
   };
 
@@ -49,6 +64,13 @@ export function ResultPage() {
             className="px-4 py-2 text-sm rounded-md bg-indigo-600 text-white disabled:opacity-40"
           >
             {exporting ? '出力中...' : 'PDFレポート出力'}
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="px-4 py-2 text-sm rounded-md border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-40"
+          >
+            {deleting ? '削除中...' : 'この診断結果を削除'}
           </button>
         </div>
       </div>
