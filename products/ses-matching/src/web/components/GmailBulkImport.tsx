@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { DatePrecisionCounts, GmailBulkImportResult } from '../../server/types';
 import { scoreColorClass } from '../scoreColor';
+import { useWorkspace } from '../workspaceContext';
 
 type Status = 'idle' | 'loading' | 'done' | 'error';
 
@@ -100,6 +102,12 @@ function ResultView({ result }: { result: GmailBulkImportResult }) {
           <p className="empty-note">実メール上で有効なProjectとEngineerの同時成立なし</p>
         )}
       </div>
+
+      {result.projects && result.projects.length > 0 && (
+        <div className="card-row">
+          <Link to="/projects">この結果をWorkspaceで見る(案件一覧) →</Link>
+        </div>
+      )}
     </>
   );
 }
@@ -113,6 +121,7 @@ function ResultView({ result }: { result: GmailBulkImportResult }) {
 export function GmailBulkImport() {
   const [status, setStatus] = useState<Status>('idle');
   const [result, setResult] = useState<GmailBulkImportResult | null>(null);
+  const workspace = useWorkspace();
 
   const handleClick = async () => {
     setStatus('loading');
@@ -121,6 +130,9 @@ export function GmailBulkImport() {
       const res = await fetch(`/api/gmail/fetch?limit=${DEFAULT_LIMIT}`);
       const data: GmailBulkImportResult = await res.json();
       setResult(data);
+      // Projects/Matching/Engineer Detailページからも同じ取り込み結果を
+      // 参照できるよう、共有state(workspaceContext)へも保存する。
+      workspace.setResult(data);
       setStatus('done');
     } catch {
       setResult({ success: false, reason: 'API呼び出しに失敗しました。' });
