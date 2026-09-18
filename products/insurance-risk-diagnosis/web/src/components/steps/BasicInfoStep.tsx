@@ -1,6 +1,6 @@
 import type { DiagnosisInput } from '../../types/diagnosis';
 import { FormField, inputClass, selectClass } from './FormField';
-import { ChoiceCardGroup } from '../ui';
+import { ChoiceCardGroup, NumberField } from '../ui';
 
 interface Props {
   input: DiagnosisInput;
@@ -29,15 +29,7 @@ export function BasicInfoStep({ input, onChange }: Props) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
         <FormField label="年齢" required>
-          <input
-            type="number"
-            min={0}
-            max={120}
-            inputMode="numeric"
-            className={inputClass}
-            value={basic.age}
-            onChange={(e) => updateBasic({ age: Number(e.target.value) })}
-          />
+          <NumberField min={0} max={120} className={inputClass} value={basic.age} onChange={(n) => updateBasic({ age: n })} />
         </FormField>
 
         <FormField label="性別">
@@ -53,14 +45,7 @@ export function BasicInfoStep({ input, onChange }: Props) {
         </FormField>
 
         <FormField label="年収(万円)" required>
-          <input
-            type="number"
-            min={0}
-            inputMode="numeric"
-            className={inputClass}
-            value={basic.annualIncome}
-            onChange={(e) => updateBasic({ annualIncome: Number(e.target.value) })}
-          />
+          <NumberField min={0} placeholder="例: 500" className={inputClass} value={basic.annualIncome} onChange={(n) => updateBasic({ annualIncome: n })} />
         </FormField>
       </div>
 
@@ -106,15 +91,7 @@ export function BasicInfoStep({ input, onChange }: Props) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
         {basic.hasSpouse && (
           <FormField label="配偶者の年齢" required>
-            <input
-              type="number"
-              min={0}
-              max={120}
-              inputMode="numeric"
-              className={inputClass}
-              value={basic.spouseAge ?? ''}
-              onChange={(e) => updateBasic({ spouseAge: Number(e.target.value) })}
-            />
+            <NumberField min={0} max={120} className={inputClass} value={basic.spouseAge ?? 0} onChange={(n) => updateBasic({ spouseAge: n })} />
           </FormField>
         )}
 
@@ -124,14 +101,7 @@ export function BasicInfoStep({ input, onChange }: Props) {
             hint="0の場合は収入なしとして計算します"
             unknownAction={{ label: '不明(0円で計算)', onClick: () => updateBasic({ spouseAnnualIncome: 0 }) }}
           >
-            <input
-              type="number"
-              min={0}
-              inputMode="numeric"
-              className={inputClass}
-              value={basic.spouseAnnualIncome ?? 0}
-              onChange={(e) => updateBasic({ spouseAnnualIncome: Number(e.target.value) })}
-            />
+            <NumberField min={0} className={inputClass} value={basic.spouseAnnualIncome ?? 0} onChange={(n) => updateBasic({ spouseAnnualIncome: n })} />
           </FormField>
         )}
 
@@ -164,15 +134,7 @@ export function BasicInfoStep({ input, onChange }: Props) {
           {basic.children.map((child, index) => (
             <div key={index} className="flex items-center gap-2">
               <span className="text-sm text-ink-muted w-14 shrink-0">第{index + 1}子</span>
-              <input
-                type="number"
-                min={0}
-                max={40}
-                inputMode="numeric"
-                className={inputClass}
-                value={child.currentAge}
-                onChange={(e) => updateChildAge(index, Number(e.target.value))}
-              />
+              <NumberField min={0} max={40} className={inputClass} value={child.currentAge} onChange={(n) => updateChildAge(index, n)} />
               <span className="text-sm text-ink-muted shrink-0">歳</span>
               <button
                 type="button"

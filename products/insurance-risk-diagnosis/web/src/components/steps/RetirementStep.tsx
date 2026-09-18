@@ -1,5 +1,6 @@
 import type { DiagnosisInput } from '../../types/diagnosis';
 import { FormField, inputClass } from './FormField';
+import { NumberField } from '../ui';
 
 interface Props {
   input: DiagnosisInput;
@@ -18,15 +19,7 @@ export function RetirementStep({ input, onChange }: Props) {
       <p className="text-sm text-ink-muted mb-5">老後・介護・相続は将来推計のため、ここでの入力は「概算」として扱われます。</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
         <FormField label="希望する退職年齢" required>
-          <input
-            type="number"
-            min={50}
-            max={90}
-            inputMode="numeric"
-            className={inputClass}
-            value={retirement.desiredRetirementAge}
-            onChange={(e) => update({ desiredRetirementAge: Number(e.target.value) })}
-          />
+          <NumberField min={50} max={90} className={inputClass} value={retirement.desiredRetirementAge} onChange={(n) => update({ desiredRetirementAge: n })} />
         </FormField>
 
         <FormField
@@ -34,14 +27,7 @@ export function RetirementStep({ input, onChange }: Props) {
           hint="わからない場合は0のままで構いません"
           unknownAction={{ label: 'わからない(0円)', onClick: () => update({ expectedSeverancePay: 0 }) }}
         >
-          <input
-            type="number"
-            min={0}
-            inputMode="numeric"
-            className={inputClass}
-            value={retirement.expectedSeverancePay}
-            onChange={(e) => update({ expectedSeverancePay: Number(e.target.value) })}
-          />
+          <NumberField min={0} className={inputClass} value={retirement.expectedSeverancePay} onChange={(n) => update({ expectedSeverancePay: n })} />
         </FormField>
 
         <FormField
