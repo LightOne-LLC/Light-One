@@ -45,16 +45,22 @@ function ResultView({ result }: { result: GmailBulkImportResult }) {
         <DatePrecisionRow label="要員: 稼働可能時期" counts={result.engineer.datePrecision} />
       )}
       <div className="card-row">
-        <span>Validation PASS</span>
-        <span>{(result.project?.valid ?? 0) + (result.engineer?.valid ?? 0)}</span>
+        <span>案件 Validation PASS / FAIL</span>
+        <span>
+          {result.project?.valid ?? 0} / {result.project?.invalid ?? 0}
+        </span>
       </div>
       <div className="card-row">
-        <span>Validation FAIL</span>
-        <span>{(result.project?.invalid ?? 0) + (result.engineer?.invalid ?? 0)}</span>
+        <span>要員 Validation PASS / FAIL</span>
+        <span>
+          {result.engineer?.valid ?? 0} / {result.engineer?.invalid ?? 0}
+        </span>
       </div>
       <div className="card-row">
-        <span>マッチング可能(案件)</span>
-        <span>{result.matching?.matchableProjects ?? 0}</span>
+        <span>マッチング可能(案件 / 要員)</span>
+        <span>
+          {result.matching?.matchableProjects ?? 0} / {result.matching?.validEngineers ?? 0}
+        </span>
       </div>
 
       {result.validationErrors && Object.keys(result.validationErrors).length > 0 && (
@@ -72,20 +78,28 @@ function ResultView({ result }: { result: GmailBulkImportResult }) {
         </div>
       )}
 
-      {result.matching?.sample && result.matching.sample.ranking.length > 0 && (
-        <div>
-          <span className="card-row" style={{ display: 'block' }}>
-            サンプルランキング({result.matching.sample.projectId}):
-          </span>
-          {result.matching.sample.ranking.map((r, i) => (
-            <div key={r.engineerId} className="ranking-item">
-              <span className="ranking-rank">{i + 1}</span>
-              <span className="ranking-id">{r.engineerId}</span>
-              <span className={`ranking-score ${scoreColorClass(r.score)}`}>{r.score}</span>
+      <div>
+        <span className="card-row" style={{ display: 'block' }}>
+          実データMatching:
+        </span>
+        {result.matching?.sample && result.matching.sample.ranking.length > 0 ? (
+          <>
+            <div className="card-row">
+              <span>Project</span>
+              <span>{result.matching.sample.projectId}</span>
             </div>
-          ))}
-        </div>
-      )}
+            {result.matching.sample.ranking.map((r, i) => (
+              <div key={r.engineerId} className="ranking-item">
+                <span className="ranking-rank">{i + 1}</span>
+                <span className="ranking-id">{r.engineerId}</span>
+                <span className={`ranking-score ${scoreColorClass(r.score)}`}>{r.score}</span>
+              </div>
+            ))}
+          </>
+        ) : (
+          <p className="empty-note">実メール上で有効なProjectとEngineerの同時成立なし</p>
+        )}
+      </div>
     </>
   );
 }

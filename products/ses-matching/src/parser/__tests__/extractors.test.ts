@@ -1,4 +1,5 @@
 import {
+  extractBulletValueNoColonNumeric,
   extractLabeledValue,
   findRateInFreeText,
   findRemoteInFreeText,
@@ -7,6 +8,7 @@ import {
   parseRateRange,
   parseRequiredSkillList,
   parseYesNo,
+  stripNoteSuffix,
 } from '../extractors';
 
 // すべて匿名の合成(synthetic)データ。実メールの内容ではない。
@@ -274,5 +276,33 @@ describe('extractLabeledValue (■ラベル■形式、両側■)', () => {
   it('■ラベル■形式が無い本文ではundefinedを返す', () => {
     const body = 'スキルシートを送付いたします。';
     expect(extractLabeledValue(body, ['期間'])).toBeUndefined();
+  });
+});
+
+// BP要員紹介メールの一部で観察された、コロンが省略された「・ラベル値」形式
+// (例: "・単金（税抜）85万円")。
+describe('extractBulletValueNoColonNumeric', () => {
+  it('コロンが省略され数字が直接続く場合に値を抽出できる', () => {
+    const body = '・出社頻度：週2日出社可（リモート尚可） ・単金（税抜）85万円 ・希望：PM/PdM案件';
+    expect(extractBulletValueNoColonNumeric(body, ['単金（税抜）'])).toBe('85万円');
+  });
+
+  it('ラベル直後が数字でなければ誤って値とみなさない(助詞等を取り込まない)', () => {
+    const body = '・稼働は即日から可能です';
+    expect(extractBulletValueNoColonNumeric(body, ['稼働'])).toBeUndefined();
+  });
+
+  it('該当ラベルが無ければundefinedを返す', () => {
+    expect(extractBulletValueNoColonNumeric('関係の無い本文です', ['単金（税抜）'])).toBeUndefined();
+  });
+});
+
+describe('stripNoteSuffix', () => {
+  it('"※"以降の注記を切り落とす', () => {
+    expect(stripNoteSuffix('浜松町 駅 ※リモート希望（週1~4日出社可）')).toBe('浜松町 駅');
+  });
+
+  it('"※"が無ければ元の文字列をそのまま返す', () => {
+    expect(stripNoteSuffix('渋谷駅')).toBe('渋谷駅');
   });
 });

@@ -29,7 +29,7 @@ describe('GmailBulkImport', () => {
     await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/gmail/fetch?limit=50'));
   });
 
-  it('集計結果(件数・分類・Validation・マッチング可能数)を表示する', async () => {
+  it('集計結果(件数・分類・Validation PASS/FAIL・マッチング可能数)を表示する', async () => {
     mockFetchOnce({
       success: true,
       limit: 50,
@@ -48,8 +48,9 @@ describe('GmailBulkImport', () => {
     expect(screen.getByText('10', { exact: true })).toBeTruthy();
     expect(screen.getByText('31')).toBeTruthy();
     expect(screen.getByText('9')).toBeTruthy(); // 未分類
-    expect(screen.getByText('8')).toBeTruthy(); // PASS合計 3+5
-    expect(screen.getByText('33')).toBeTruthy(); // FAIL合計 7+26
+    expect(screen.getByText('3 / 7')).toBeTruthy(); // 案件 PASS/FAIL
+    expect(screen.getByText('5 / 26')).toBeTruthy(); // 要員 PASS/FAIL
+    expect(screen.getByText('3 / 5')).toBeTruthy(); // マッチング可能(案件/要員)
     expect(screen.getByText('availableFrom: 20')).toBeTruthy();
     expect(screen.getByText('startDate: 6')).toBeTruthy();
   });
@@ -99,11 +100,30 @@ describe('GmailBulkImport', () => {
     render(<GmailBulkImport />);
     fireEvent.click(screen.getByRole('button', { name: '直近50件を取得' }));
 
-    await waitFor(() => expect(screen.getByText('マッチング可能(案件)')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('実データMatching:')).toBeTruthy());
     expect(screen.queryByText(/Validation FAIL理由/)).toBeNull();
   });
 
-  it('マッチングサンプルのランキングを表示する', async () => {
+  it('実際のProject/Engineerが同時成立しない場合はその旨を明示する', async () => {
+    mockFetchOnce({
+      success: true,
+      fetched: 5,
+      project: { total: 2, valid: 1, invalid: 1 },
+      engineer: { total: 3, valid: 0, invalid: 3 },
+      unparsed: 0,
+      validationErrors: {},
+      matching: { validProjects: 1, validEngineers: 0, matchableProjects: 0 },
+    });
+
+    render(<GmailBulkImport />);
+    fireEvent.click(screen.getByRole('button', { name: '直近50件を取得' }));
+
+    await waitFor(() =>
+      expect(screen.getByText('実メール上で有効なProjectとEngineerの同時成立なし')).toBeTruthy(),
+    );
+  });
+
+  it('実データマッチングのランキングを表示する', async () => {
     mockFetchOnce({
       success: true,
       fetched: 3,
@@ -128,7 +148,8 @@ describe('GmailBulkImport', () => {
     render(<GmailBulkImport />);
     fireEvent.click(screen.getByRole('button', { name: '直近50件を取得' }));
 
-    await waitFor(() => expect(screen.getByText(/サンプルランキング/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('実データMatching:')).toBeTruthy());
+    expect(screen.getByText('email-project-1')).toBeTruthy();
     expect(screen.getByText('email-engineer-1')).toBeTruthy();
     expect(screen.getByText('90')).toBeTruthy();
     expect(screen.getByText('email-engineer-2')).toBeTruthy();
