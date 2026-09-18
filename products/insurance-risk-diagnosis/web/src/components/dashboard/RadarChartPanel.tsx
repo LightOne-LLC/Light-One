@@ -1,11 +1,12 @@
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 import type { RiskCategoryResult } from '../../types/diagnosis';
+import { Card } from '../ui';
 
 export function RadarChartPanel({ categories }: { categories: RiskCategoryResult[] }) {
   const data = categories.map((c) => ({ subject: c.label, score: c.score }));
 
   return (
-    <div className="bg-surface rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
+    <Card>
       <h3 className="text-sm font-semibold text-slate-700 mb-2">リスクスコア分布(0〜100、高いほど対策の必要性が高い)</h3>
       <ResponsiveContainer width="100%" height={300}>
         <RadarChart data={data} outerRadius="75%">
@@ -15,6 +16,6 @@ export function RadarChartPanel({ categories }: { categories: RiskCategoryResult
           <Radar name="リスクスコア" dataKey="score" stroke="#4f46e5" fill="#4f46e5" fillOpacity={0.3} />
         </RadarChart>
       </ResponsiveContainer>
-    </div>
+    </Card>
   );
 }

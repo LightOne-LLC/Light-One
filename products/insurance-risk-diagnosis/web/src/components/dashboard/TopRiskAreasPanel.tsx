@@ -1,15 +1,13 @@
 import type { RiskCategoryResult } from '../../types/diagnosis';
 import { riskLevelStyle } from '../../lib/riskLevelStyle';
+import { Card, SectionHeader } from '../ui';
 
 export function TopRiskAreasPanel({ categories }: { categories: RiskCategoryResult[] }) {
   const ranked = categories.slice().sort((a, b) => b.score - a.score).slice(0, 3);
 
   return (
-    <section className="bg-surface rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
-      <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-1">Top Risk Areas</h2>
-      <p className="text-sm text-slate-500 mb-6">
-        現在の入力条件では、この順番で確認すると家計への影響が大きいと考えられます。
-      </p>
+    <Card as="section">
+      <SectionHeader title="Top Risk Areas" description="現在の入力条件では、この順番で確認すると家計への影響が大きいと考えられます。" />
       <ol className="space-y-3">
         {ranked.map((c, i) => {
           const style = riskLevelStyle(c.level);
@@ -27,6 +25,6 @@ export function TopRiskAreasPanel({ categories }: { categories: RiskCategoryResu
           );
         })}
       </ol>
-    </section>
+    </Card>
   );
 }

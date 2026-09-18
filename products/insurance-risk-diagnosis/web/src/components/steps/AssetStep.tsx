@@ -1,5 +1,6 @@
 import type { DiagnosisInput } from '../../types/diagnosis';
-import { FormField, inputClass, selectClass } from './FormField';
+import { FormField, inputClass } from './FormField';
+import { ChoiceCardGroup } from '../ui';
 
 interface Props {
   input: DiagnosisInput;
@@ -69,19 +70,6 @@ export function AssetStep({ input, onChange }: Props) {
           />
         </FormField>
 
-        {asset.mortgageBalance > 0 && (
-          <FormField label="団体信用生命保険(団信)加入" hint="加入していれば死亡時にローン残高は保障の対象外になります">
-            <select
-              className={selectClass}
-              value={asset.hasMortgageLifeInsurance ? 'yes' : 'no'}
-              onChange={(e) => updateAsset({ hasMortgageLifeInsurance: e.target.value === 'yes' })}
-            >
-              <option value="yes">加入している</option>
-              <option value="no">加入していない</option>
-            </select>
-          </FormField>
-        )}
-
         <FormField label="その他借入残高(万円)" hint="住宅ローン以外の借入(自動車ローン・カードローン等)">
           <input
             type="number"
@@ -93,6 +81,19 @@ export function AssetStep({ input, onChange }: Props) {
           />
         </FormField>
       </div>
+
+      {asset.mortgageBalance > 0 && (
+        <ChoiceCardGroup
+          label="団体信用生命保険(団信)加入"
+          value={asset.hasMortgageLifeInsurance ? 'yes' : 'no'}
+          onChange={(v) => updateAsset({ hasMortgageLifeInsurance: v === 'yes' })}
+          options={[
+            { value: 'yes', label: '加入している' },
+            { value: 'no', label: '加入していない' },
+          ]}
+          columns={2}
+        />
+      )}
     </div>
   );
 }

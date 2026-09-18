@@ -1,13 +1,43 @@
 import type { RiskCategoryResult } from '../../types/diagnosis';
 import { formatManYen } from '../../lib/riskLevelStyle';
+import { Card, SectionHeader } from '../ui';
 
-function GapRow({ label, value, emphasis }: { label: string; value: number; emphasis?: boolean }) {
+function GapRow({ label, value, emphasis, swatchClass }: { label: string; value: number; emphasis?: boolean; swatchClass?: string }) {
   return (
     <div className="flex justify-between items-baseline py-1.5 border-b border-slate-100 last:border-0">
-      <span className={emphasis ? 'text-sm font-semibold text-slate-900' : 'text-sm text-slate-500'}>{label}</span>
+      <span className={`flex items-center gap-2 ${emphasis ? 'text-sm font-semibold text-slate-900' : 'text-sm text-slate-500'}`}>
+        {swatchClass && <span className={`w-2 h-2 rounded-full shrink-0 ${swatchClass}`} aria-hidden="true" />}
+        {label}
+      </span>
       <span className={`tabular-nums ${emphasis ? 'text-base font-bold text-rose-600' : 'text-sm font-medium text-slate-700'}`}>
         {formatManYen(value)}
       </span>
+    </div>
+  );
+}
+
+// 必要額を100%とした積み上げバー: 公的保障・自己資産・既存保険で埋まった分と、残る不足額を視覚化する。
+function GapBar({ requiredAmount, publicCoverage, ownAssets, existingInsurance, shortfall }: {
+  requiredAmount: number; publicCoverage: number; ownAssets: number; existingInsurance: number; shortfall: number;
+}) {
+  if (requiredAmount <= 0) return null;
+  const pct = (v: number) => Math.max(0, Math.min(100, (v / requiredAmount) * 100));
+
+  let remaining = requiredAmount;
+  const publicSeg = Math.min(publicCoverage, remaining);
+  remaining -= publicSeg;
+  const assetsSeg = Math.min(ownAssets, remaining);
+  remaining -= assetsSeg;
+  const existingSeg = Math.min(existingInsurance, remaining);
+  remaining -= existingSeg;
+  const shortfallSeg = Math.max(0, Math.min(shortfall, remaining));
+
+  return (
+    <div className="flex h-3 rounded-full overflow-hidden bg-slate-100 mb-4" role="img" aria-label={`必要額${formatManYen(requiredAmount)}のうち不足額${formatManYen(shortfall)}`}>
+      {publicSeg > 0 && <div className="bg-emerald-400" style={{ width: `${pct(publicSeg)}%` }} />}
+      {assetsSeg > 0 && <div className="bg-sky-400" style={{ width: `${pct(assetsSeg)}%` }} />}
+      {existingSeg > 0 && <div className="bg-indigo-400" style={{ width: `${pct(existingSeg)}%` }} />}
+      {shortfallSeg > 0 && <div className="bg-rose-400" style={{ width: `${pct(shortfallSeg)}%` }} />}
     </div>
   );
 }
@@ -17,12 +47,15 @@ function GapCard({ category }: { category: RiskCategoryResult }) {
   if (!gap) return null;
   return (
     <div className="rounded-xl border border-slate-200 p-5">
-      <h3 className="text-sm font-semibold text-slate-800 mb-3">{category.label}</h3>
-      <GapRow label="必要額" value={gap.requiredAmount} />
-      <GapRow label="公的保障" value={-gap.publicCoverage} />
-      <GapRow label="自己資産" value={-gap.ownAssets} />
-      <GapRow label="既存の保険" value={-gap.existingInsurance} />
-      <GapRow label="推定不足額" value={gap.shortfall} emphasis />
+      <div className="flex items-baseline justify-between mb-3">
+        <h3 className="text-sm font-semibold text-slate-800">{category.label}</h3>
+        <span className="text-xs text-slate-400">必要額 {formatManYen(gap.requiredAmount)}</span>
+      </div>
+      <GapBar {...gap} />
+      <GapRow label="公的保障" value={-gap.publicCoverage} swatchClass="bg-emerald-400" />
+      <GapRow label="自己資産" value={-gap.ownAssets} swatchClass="bg-sky-400" />
+      <GapRow label="既存の保険" value={-gap.existingInsurance} swatchClass="bg-indigo-400" />
+      <GapRow label="推定不足額" value={gap.shortfall} swatchClass="bg-rose-400" emphasis />
     </div>
   );
 }
@@ -31,16 +64,16 @@ export function FinancialGapPanel({ categories }: { categories: RiskCategoryResu
   const withGap = categories.filter((c) => c.gap);
   if (withGap.length === 0) return null;
   return (
-    <section className="bg-surface rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
-      <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-1">Financial Gap</h2>
-      <p className="text-sm text-slate-500 mb-6">
-        必要な資金から、公的保障・自己資産・既存の保険を差し引いた、いま確認しておきたい不足額です。
-      </p>
+    <Card as="section">
+      <SectionHeader
+        title="Financial Gap"
+        description="必要な資金に対して、公的保障・自己資産・既存の保険でどこまで備えられているかを示します。"
+      />
       <div className="grid gap-4 sm:grid-cols-2">
         {withGap.map((c) => (
           <GapCard key={c.key} category={c} />
         ))}
       </div>
-    </section>
+    </Card>
   );
 }

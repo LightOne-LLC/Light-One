@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import type { HistoryItem } from '../types/diagnosis';
 import { listDiagnosisHistory, deleteDiagnosisHistory } from '../lib/diagnosisStore';
 import { riskLevelStyle, formatManYen } from '../lib/riskLevelStyle';
+import { Card, Badge, Button, Metric, EmptyState, LoadingState } from '../components/ui';
 
 export function HistoryPage() {
   const [items, setItems] = useState<HistoryItem[] | null>(null);
@@ -28,17 +29,22 @@ export function HistoryPage() {
     <div className="max-w-3xl mx-auto py-8 sm:py-12 px-4">
       <div className="flex items-center justify-between gap-3 flex-wrap mb-8">
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">診断履歴</h1>
-        <Link to="/diagnosis" className="min-h-[40px] px-4 py-2 text-sm rounded-lg bg-slate-900 text-white hover:bg-slate-700 transition-colors flex items-center">
-          新しく診断する
+        <Link to="/diagnosis">
+          <Button variant="dark" size="sm">新しく診断する</Button>
         </Link>
       </div>
 
-      {error && <p className="text-rose-600 text-sm mb-4">{error}</p>}
-      {!items && !error && <p className="text-slate-400 text-sm">読み込み中...</p>}
+      {error && <p className="text-rose-600 text-sm mb-4" role="alert">{error}</p>}
+      {!items && !error && <LoadingState message="履歴を読み込んでいます..." />}
       {items && items.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-slate-200 p-12 text-center">
-          <p className="text-sm text-slate-400">診断履歴はまだありません。</p>
-        </div>
+        <EmptyState
+          message="診断履歴はまだありません。"
+          action={
+            <Link to="/diagnosis">
+              <Button variant="primary" size="sm">最初の診断を始める</Button>
+            </Link>
+          }
+        />
       )}
 
       <div className="space-y-3">
@@ -46,18 +52,12 @@ export function HistoryPage() {
           const topLevel = item.topRisks[0]?.level ?? 'low';
           const style = riskLevelStyle(topLevel);
           return (
-            <div
-              key={item.id}
-              className="bg-surface rounded-2xl border border-slate-200 shadow-sm p-5 hover:border-slate-300 transition-colors"
-            >
+            <Card key={item.id} className="hover:border-slate-300 transition-colors">
               <Link to={`/result/${item.id}`} className="block">
                 <div className="flex justify-between items-center gap-4">
                   <div>
-                    <p className="text-xs text-slate-400">{new Date(item.createdAt).toLocaleString('ja-JP')}</p>
-                    <p className="text-2xl font-bold tabular-nums text-slate-900 mt-1">
-                      {item.overallScore}
-                      <span className="text-sm font-medium text-slate-400"> / 100</span>
-                    </p>
+                    <p className="text-xs text-slate-400 mb-1">{new Date(item.createdAt).toLocaleString('ja-JP')}</p>
+                    <Metric value={item.overallScore} unit="/ 100" size="md" />
                   </div>
                   <span className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium ${style.badgeClass}`}>{style.label}</span>
                 </div>
@@ -69,13 +69,12 @@ export function HistoryPage() {
                 <p className="text-xs text-slate-400 mt-1">必要死亡保障額の目安: {formatManYen(item.requiredDeathCoverage)}</p>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {item.topRisks.map((r) => (
-                    <span key={r.label} className="px-2 py-0.5 rounded-full bg-slate-50 text-slate-600 text-xs ring-1 ring-inset ring-slate-200">
-                      {r.label}
-                    </span>
+                    <Badge key={r.label}>{r.label}</Badge>
                   ))}
                 </div>
+                <p className="mt-3 text-xs text-indigo-600 font-medium">結果を見る →</p>
               </Link>
-              <div className="mt-3 flex justify-end">
+              <div className="mt-2 flex justify-end">
                 <button
                   type="button"
                   onClick={() => handleDelete(item.id)}
@@ -84,7 +83,7 @@ export function HistoryPage() {
                   削除
                 </button>
               </div>
-            </div>
+            </Card>
           );
         })}
       </div>

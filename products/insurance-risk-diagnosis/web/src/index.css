@@ -31,6 +31,15 @@ body {
   animation: fade-in 0.25s ease-out;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in {
+    animation: none;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /*
   印刷/PDF用。診断レポート(#pdf-report)を紙面向けに整える。
   折りたたみ済みの<details>は既定では中身が印刷されないため、summary以外を強制的に表示する。

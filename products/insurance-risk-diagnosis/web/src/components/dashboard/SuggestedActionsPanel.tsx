@@ -1,23 +1,22 @@
 import type { RiskCategoryResult } from '../../types/diagnosis';
 import { NEXT_STEPS } from '../../lib/nextSteps';
+import { Card, SectionHeader } from '../ui';
 
 export function SuggestedActionsPanel({ categories, productTypes }: { categories: RiskCategoryResult[]; productTypes: string[] }) {
-  const priority = categories
-    .slice()
-    .sort((a, b) => b.score - a.score)
-    .filter((c) => c.level === 'critical' || c.level === 'high')
-    .slice(0, 3);
-
-  const checklist = priority.length > 0 ? priority : categories.slice().sort((a, b) => b.score - a.score).slice(0, 1);
+  const sorted = categories.slice().sort((a, b) => b.score - a.score);
+  const priority = sorted.filter((c) => c.level === 'critical' || c.level === 'high').slice(0, 3);
+  const checklist = priority.length > 0 ? priority : sorted.slice(0, 1);
+  const rest = sorted.filter((c) => !checklist.includes(c));
 
   return (
-    <section className="bg-surface rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
-      <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-1">Suggested Actions</h2>
-      <p className="text-sm text-slate-500 mb-6">
-        「保険に入る」ことではなく、「不足しているかもしれないリスクを確認する」ことを次の一歩にしてください。
-      </p>
+    <Card as="section">
+      <SectionHeader
+        title="Suggested Actions"
+        description="「保険に入る」ことではなく、「不足しているかもしれないリスクを確認する」ことを次の一歩にしてください。"
+      />
 
-      <div className="space-y-5">
+      <p className="text-xs font-semibold tracking-wide text-slate-400 mb-3">優先して確認したいこと</p>
+      <div className="space-y-5 mb-2">
         {checklist.map((c) => (
           <div key={c.key}>
             <p className="text-sm font-semibold text-slate-800 mb-2">{c.label}リスクについて</p>
@@ -33,8 +32,22 @@ export function SuggestedActionsPanel({ categories, productTypes }: { categories
         ))}
       </div>
 
+      {rest.length > 0 && (
+        <details className="mt-4 pt-4 border-t border-slate-100">
+          <summary className="cursor-pointer text-sm text-slate-500 hover:text-slate-700 select-none">その他に確認しておきたいこと</summary>
+          <ul className="mt-3 space-y-2">
+            {rest.map((c) => (
+              <li key={c.key} className="flex items-start gap-2.5 text-sm text-slate-600">
+                <span className="mt-0.5 w-4 h-4 rounded border border-slate-300 shrink-0" aria-hidden="true" />
+                <span>{c.label}: {NEXT_STEPS[c.key][0]}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+
       {productTypes.length > 0 && (
-        <details className="mt-6 pt-5 border-t border-slate-100">
+        <details className="mt-4 pt-4 border-t border-slate-100">
           <summary className="cursor-pointer text-sm text-indigo-600 hover:underline select-none">検討の参考になる保障の種類を見る</summary>
           <div className="mt-3 flex flex-wrap gap-2">
             {productTypes.map((t) => (
@@ -48,6 +61,6 @@ export function SuggestedActionsPanel({ categories, productTypes }: { categories
           </p>
         </details>
       )}
-    </section>
+    </Card>
   );
 }

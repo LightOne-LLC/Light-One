@@ -1,4 +1,5 @@
 import type { DeathCoverageResult } from '../../types/diagnosis';
+import { Card } from '../ui';
 
 function fmt(n: number) {
   return `${n.toLocaleString('ja-JP', { maximumFractionDigits: 0 })}万円`;
@@ -7,11 +8,11 @@ function fmt(n: number) {
 export function CoverageBreakdown({ deathCoverage }: { deathCoverage: DeathCoverageResult }) {
   const b = deathCoverage.breakdown;
   return (
-    <div className="bg-surface rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
+    <Card>
       <h3 className="text-sm font-semibold text-slate-700 mb-1">死亡リスクの内訳詳細</h3>
       <p className="text-3xl font-bold tracking-tight text-slate-900 mb-4">{fmt(deathCoverage.requiredAmount)}</p>
 
-      <table className="w-full text-sm">
+      <table className="w-full text-sm table-fixed">
         <tbody>
           <Row label="遺族生活費(末子独立まで)" value={b.phaseALivingCost} />
           <Row label="遺族生活費(末子独立後・配偶者)" value={b.phaseBLivingCost} />
@@ -33,7 +34,7 @@ export function CoverageBreakdown({ deathCoverage }: { deathCoverage: DeathCover
           ))}
         </ul>
       </details>
-    </div>
+    </Card>
   );
 }
 

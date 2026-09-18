@@ -1,5 +1,6 @@
 import type { DiagnosisInput } from '../../types/diagnosis';
 import { formatManYen } from '../../lib/riskLevelStyle';
+import { Card, SectionHeader } from '../ui';
 
 export function CurrentProtectionPanel({ existingInsurance }: { existingInsurance: DiagnosisInput['existingInsurance'] }) {
   const items: { label: string; active: boolean }[] = [
@@ -12,9 +13,8 @@ export function CurrentProtectionPanel({ existingInsurance }: { existingInsuranc
   ];
 
   return (
-    <section className="bg-surface rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
-      <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-1">Current Protection</h2>
-      <p className="text-sm text-slate-500 mb-6">現在加入している保障の状況です。</p>
+    <Card as="section">
+      <SectionHeader title="Current Protection" description="現在加入している保障の状況です。" />
 
       <div className="flex justify-between items-baseline mb-4 pb-4 border-b border-slate-100">
         <span className="text-sm text-slate-500">現在の死亡保障額</span>
@@ -37,6 +37,6 @@ export function CurrentProtectionPanel({ existingInsurance }: { existingInsuranc
           </span>
         ))}
       </div>
-    </section>
+    </Card>
   );
 }

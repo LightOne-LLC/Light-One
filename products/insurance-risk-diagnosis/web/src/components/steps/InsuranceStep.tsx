@@ -1,10 +1,23 @@
-import type { DiagnosisInput } from '../../types/diagnosis';
-import { FormField, inputClass, checkboxLabelClass, checkboxClass } from './FormField';
+import type { DiagnosisInput, ExistingInsurance } from '../../types/diagnosis';
+import { FormField, inputClass, checkboxClass } from './FormField';
 
 interface Props {
   input: DiagnosisInput;
   onChange: (updater: (draft: DiagnosisInput) => DiagnosisInput) => void;
 }
+
+type CoverageFlagKey = {
+  [K in keyof ExistingInsurance]: ExistingInsurance[K] extends boolean ? K : never;
+}[keyof ExistingInsurance];
+
+const COVERAGE_OPTIONS: { key: CoverageFlagKey; label: string }[] = [
+  { key: 'hasMedicalCoverage', label: '医療保険に加入している' },
+  { key: 'hasCancerCoverage', label: 'がん保険に加入している' },
+  { key: 'hasDisabilityCoverage', label: '就業不能保険に加入している' },
+  { key: 'hasCareCoverage', label: '介護保険(民間)に加入している' },
+  { key: 'hasPersonalPension', label: '個人年金保険に加入している' },
+  { key: 'hasSavingsTypeCoverage', label: '資産形成型の保険に加入している' },
+];
 
 export function InsuranceStep({ input, onChange }: Props) {
   const { existingInsurance } = input;
@@ -47,61 +60,26 @@ export function InsuranceStep({ input, onChange }: Props) {
         />
       </FormField>
 
-      <div className="mt-2 rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
-        <label className={`${checkboxLabelClass} px-4`}>
-          <input
-            type="checkbox"
-            className={checkboxClass}
-            checked={existingInsurance.hasMedicalCoverage}
-            onChange={(e) => update({ hasMedicalCoverage: e.target.checked })}
-          />
-          医療保険に加入している
-        </label>
-        <label className={`${checkboxLabelClass} px-4`}>
-          <input
-            type="checkbox"
-            className={checkboxClass}
-            checked={existingInsurance.hasCancerCoverage}
-            onChange={(e) => update({ hasCancerCoverage: e.target.checked })}
-          />
-          がん保険に加入している
-        </label>
-        <label className={`${checkboxLabelClass} px-4`}>
-          <input
-            type="checkbox"
-            className={checkboxClass}
-            checked={existingInsurance.hasDisabilityCoverage}
-            onChange={(e) => update({ hasDisabilityCoverage: e.target.checked })}
-          />
-          就業不能保険に加入している
-        </label>
-        <label className={`${checkboxLabelClass} px-4`}>
-          <input
-            type="checkbox"
-            className={checkboxClass}
-            checked={existingInsurance.hasCareCoverage}
-            onChange={(e) => update({ hasCareCoverage: e.target.checked })}
-          />
-          介護保険(民間)に加入している
-        </label>
-        <label className={`${checkboxLabelClass} px-4`}>
-          <input
-            type="checkbox"
-            className={checkboxClass}
-            checked={existingInsurance.hasPersonalPension}
-            onChange={(e) => update({ hasPersonalPension: e.target.checked })}
-          />
-          個人年金保険に加入している
-        </label>
-        <label className={`${checkboxLabelClass} px-4`}>
-          <input
-            type="checkbox"
-            className={checkboxClass}
-            checked={existingInsurance.hasSavingsTypeCoverage}
-            onChange={(e) => update({ hasSavingsTypeCoverage: e.target.checked })}
-          />
-          資産形成型の保険に加入している
-        </label>
+      <div className="mt-2 space-y-2">
+        {COVERAGE_OPTIONS.map((opt) => {
+          const checked = existingInsurance[opt.key];
+          return (
+            <label
+              key={opt.key}
+              className={`flex items-center gap-3 min-h-[44px] px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors cursor-pointer ${
+                checked ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              <input
+                type="checkbox"
+                className={checkboxClass}
+                checked={checked}
+                onChange={(e) => update({ [opt.key]: e.target.checked } as Partial<ExistingInsurance>)}
+              />
+              {opt.label}
+            </label>
+          );
+        })}
       </div>
     </div>
   );

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import type { DiagnosisInput, DiagnosisResult } from '../types/diagnosis';
 import { getDiagnosisDetail, deleteDiagnosisHistory } from '../lib/diagnosisStore';
-import { riskLevelStyle } from '../lib/riskLevelStyle';
+import { Button, ResultHero, LoadingState } from '../components/ui';
 import { RadarChartPanel } from '../components/dashboard/RadarChartPanel';
 import { RiskMapPanel } from '../components/dashboard/RiskMapPanel';
 import { FinancialGapPanel } from '../components/dashboard/FinancialGapPanel';
@@ -61,12 +61,12 @@ export function ResultPage() {
     }
   };
 
-  if (error) return <p className="text-center text-rose-600 py-16">{error}</p>;
-  if (!data) return <p className="text-center text-slate-400 py-16">読み込み中...</p>;
+  if (error) return <p className="text-center text-rose-600 py-16" role="alert">{error}</p>;
+  if (!data) return <LoadingState message="診断結果を読み込んでいます..." />;
 
   const { result } = data;
   const topCategory = result.categories.slice().sort((a, b) => b.score - a.score)[0];
-  const style = riskLevelStyle(topCategory?.level ?? 'low');
+  const diagnosisDate = new Date(data.createdAt).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
 
   return (
     <div className="max-w-3xl mx-auto py-6 sm:py-12 px-4 space-y-6">
@@ -75,61 +75,58 @@ export function ResultPage() {
           ← 履歴一覧
         </Link>
         <div className="flex gap-2 flex-wrap">
-          <button
-            onClick={handlePrint}
-            className="min-h-[40px] px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors"
-          >
-            印刷する
-          </button>
-          <button
-            onClick={handleExportPdf}
-            disabled={exporting}
-            className="min-h-[40px] px-4 py-2 text-sm rounded-lg bg-slate-900 text-white hover:bg-slate-700 transition-colors disabled:opacity-40"
-          >
+          <Button variant="secondary" size="sm" onClick={handlePrint}>印刷する</Button>
+          <Button variant="dark" size="sm" onClick={handleExportPdf} disabled={exporting}>
             {exporting ? '出力中...' : 'PDFレポート出力'}
-          </button>
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className="min-h-[40px] px-4 py-2 text-sm rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors disabled:opacity-40"
-          >
+          </Button>
+          <Button variant="danger" size="sm" onClick={handleDelete} disabled={deleting}>
             {deleting ? '削除中...' : '削除'}
-          </button>
+          </Button>
         </div>
       </div>
 
       <div id="pdf-report" className="space-y-5 sm:space-y-6">
-        <header className={`rounded-2xl border p-6 sm:p-10 ${style.badgeClass}`}>
-          <p className="text-xs font-semibold tracking-widest uppercase text-slate-500 mb-2">Your Financial Risk Profile</p>
-          <p className="text-5xl sm:text-6xl font-bold tracking-tight tabular-nums text-slate-900">
-            {result.overallScore}
-            <span className="text-xl sm:text-2xl font-medium text-slate-400"> / 100</span>
-          </p>
-          <p className="mt-3 text-sm text-slate-600 max-w-md">{overallMessage(result.overallScore)}</p>
-          {topCategory && (
-            <p className="mt-3 text-sm text-slate-700">
-              最も注意すべき領域: <span className="font-semibold">{topCategory.label}</span>({topCategory.score}点)
-            </p>
-          )}
-        </header>
+        {/* Level 1: 一目で分かる情報 — 総合評価・最重要リスク・理由・次の一歩。HeroとTop Riskは間隔を詰めて一続きに読ませる */}
+        <div className="space-y-2">
+          <ResultHero
+            overallScore={result.overallScore}
+            topLevel={topCategory?.level ?? 'low'}
+            topLabel={topCategory?.label}
+            topScore={topCategory?.score}
+            message={overallMessage(result.overallScore)}
+            date={diagnosisDate}
+          />
+          <TopRiskAreasPanel categories={result.categories} />
+        </div>
 
-        <RiskMapPanel categories={result.categories} />
-        <RadarChartPanel categories={result.categories} />
-        <FinancialGapPanel categories={result.categories} />
+        <WhyPanel categories={result.categories} />
+        <SuggestedActionsPanel categories={result.categories} productTypes={result.suggestedProductTypes} />
 
-        <details className="group print:hidden">
-          <summary className="cursor-pointer text-sm text-indigo-600 hover:underline select-none py-1">死亡リスクの計算根拠を詳しく見る</summary>
-          <div className="mt-4">
-            <CoverageBreakdown deathCoverage={result.deathCoverage} />
+        {/* Level 2-3: 詳細データ・計算根拠。既定では折りたたみ、印刷時は既存のprint CSSにより自動展開される */}
+        <details className="group">
+          <summary className="cursor-pointer list-none">
+            <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-surface px-6 py-4 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+              <span>詳細データを見る(7領域のスコア内訳・不足額の計算・公的保障の詳細など)</span>
+              <span className="text-slate-400 group-open:rotate-180 transition-transform">▾</span>
+            </div>
+          </summary>
+          <div className="space-y-5 sm:space-y-6 mt-5">
+            <RiskMapPanel categories={result.categories} />
+            <RadarChartPanel categories={result.categories} />
+            <FinancialGapPanel categories={result.categories} />
+
+            <details>
+              <summary className="cursor-pointer text-sm text-indigo-600 hover:underline select-none py-1">死亡リスクの計算根拠を詳しく見る</summary>
+              <div className="mt-4">
+                <CoverageBreakdown deathCoverage={result.deathCoverage} />
+              </div>
+            </details>
+
+            <CurrentProtectionPanel existingInsurance={data.input.existingInsurance} />
+            <PublicProtectionPanel basic={data.input.basic} />
+            <AssumptionsPanel assumptions={result.assumptions} />
           </div>
         </details>
-
-        <TopRiskAreasPanel categories={result.categories} />
-        <WhyPanel categories={result.categories} />
-        <CurrentProtectionPanel existingInsurance={data.input.existingInsurance} />
-        <PublicProtectionPanel basic={data.input.basic} />
-        <SuggestedActionsPanel categories={result.categories} productTypes={result.suggestedProductTypes} />
-        <AssumptionsPanel assumptions={result.assumptions} />
       </div>
     </div>
   );

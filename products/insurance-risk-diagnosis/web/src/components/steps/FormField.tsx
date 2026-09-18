@@ -46,5 +46,4 @@ export const inputClass =
 export const inputErrorClass =
   'w-full min-h-[44px] rounded-lg border border-rose-300 px-3.5 py-2.5 text-base sm:text-sm text-slate-900 transition-colors focus:outline-none focus:ring-2 focus:ring-rose-500/40 focus:border-rose-500';
 export const selectClass = inputClass;
-export const checkboxLabelClass = 'flex items-center gap-3 text-sm text-slate-700 py-2.5 min-h-[44px]';
 export const checkboxClass = 'w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/40 shrink-0';

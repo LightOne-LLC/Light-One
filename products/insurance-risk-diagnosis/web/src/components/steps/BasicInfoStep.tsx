@@ -1,5 +1,6 @@
 import type { DiagnosisInput } from '../../types/diagnosis';
 import { FormField, inputClass, selectClass } from './FormField';
+import { ChoiceCardGroup } from '../ui';
 
 interface Props {
   input: DiagnosisInput;
@@ -51,30 +52,6 @@ export function BasicInfoStep({ input, onChange }: Props) {
           </select>
         </FormField>
 
-        <FormField label="雇用形態" required hint="公的保障(傷病手当金・厚生年金等)の有無に影響します">
-          <select
-            className={selectClass}
-            value={basic.occupationType}
-            onChange={(e) => updateBasic({ occupationType: e.target.value as typeof basic.occupationType })}
-          >
-            <option value="employee">会社員</option>
-            <option value="public_servant">公務員</option>
-            <option value="self_employed">自営業・フリーランス</option>
-          </select>
-        </FormField>
-
-        <FormField label="職業危険度区分" required hint="デスクワーク中心=低、外勤中心=中、身体を使う作業=高">
-          <select
-            className={selectClass}
-            value={basic.occupationRisk}
-            onChange={(e) => updateBasic({ occupationRisk: e.target.value as typeof basic.occupationRisk })}
-          >
-            <option value="low">低</option>
-            <option value="mid">中</option>
-            <option value="high">高</option>
-          </select>
-        </FormField>
-
         <FormField label="年収(万円)" required>
           <input
             type="number"
@@ -85,18 +62,48 @@ export function BasicInfoStep({ input, onChange }: Props) {
             onChange={(e) => updateBasic({ annualIncome: Number(e.target.value) })}
           />
         </FormField>
+      </div>
 
-        <FormField label="配偶者" required>
-          <select
-            className={selectClass}
-            value={basic.hasSpouse ? 'yes' : 'no'}
-            onChange={(e) => updateBasic({ hasSpouse: e.target.value === 'yes', spouseAge: e.target.value === 'yes' ? basic.spouseAge ?? basic.age : undefined })}
-          >
-            <option value="no">いない</option>
-            <option value="yes">いる</option>
-          </select>
-        </FormField>
+      <ChoiceCardGroup
+        label="雇用形態"
+        required
+        value={basic.occupationType}
+        onChange={(v) => updateBasic({ occupationType: v })}
+        options={[
+          { value: 'employee', label: '会社員' },
+          { value: 'public_servant', label: '公務員' },
+          { value: 'self_employed', label: '自営業・フリーランス' },
+        ]}
+        columns={3}
+      />
+      <p className="text-xs text-slate-400 -mt-4 mb-6">公的保障(傷病手当金・厚生年金等)の有無に影響します</p>
 
+      <ChoiceCardGroup
+        label="職業危険度区分"
+        required
+        value={basic.occupationRisk}
+        onChange={(v) => updateBasic({ occupationRisk: v })}
+        options={[
+          { value: 'low', label: '低', hint: 'デスクワーク中心' },
+          { value: 'mid', label: '中', hint: '外勤中心' },
+          { value: 'high', label: '高', hint: '身体を使う作業' },
+        ]}
+        columns={3}
+      />
+
+      <ChoiceCardGroup
+        label="配偶者"
+        required
+        value={basic.hasSpouse ? 'yes' : 'no'}
+        onChange={(v) => updateBasic({ hasSpouse: v === 'yes', spouseAge: v === 'yes' ? basic.spouseAge ?? basic.age : undefined })}
+        options={[
+          { value: 'no', label: 'いない' },
+          { value: 'yes', label: 'いる' },
+        ]}
+        columns={2}
+      />
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
         {basic.hasSpouse && (
           <FormField label="配偶者の年齢" required>
             <input
