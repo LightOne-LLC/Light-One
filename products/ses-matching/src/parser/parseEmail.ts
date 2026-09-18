@@ -2,12 +2,14 @@ import type { RawEmail } from '../gmail/types';
 import {
   extractBulletValueNoColonNumeric,
   extractLabeledValue,
+  extractNestedSkillSections,
   findRateInFreeText,
   findRemoteInFreeText,
   parseDateValue,
   parseEngineerSkillList,
   parseJapaneseLevel,
   parseLocationList,
+  parseNestedRequirementList,
   parseRateRange,
   parseRequiredSkillList,
   parseYesNo,
@@ -66,9 +68,23 @@ function parseProjectCandidate(subject: string, body: string, id: string): Recor
 
   const requiredValue = extractLabeledValue(body, ['必須スキル', '必要スキル']);
   const preferredValue = extractLabeledValue(body, ['歓迎スキル', '尚可スキル']);
+  // 株式会社キャリアビート形式で観察された「■スキル■」+「<<必須>>」/
+  // 「<<尚可>>」(稀に【必須】【尚可】)のネスト構造。明示的な必須/歓迎スキル
+  // ラベルが無い場合のみのフォールバックとして使う(優先順位を維持)。
+  const skillSectionValue = requiredValue || preferredValue ? undefined : extractLabeledValue(body, ['スキル']);
+  const nestedSkills = skillSectionValue ? extractNestedSkillSections(skillSectionValue) : {};
+
   const requiredSkills = [
-    ...(requiredValue ? parseRequiredSkillList(requiredValue, true) : []),
-    ...(preferredValue ? parseRequiredSkillList(preferredValue, false) : []),
+    ...(requiredValue
+      ? parseRequiredSkillList(requiredValue, true)
+      : nestedSkills.required
+        ? parseNestedRequirementList(nestedSkills.required, true)
+        : []),
+    ...(preferredValue
+      ? parseRequiredSkillList(preferredValue, false)
+      : nestedSkills.preferred
+        ? parseNestedRequirementList(nestedSkills.preferred, false)
+        : []),
   ];
   if (requiredSkills.length > 0) candidate.requiredSkills = requiredSkills;
 
