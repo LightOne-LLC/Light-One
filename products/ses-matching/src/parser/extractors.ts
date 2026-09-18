@@ -87,6 +87,34 @@ function extractBulletColonValue(body: string, labels: string[]): string | undef
   return undefined;
 }
 
+/** 「・ラベル値」形式(コロン省略、ラベル直後に数字が続く)を本文全体から
+ * 探す。BP要員紹介メールの一部で「・単金（税抜）85万円」のようにコロンが
+ * 省略される表記が観測されたため対応する。コロンが無い分、通常の助詞等を
+ * 値として誤って取り込まないよう、ラベル直後(空白を挟んでもよい)が数字の
+ * 場合のみ値とみなす、より保守的な条件にする。extractLabeledValueの
+ * 共通チェーンには入れず、数値系フィールド(単価等)の呼び出し側で
+ * 明示的にフォールバックとして使う。 */
+export function extractBulletValueNoColonNumeric(body: string, labels: string[]): string | undefined {
+  for (const label of labels) {
+    const match = body.match(new RegExp(`・\\s*${escapeRegExp(label)}\\s*(?=\\d)([^・■]*)`));
+    if (match) {
+      const value = match[1].replace(/\s+/g, ' ').trim();
+      if (value) return value;
+    }
+  }
+  return undefined;
+}
+
+/** 「※」以降の補足注記を切り落とす。BP要員紹介メールの一部で
+ * "■最寄り駅 浜松町 駅 ※リモート希望（週1~4日出社可）"のように、
+ * 見出しの値本体に直接※注記が続けて書かれる(別の■見出しに分かれていない)
+ * ケースが観測されたため、勤務地等の値として注記まで丸ごと取り込まない
+ * ようにする。※が無ければ元の文字列をそのまま返す。 */
+export function stripNoteSuffix(value: string): string {
+  const index = value.indexOf('※');
+  return index === -1 ? value : value.slice(0, index).trim();
+}
+
 /** 「■ラベル■値」形式(■で開閉された見出し)を本文全体から探す。次の■または
  * 末尾までが値。株式会社キャリアビート形式の案件メールで観察された
  * "■期間■\n2026年10月 ~ 2027年3月"等に対応する。単独の■(閉じ側が無い
@@ -277,8 +305,11 @@ function splitList(value: string): string[] {
     .filter((token) => token.length > 0);
 }
 
-/** リモート関連の強いキーワード(誤判定しにくいもの)。 */
-const STRONG_REMOTE_POSITIVE = /フルリモート|リモートメイン|基本リモート|テレワーク/;
+/** リモート関連の強いキーワード(誤判定しにくいもの)。「リモート希望」は
+ * 実メール(単独■見出し形式で最寄駅の値に直接注記される等)で観察された、
+ * 「出社可能」「常駐可能」のような曖昧語とは異なり明確にリモートを希望する
+ * という意思を示す語のため、強いキーワードとして扱って問題ない。 */
+const STRONG_REMOTE_POSITIVE = /フルリモート|リモートメイン|基本リモート|テレワーク|リモート希望/;
 const STRONG_REMOTE_NEGATIVE = /リモート不可|フル出社|出社必須/;
 
 /** "可"/"あり"/"希望" -> true, "不可"/"なし" -> false。判別できなければundefined。

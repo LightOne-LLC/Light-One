@@ -1,5 +1,6 @@
 import type { RawEmail } from '../gmail/types';
 import {
+  extractBulletValueNoColonNumeric,
   extractLabeledValue,
   findRateInFreeText,
   findRemoteInFreeText,
@@ -10,6 +11,7 @@ import {
   parseRateRange,
   parseRequiredSkillList,
   parseYesNo,
+  stripNoteSuffix,
 } from './extractors';
 import type { ParsedEmailResult } from './types';
 
@@ -106,7 +108,10 @@ function parseEngineerCandidate(subject: string, body: string, id: string): Reco
 
   // BP-A形式の「・単金（税抜）：」もここに接続する(単金＝要員側の希望単価と同義)。
   // 括弧の全角/半角ゆれを個別のラベルとして扱う(注釈込みでラベルの一部とする)。
-  const rateValue = extractLabeledValue(body, ['希望単価', '単価', '単金（税抜）', '単金(税抜)', '単金']);
+  // 一部の実メールではコロンが省略される("・単金（税抜）85万円")ため、
+  // その場合は数字直前フォールバックで補う。
+  const rateLabels = ['希望単価', '単価', '単金（税抜）', '単金(税抜)', '単金'];
+  const rateValue = extractLabeledValue(body, rateLabels) ?? extractBulletValueNoColonNumeric(body, rateLabels);
   const rateRange = rateValue ? parseRateRange(rateValue) : findRateInFreeText(subject);
   if (rateRange) {
     candidate.desiredRateMin = rateRange.min;
@@ -119,9 +124,18 @@ function parseEngineerCandidate(subject: string, body: string, id: string): Reco
   // 位置情報が無いため、既存の【最寄駅】形式(非BP-A、通常のスキルシート形式)
   // と同様にdesiredLocationsの値として採用する。実際に「勤務地」「作業場所」
   // 相当のラベルが記載されているメールでは、そちらが優先される(labels配列の
-  // 先頭に「希望勤務地」を置いているため)。
-  const locationsValue = extractLabeledValue(body, ['希望勤務地', '最寄駅']);
-  if (locationsValue) candidate.desiredLocations = parseLocationList(locationsValue);
+  // 先頭に「希望勤務地」を置いているため)。「最寄り駅」(り入り)という表記
+  // ゆれも実メールで観測されたため候補に加える。
+  const locationsValue = extractLabeledValue(body, ['希望勤務地', '最寄駅', '最寄り駅']);
+  // 一部の実メール(単独■見出し形式)では、最寄駅の値に直接
+  // "※リモート希望（週1~4日出社可）"のような注記が続けて書かれ、次の■まで
+  // 丸ごと1つの値として抽出される。注記込みで勤務地とみなすと汚染される
+  // ため、勤務地としてはstripNoteSuffixで※以降を切り落とす(remoteDesiredの
+  // 判定には注記込みの元の値を別途使う、下記参照)。
+  if (locationsValue) {
+    const location = stripNoteSuffix(locationsValue);
+    if (location) candidate.desiredLocations = parseLocationList(location);
+  }
 
   // BP-A形式の「・出社頻度：」は「稼働●回まで出社可能」「常駐可能」等、
   // リモートの可否を直接表さない自由文が多い(「可」の一致だけでtrue判定すると
@@ -129,11 +143,14 @@ function parseEngineerCandidate(subject: string, body: string, id: string): Reco
   // 出社頻度の値は、直接的な「リモート」ラベルの値(parseYesNoで柔軟に判定)とは
   // 別に、フルリモート/リモートメイン等の強いキーワードのみで判定する
   // findRemoteInFreeTextを使う(該当が無ければ無理に推測せずundefinedのまま)。
+  // 最寄駅の値に埋め込まれた注記(上記)も同様にfindRemoteInFreeTextで拾う
+  // (案件側のfindRemoteInFreeText(location)フォールバックと同じ考え方)。
   const directRemoteValue = extractLabeledValue(body, ['リモート希望', 'リモート', '通勤']);
   const commuteFrequencyValue = extractLabeledValue(body, ['出社頻度']);
   const remoteDesired =
     (directRemoteValue ? parseYesNo(directRemoteValue) : undefined) ??
     (commuteFrequencyValue ? findRemoteInFreeText(commuteFrequencyValue) : undefined) ??
+    (locationsValue ? findRemoteInFreeText(locationsValue) : undefined) ??
     findRemoteInFreeText(subject);
   if (remoteDesired !== undefined) candidate.remoteDesired = remoteDesired;
 

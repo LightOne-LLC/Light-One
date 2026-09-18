@@ -636,3 +636,88 @@ describe('parseEmail (BP-A要員メールのlocation/remote抽出)', () => {
     expect(validation.valid).toBe(true);
   });
 });
+
+// 実メール観察で見つかった別のBP要員紹介フォーマット(単独■見出し、コロン
+// 無し、"最寄り駅"表記、注記が値に直接続く)。既存のBP-A(・ラベル：)形式とは
+// 別の実在フォーマットとして、そのまま抽出→validationまで通ることを確認する。
+describe('parseEmail (単独■見出し・コロン無し・最寄り駅表記のBP要員メール)', () => {
+  const singleMarkerEngineerEmail: RawEmail = {
+    id: 'email-engineer-single-marker-001',
+    subject: '要員のご紹介',
+    bodyText: [
+      '下記要員のご紹介をさせていただきます。',
+      '見合う案件がございましたらご紹介いただけますと幸いです。',
+      '■氏名',
+      'M.O(41歳/女性)',
+      '■希望業務',
+      '・上流、PMO案件',
+      '■稼働',
+      '10月~',
+      '■最寄り駅',
+      '浜松町 駅 ※リモート希望（週1~4日出社可）',
+      '■単価',
+      '85万',
+      '■所属',
+      '弊社個人事業主',
+      '■スキル',
+      'Tableau、SQL',
+    ].join('\n'),
+  };
+
+  it('"最寄り駅"(り入り)表記からdesiredLocationsを取得し、注記(※以降)は除去する', () => {
+    const result = parseEmail(singleMarkerEngineerEmail);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'engineer') return;
+
+    expect(result.candidate.desiredLocations).toEqual(['浜松町 駅']);
+  });
+
+  it('最寄り駅の値に埋め込まれた"※リモート希望"からremoteDesired=trueを取得する', () => {
+    const result = parseEmail(singleMarkerEngineerEmail);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'engineer') return;
+
+    expect(result.candidate.remoteDesired).toBe(true);
+  });
+
+  it('単独■見出し・コロン無しの"■単価 85万"から単価を取得する', () => {
+    const result = parseEmail(singleMarkerEngineerEmail);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'engineer') return;
+
+    expect(result.candidate.desiredRateMin).toBe(85);
+    expect(result.candidate.desiredRateMax).toBe(85);
+  });
+
+  it('単独■見出し・コロン無しの"■稼働 10月~"は年が無いためunknown precisionのまま(推測しない)', () => {
+    const result = parseEmail(singleMarkerEngineerEmail);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'engineer') return;
+
+    expect(result.candidate.availableFrom).toEqual({ precision: 'unknown', value: '' });
+  });
+
+  it('コロンが省略された"・単金（税抜）85万円"からも単価を取得する(BP-A箇条書き形式)', () => {
+    const email: RawEmail = {
+      id: 'email-engineer-no-colon-rate-001',
+      subject: '個人事業主のご紹介',
+      bodyText: [
+        '■基本情報',
+        '・最寄駅：渋谷駅',
+        '■希望条件',
+        '・稼働：即日',
+        '・出社頻度：週2日出社可（リモート尚可）',
+        '・単金（税抜）85万円',
+        '・希望：PM/PdM案件',
+        '■スキル',
+        'PM、PMO',
+      ].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'engineer') return;
+
+    expect(result.candidate.desiredRateMin).toBe(85);
+    expect(result.candidate.desiredRateMax).toBe(85);
+  });
+});
