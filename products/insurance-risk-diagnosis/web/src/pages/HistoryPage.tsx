@@ -26,9 +26,9 @@ export function HistoryPage() {
 
   return (
     <div className="max-w-3xl mx-auto py-8 sm:py-12 px-4">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-8">
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">診断履歴</h1>
-        <Link to="/diagnosis" className="px-4 py-2 text-sm rounded-lg bg-slate-900 text-white hover:bg-slate-700 transition-colors">
+        <Link to="/diagnosis" className="min-h-[40px] px-4 py-2 text-sm rounded-lg bg-slate-900 text-white hover:bg-slate-700 transition-colors flex items-center">
           新しく診断する
         </Link>
       </div>
@@ -61,7 +61,12 @@ export function HistoryPage() {
                   </div>
                   <span className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium ${style.badgeClass}`}>{style.label}</span>
                 </div>
-                <p className="text-sm text-slate-500 mt-2">必要死亡保障額: {formatManYen(item.requiredDeathCoverage)}</p>
+                {item.topRisks[0] && (
+                  <p className="text-sm text-slate-700 mt-2">
+                    最も注意すべき領域: <span className="font-medium">{item.topRisks[0].label}</span>
+                  </p>
+                )}
+                <p className="text-xs text-slate-400 mt-1">必要死亡保障額の目安: {formatManYen(item.requiredDeathCoverage)}</p>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {item.topRisks.map((r) => (
                     <span key={r.label} className="px-2 py-0.5 rounded-full bg-slate-50 text-slate-600 text-xs ring-1 ring-inset ring-slate-200">
@@ -74,7 +79,7 @@ export function HistoryPage() {
                 <button
                   type="button"
                   onClick={() => handleDelete(item.id)}
-                  className="text-xs text-slate-400 hover:text-rose-600 transition-colors"
+                  className="text-xs text-slate-400 hover:text-rose-600 transition-colors py-2 px-1 min-h-[36px]"
                 >
                   削除
                 </button>

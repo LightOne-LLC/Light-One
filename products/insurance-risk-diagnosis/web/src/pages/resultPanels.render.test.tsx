@@ -11,7 +11,7 @@ import { TopRiskAreasPanel } from '../components/dashboard/TopRiskAreasPanel';
 import { WhyPanel } from '../components/dashboard/WhyPanel';
 import { CurrentProtectionPanel } from '../components/dashboard/CurrentProtectionPanel';
 import { PublicProtectionPanel } from '../components/dashboard/PublicProtectionPanel';
-import { ProductSuggestions } from '../components/dashboard/ProductSuggestions';
+import { SuggestedActionsPanel } from '../components/dashboard/SuggestedActionsPanel';
 import { AssumptionsPanel } from '../components/dashboard/AssumptionsPanel';
 import { CoverageBreakdown } from '../components/dashboard/CoverageBreakdown';
 import { RadarChartPanel } from '../components/dashboard/RadarChartPanel';
@@ -20,6 +20,8 @@ import { AssetStep } from '../components/steps/AssetStep';
 import { InsuranceStep } from '../components/steps/InsuranceStep';
 import { HealthStep } from '../components/steps/HealthStep';
 import { RetirementStep } from '../components/steps/RetirementStep';
+import { FormField } from '../components/steps/FormField';
+import { NEXT_STEPS } from '../lib/nextSteps';
 
 function richInput(): DiagnosisInput {
   return {
@@ -81,8 +83,8 @@ describe('ResultPage dashboard panels - 実データでのレンダリング検�
     expect(html).toContain('対象外');
   });
 
-  test('ProductSuggestions', () => {
-    const html = renderToStaticMarkup(<ProductSuggestions types={result.suggestedProductTypes} />);
+  test('SuggestedActionsPanel', () => {
+    const html = renderToStaticMarkup(<SuggestedActionsPanel categories={result.categories} productTypes={result.suggestedProductTypes} />);
     expect(html).toContain('Suggested Actions');
   });
 
@@ -134,5 +136,66 @@ describe('RadarChartPanel(Recharts) - サーバーレンダリングでの挙動
       // Node上のサーバーレンダリングでは失敗する可能性がある(実ブラウザでは問題なく動作する既知の制約)。
       console.warn('RadarChartPanel: SSR環境でのレンダリングに失敗(実ブラウザでは動作想定):', (e as Error).message);
     }
+  });
+});
+
+describe('SuggestedActionsPanel - チェックリストの中身', () => {
+  test('スコアが最も高い領域の「次に確認すること」を含む', () => {
+    const html = renderToStaticMarkup(<SuggestedActionsPanel categories={result.categories} productTypes={result.suggestedProductTypes} />);
+    const top = result.categories.slice().sort((a, b) => b.score - a.score)[0];
+    expect(html).toContain(NEXT_STEPS[top.key][0]);
+  });
+
+  test('特定の保険会社名を含まない', () => {
+    // 「会社員」等の一般語は許容し、実在の保険会社名(を想起させる表記)のみを禁止する。
+    const html = renderToStaticMarkup(<SuggestedActionsPanel categories={result.categories} productTypes={result.suggestedProductTypes} />);
+    expect(html).not.toMatch(/日本生命|第一生命|住友生命|明治安田生命|かんぽ生命|東京海上|損保ジャパン|三井住友海上|あいおいニッセイ/);
+  });
+});
+
+describe('NEXT_STEPS - 7領域すべてに次のアクションが定義されている', () => {
+  test('全カテゴリキーに1件以上のアクションがある', () => {
+    for (const c of result.categories) {
+      expect(NEXT_STEPS[c.key]?.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('FormField - required/unknownAction拡張', () => {
+  test('required指定時に「必須」バッジが表示される', () => {
+    const html = renderToStaticMarkup(
+      <FormField label="テスト項目" required>
+        <input readOnly value="" />
+      </FormField>,
+    );
+    expect(html).toContain('必須');
+  });
+
+  test('required未指定時は「任意」バッジが表示される', () => {
+    const html = renderToStaticMarkup(
+      <FormField label="テスト項目">
+        <input readOnly value="" />
+      </FormField>,
+    );
+    expect(html).toContain('任意');
+  });
+
+  test('unknownActionのラベルが表示される', () => {
+    const html = renderToStaticMarkup(
+      <FormField label="テスト項目" unknownAction={{ label: 'わからない', onClick: () => {} }}>
+        <input readOnly value="" />
+      </FormField>,
+    );
+    expect(html).toContain('わからない');
+  });
+
+  test('errorがある場合はhintの代わりにエラーメッセージが表示される', () => {
+    const html = renderToStaticMarkup(
+      <FormField label="テスト項目" hint="ヒント文" error="エラー文">
+        <input readOnly value="" />
+      </FormField>,
+    );
+    expect(html).toContain('エラー文');
+    expect(html).not.toContain('ヒント文');
   });
 });

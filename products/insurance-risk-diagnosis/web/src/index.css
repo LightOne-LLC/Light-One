@@ -30,3 +30,26 @@ body {
 .animate-fade-in {
   animation: fade-in 0.25s ease-out;
 }
+
+/*
+  印刷/PDF用。診断レポート(#pdf-report)を紙面向けに整える。
+  折りたたみ済みの<details>は既定では中身が印刷されないため、summary以外を強制的に表示する。
+*/
+@media print {
+  body {
+    background: #ffffff;
+  }
+  #pdf-report {
+    max-width: 100%;
+  }
+  #pdf-report details:not([open]) > *:not(summary) {
+    display: block !important;
+  }
+  #pdf-report summary {
+    display: none;
+  }
+  #pdf-report section {
+    break-inside: avoid;
+    box-shadow: none !important;
+  }
+}

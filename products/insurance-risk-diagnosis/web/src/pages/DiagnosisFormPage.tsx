@@ -21,7 +21,7 @@ export function DiagnosisFormPage() {
   useEffect(() => {
     const draft = loadDraft();
     if (!draft) return;
-    if (window.confirm('以前の入力内容があります。復元しますか?')) {
+    if (window.confirm('以前の入力内容があります。続きから再開しますか?')) {
       setInput(mergeWithDefaults(draft));
     } else {
       clearDraft();
@@ -41,6 +41,15 @@ export function DiagnosisFormPage() {
     return true;
   };
 
+  const goNext = () => {
+    setStep((s) => Math.min(STEPS.length - 1, s + 1));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const goBack = () => {
+    setStep((s) => Math.max(0, s - 1));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleSubmit = async () => {
     setSubmitting(true);
     setError(null);
@@ -58,10 +67,10 @@ export function DiagnosisFormPage() {
   const progressPercent = Math.round(((step + 1) / STEPS.length) * 100);
 
   return (
-    <div className="max-w-2xl mx-auto py-8 sm:py-12 px-4">
+    <div className="max-w-2xl mx-auto py-6 sm:py-12 px-4 pb-28 sm:pb-12">
       <h1 className="text-2xl font-bold tracking-tight text-slate-900 mb-6">保険リスク診断</h1>
 
-      <div className="mb-8">
+      <div className="mb-6">
         <div className="flex items-baseline justify-between mb-2">
           <span className="text-xs font-semibold tracking-wide text-slate-500">
             STEP {step + 1} / {STEPS.length}
@@ -73,7 +82,7 @@ export function DiagnosisFormPage() {
         </div>
       </div>
 
-      <div className="bg-surface rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8">
+      <div className="bg-surface rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-8">
         {step === 0 && <BasicInfoStep input={input} onChange={update} />}
         {step === 1 && <AssetStep input={input} onChange={update} />}
         {step === 2 && <InsuranceStep input={input} onChange={update} />}
@@ -81,14 +90,15 @@ export function DiagnosisFormPage() {
         {step === 4 && <RetirementStep input={input} onChange={update} />}
         {step === 5 && <ConfirmStep input={input} />}
 
-        {error && <p className="text-sm text-rose-600 mt-4">{error}</p>}
+        {error && <p className="text-sm text-rose-600 mt-4" role="alert">{error}</p>}
 
-        <div className="flex justify-between mt-8">
+        {/* モバイルでは画面下部に固定し、長いフォームでもスクロールせず操作できるようにする */}
+        <div className="mt-8 -mx-5 sm:-mx-8 -mb-5 sm:-mb-8 px-5 sm:px-8 py-4 border-t border-slate-100 flex justify-between gap-3 sticky bottom-0 bg-surface/95 backdrop-blur rounded-b-2xl">
           <button
             type="button"
             disabled={step === 0}
-            onClick={() => setStep((s) => Math.max(0, s - 1))}
-            className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-40"
+            onClick={goBack}
+            className="min-h-[44px] px-4 py-2.5 text-sm rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-40"
           >
             戻る
           </button>
@@ -97,8 +107,8 @@ export function DiagnosisFormPage() {
             <button
               type="button"
               disabled={!canGoNext()}
-              onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}
-              className="px-5 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-40"
+              onClick={goNext}
+              className="min-h-[44px] flex-1 sm:flex-none px-5 py-2.5 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-40"
             >
               次へ
             </button>
@@ -107,7 +117,7 @@ export function DiagnosisFormPage() {
               type="button"
               disabled={submitting}
               onClick={handleSubmit}
-              className="px-5 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-40"
+              className="min-h-[44px] flex-1 sm:flex-none px-5 py-2.5 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-40"
             >
               {submitting ? '診断中...' : '診断する'}
             </button>
@@ -121,33 +131,62 @@ export function DiagnosisFormPage() {
 function ConfirmStep({ input }: { input: DiagnosisInput }) {
   return (
     <div>
-      <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-5">入力内容の確認</h2>
-      <dl className="text-sm text-slate-700 space-y-0.5">
+      <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-1">入力内容の確認</h2>
+      <p className="text-sm text-slate-500 mb-5">この内容で診断します。修正する場合は「戻る」から該当ステップへ移動してください。</p>
+
+      <ConfirmSection title="基本情報">
         <Row label="年齢" value={`${input.basic.age}歳`} />
-        <Row label="雇用形態" value={input.basic.occupationType} />
+        <Row label="雇用形態" value={occupationLabel(input.basic.occupationType)} />
         <Row label="年収" value={`${input.basic.annualIncome}万円`} />
         <Row label="配偶者" value={input.basic.hasSpouse ? `いる(${input.basic.spouseAge}歳、年収${input.basic.spouseAnnualIncome ?? 0}万円)` : 'いない'} />
         <Row label="子供" value={input.basic.children.length ? input.basic.children.map((c) => `${c.currentAge}歳`).join(', ') : 'いない'} />
+      </ConfirmSection>
+
+      <ConfirmSection title="資産・負債">
         <Row label="貯蓄額" value={`${input.asset.savings}万円`} />
         <Row label="投資性資産" value={`${input.asset.otherAssets}万円`} />
         <Row label="不動産評価額" value={`${input.asset.realEstateValue}万円`} />
         <Row label="住宅ローン残高" value={`${input.asset.mortgageBalance}万円`} />
         <Row label="その他借入残高" value={`${input.asset.otherLoanBalance}万円`} />
+      </ConfirmSection>
+
+      <ConfirmSection title="既存保険">
         <Row label="既存死亡保障" value={`${input.existingInsurance.deathCoverage}万円`} />
         <Row label="月額保険料合計" value={`${input.existingInsurance.monthlyPremiumTotal}万円`} />
+      </ConfirmSection>
+
+      <ConfirmSection title="健康状態">
         <Row label="既往歴" value={input.health.hasMedicalHistory ? 'あり' : 'なし'} />
+      </ConfirmSection>
+
+      <ConfirmSection title="老後の希望" last>
         <Row label="希望退職年齢" value={`${input.retirement.desiredRetirementAge}歳`} />
         <Row label="退職金見込み額" value={`${input.retirement.expectedSeverancePay}万円`} />
-      </dl>
+      </ConfirmSection>
+    </div>
+  );
+}
+
+function occupationLabel(t: string): string {
+  if (t === 'employee') return '会社員';
+  if (t === 'public_servant') return '公務員';
+  return '自営業・フリーランス';
+}
+
+function ConfirmSection({ title, children, last }: { title: string; children: React.ReactNode; last?: boolean }) {
+  return (
+    <div className={last ? 'mb-0' : 'mb-5'}>
+      <h3 className="text-xs font-semibold tracking-wide text-slate-400 mb-1.5">{title}</h3>
+      <dl className="text-sm text-slate-700">{children}</dl>
     </div>
   );
 }
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between border-b border-slate-100 py-1.5">
-      <dt className="text-slate-500">{label}</dt>
-      <dd className="font-medium text-slate-900">{value}</dd>
+    <div className="flex justify-between gap-4 border-b border-slate-100 py-2">
+      <dt className="text-slate-500 shrink-0">{label}</dt>
+      <dd className="font-medium text-slate-900 text-right">{value}</dd>
     </div>
   );
 }

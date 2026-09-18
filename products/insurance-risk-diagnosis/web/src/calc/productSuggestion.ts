@@ -17,6 +17,6 @@ export function suggestProductTypes(scores: SuggestionScores): string[] {
   if (scores.disabilityScore >= SUGGESTION_THRESHOLD) suggestions.push('就業不能保険');
   if (scores.assetFormationScore >= SUGGESTION_THRESHOLD) suggestions.push('資産形成型保険(個人年金等)');
   if (scores.careScore >= SUGGESTION_THRESHOLD) suggestions.push('介護保険');
-  if (scores.inheritanceScore >= SUGGESTION_THRESHOLD) suggestions.push('相続対策(生命保険の非課税枠等)');
+  if (scores.inheritanceScore >= SUGGESTION_THRESHOLD) suggestions.push('相続対策(生前贈与・非課税枠等)');
   return suggestions;
 }

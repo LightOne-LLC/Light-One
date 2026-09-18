@@ -14,7 +14,8 @@ export function HealthStep({ input, onChange }: Props) {
 
   return (
     <div>
-      <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-5">健康状態</h2>
+      <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-1">健康状態</h2>
+      <p className="text-sm text-slate-500 mb-5">既往歴は医療リスクの評価に使用します。詳細な病名の入力は不要です。</p>
       <label className={checkboxLabelClass}>
         <input
           type="checkbox"

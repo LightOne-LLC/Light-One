@@ -12,7 +12,7 @@ function Header() {
   const { user, signOut } = useAuth();
   if (!user) return null;
   return (
-    <header className="border-b border-slate-200 bg-surface/80 backdrop-blur supports-[backdrop-filter]:bg-surface/60">
+    <header className="print:hidden border-b border-slate-200 bg-surface/80 backdrop-blur supports-[backdrop-filter]:bg-surface/60">
       <div className="max-w-3xl mx-auto px-4 py-4 flex justify-between items-center">
         <Link to="/diagnosis" className="font-semibold tracking-tight text-slate-900">
           Financial Risk Diagnosis
