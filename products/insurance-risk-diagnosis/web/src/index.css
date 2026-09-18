@@ -2,21 +2,25 @@
 
 /*
   LIGHT ONE — Financial Risk Intelligence design tokens.
-  "Quiet Luxury": warm ivory/white over cold gray, deep navy as the
-  primary/executive color, muted gold as the sole accent. No indigo,
-  no purple "AI" gradients, no gold-overload. Risk colors stay but are
+  Platinum Silver x Midnight Navy. Luxury first, transparency second,
+  future a quiet hint (never the point). No indigo, no purple "AI"
+  gradients, no neon, no gold-as-hero — silver/platinum carries the
+  accent role, navy carries authority. Risk colors stay but are
   desaturated so they read as an executive report status, not alarms.
 */
 @theme {
-  --color-canvas: #faf7f1;       /* warm ivory page background */
+  --color-canvas: #f1f2f5;       /* platinum/pearl page background (cool, not warm ivory) */
   --color-surface: #ffffff;      /* card surface */
-  --color-navy: #16233f;         /* primary / CTA / headings */
-  --color-navy-dark: #0b1526;    /* hover / deepest navy */
-  --color-ink-muted: #5c6472;    /* secondary text, warm-neutral */
-  --color-line: #e7e1d2;         /* warm neutral border, replaces cold gray */
-  --color-gold: #a1813f;         /* muted gold accent (icons, bullets) */
-  --color-gold-soft: #f5efdd;    /* soft gold background for badges */
-  --color-gold-ring: #e3d3a9;    /* ring/border for gold accents */
+  --color-navy: #101a30;         /* midnight navy — primary / CTA / headings */
+  --color-navy-dark: #060b16;    /* near-black navy — hover / deepest */
+  --color-ink-muted: #5c6577;    /* secondary text, cool-neutral */
+  --color-line: #dfe2e8;         /* platinum-silver border */
+  --color-gold: #8b93a0;         /* "light" accent: platinum silver (token name kept for
+                                     compatibility with earlier styling call-sites; value is
+                                     silver, not gold — gold is no longer the brand accent) */
+  --color-gold-soft: #eef0f3;    /* soft silver background for badges */
+  --color-gold-ring: #d6dae1;    /* ring/border for silver accents */
+  --color-ice: #dbeaf4;          /* very subtle ice-blue, used only for the light/glow motif */
   --font-display: "Inter", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
 }
 
@@ -36,6 +40,25 @@ body {
 .font-display-num {
   font-feature-settings: "tnum" 1, "ss01" 1;
   letter-spacing: -0.02em;
+}
+
+/*
+  Material層: 単なる「白背景+影」にしないための素材感ユーティリティ。
+  ブランド名の"LIGHT"を、派手な発光ではなく「光が当たっている」程度の
+  控えめなradial highlightとして表現する。多用せず、Hero等の主要面のみに使う。
+*/
+.material-navy {
+  background:
+    radial-gradient(120% 140% at 15% -10%, rgba(255, 255, 255, 0.08), transparent 55%),
+    linear-gradient(160deg, var(--color-navy) 0%, var(--color-navy-dark) 100%);
+}
+
+.material-platinum {
+  background: linear-gradient(160deg, #ffffff 0%, var(--color-canvas) 100%);
+}
+
+.hairline-light {
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 @keyframes fade-in {
@@ -76,5 +99,10 @@ body {
   #pdf-report section {
     break-inside: avoid;
     box-shadow: none !important;
+  }
+  .material-navy {
+    background: var(--color-navy) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 }

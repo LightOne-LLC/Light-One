@@ -22,7 +22,7 @@ import { HealthStep } from '../components/steps/HealthStep';
 import { RetirementStep } from '../components/steps/RetirementStep';
 import { FormField } from '../components/steps/FormField';
 import { NEXT_STEPS } from '../lib/nextSteps';
-import { Card, Button, Badge, SectionHeader, ChoiceCardGroup, Metric, EmptyState, LoadingState, ResultHero } from '../components/ui';
+import { Card, Button, Badge, SectionHeader, ChoiceCardGroup, Metric, EmptyState, LoadingState, ResultHero, NumberField } from '../components/ui';
 
 function richInput(): DiagnosisInput {
   return {
@@ -298,5 +298,17 @@ describe('FinancialGapPanel - 積み上げバーの安全性', () => {
     const categories = [{ key: 'asset' as const, label: '資産', score: 10, level: 'low' as const, reasons: [] }];
     const html = renderToStaticMarkup(<FinancialGapPanel categories={categories} />);
     expect(html).toBe('');
+  });
+});
+
+describe('NumberField - レンダリング', () => {
+  test('値が0のときは空欄でレンダリングされる(value属性が空文字)', () => {
+    const html = renderToStaticMarkup(<NumberField value={0} onChange={() => {}} className="x" />);
+    expect(html).toContain('value=""');
+  });
+
+  test('値が0以外のときはその数値でレンダリングされる', () => {
+    const html = renderToStaticMarkup(<NumberField value={500} onChange={() => {}} className="x" />);
+    expect(html).toContain('value="500"');
   });
 });

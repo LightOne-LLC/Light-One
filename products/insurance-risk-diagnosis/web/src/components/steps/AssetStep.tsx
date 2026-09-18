@@ -1,6 +1,6 @@
 import type { DiagnosisInput } from '../../types/diagnosis';
 import { FormField, inputClass } from './FormField';
-import { ChoiceCardGroup } from '../ui';
+import { ChoiceCardGroup, NumberField } from '../ui';
 
 interface Props {
   input: DiagnosisInput;
@@ -23,14 +23,7 @@ export function AssetStep({ input, onChange }: Props) {
           hint="現金・預金等、すぐに使える資産"
           unknownAction={{ label: 'なし(0円)', onClick: () => updateAsset({ savings: 0 }) }}
         >
-          <input
-            type="number"
-            min={0}
-            inputMode="numeric"
-            className={inputClass}
-            value={asset.savings}
-            onChange={(e) => updateAsset({ savings: Number(e.target.value) })}
-          />
+          <NumberField min={0} placeholder="例: 100" className={inputClass} value={asset.savings} onChange={(n) => updateAsset({ savings: n })} />
         </FormField>
 
         <FormField
@@ -38,47 +31,19 @@ export function AssetStep({ input, onChange }: Props) {
           hint="投資信託・株式等"
           unknownAction={{ label: 'なし(0円)', onClick: () => updateAsset({ otherAssets: 0 }) }}
         >
-          <input
-            type="number"
-            min={0}
-            inputMode="numeric"
-            className={inputClass}
-            value={asset.otherAssets}
-            onChange={(e) => updateAsset({ otherAssets: Number(e.target.value) })}
-          />
+          <NumberField min={0} className={inputClass} value={asset.otherAssets} onChange={(n) => updateAsset({ otherAssets: n })} />
         </FormField>
 
         <FormField label="不動産評価額(万円)" hint="自宅等の時価の目安。相続財産の概算にも使用します">
-          <input
-            type="number"
-            min={0}
-            inputMode="numeric"
-            className={inputClass}
-            value={asset.realEstateValue}
-            onChange={(e) => updateAsset({ realEstateValue: Number(e.target.value) })}
-          />
+          <NumberField min={0} className={inputClass} value={asset.realEstateValue} onChange={(n) => updateAsset({ realEstateValue: n })} />
         </FormField>
 
         <FormField label="住宅ローン残高(万円)">
-          <input
-            type="number"
-            min={0}
-            inputMode="numeric"
-            className={inputClass}
-            value={asset.mortgageBalance}
-            onChange={(e) => updateAsset({ mortgageBalance: Number(e.target.value) })}
-          />
+          <NumberField min={0} className={inputClass} value={asset.mortgageBalance} onChange={(n) => updateAsset({ mortgageBalance: n })} />
         </FormField>
 
         <FormField label="その他借入残高(万円)" hint="住宅ローン以外の借入(自動車ローン・カードローン等)">
-          <input
-            type="number"
-            min={0}
-            inputMode="numeric"
-            className={inputClass}
-            value={asset.otherLoanBalance}
-            onChange={(e) => updateAsset({ otherLoanBalance: Number(e.target.value) })}
-          />
+          <NumberField min={0} className={inputClass} value={asset.otherLoanBalance} onChange={(n) => updateAsset({ otherLoanBalance: n })} />
         </FormField>
       </div>
 

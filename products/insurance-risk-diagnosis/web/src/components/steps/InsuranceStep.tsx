@@ -1,5 +1,6 @@
 import type { DiagnosisInput, ExistingInsurance } from '../../types/diagnosis';
 import { FormField, inputClass, checkboxClass } from './FormField';
+import { NumberField } from '../ui';
 
 interface Props {
   input: DiagnosisInput;
@@ -34,14 +35,7 @@ export function InsuranceStep({ input, onChange }: Props) {
         label="既存の死亡保障額の合計(万円)"
         unknownAction={{ label: '未加入(0円)', onClick: () => update({ deathCoverage: 0 }) }}
       >
-        <input
-          type="number"
-          min={0}
-          inputMode="numeric"
-          className={inputClass}
-          value={existingInsurance.deathCoverage}
-          onChange={(e) => update({ deathCoverage: Number(e.target.value) })}
-        />
+        <NumberField min={0} className={inputClass} value={existingInsurance.deathCoverage} onChange={(n) => update({ deathCoverage: n })} />
       </FormField>
 
       <FormField
@@ -49,15 +43,7 @@ export function InsuranceStep({ input, onChange }: Props) {
         hint="生命保険・医療保険等、すべての保険料の合計目安"
         unknownAction={{ label: 'わからない(0円)', onClick: () => update({ monthlyPremiumTotal: 0 }) }}
       >
-        <input
-          type="number"
-          min={0}
-          step={0.1}
-          inputMode="decimal"
-          className={inputClass}
-          value={existingInsurance.monthlyPremiumTotal}
-          onChange={(e) => update({ monthlyPremiumTotal: Number(e.target.value) })}
-        />
+        <NumberField min={0} step={0.1} inputMode="decimal" className={inputClass} value={existingInsurance.monthlyPremiumTotal} onChange={(n) => update({ monthlyPremiumTotal: n })} />
       </FormField>
 
       <div className="mt-2 space-y-2">
