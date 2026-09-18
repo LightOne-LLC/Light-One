@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { emptyDiagnosisInput } from '../types/diagnosis';
 import type { DiagnosisInput } from '../types/diagnosis';
@@ -6,7 +6,7 @@ import { BasicInfoStep } from '../components/steps/BasicInfoStep';
 import { AssetStep } from '../components/steps/AssetStep';
 import { InsuranceStep } from '../components/steps/InsuranceStep';
 import { HealthStep } from '../components/steps/HealthStep';
-import { runDiagnosis } from '../lib/diagnosisStore';
+import { runDiagnosis, saveDraft, loadDraft, clearDraft } from '../lib/diagnosisStore';
 
 const STEPS = ['基本情報', '資産・負債', '既存保険', '健康状態', '確認'];
 
@@ -17,8 +17,22 @@ export function DiagnosisFormPage() {
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
+  useEffect(() => {
+    const draft = loadDraft();
+    if (!draft) return;
+    if (window.confirm('以前の入力内容があります。復元しますか?')) {
+      setInput(draft);
+    } else {
+      clearDraft();
+    }
+  }, []);
+
   const update = (updater: (draft: DiagnosisInput) => DiagnosisInput) => {
-    setInput((prev) => updater(prev));
+    setInput((prev) => {
+      const next = updater(prev);
+      saveDraft(next);
+      return next;
+    });
   };
 
   const canGoNext = () => {
@@ -31,6 +45,7 @@ export function DiagnosisFormPage() {
     setError(null);
     try {
       const { id } = await runDiagnosis(input);
+      clearDraft();
       navigate(`/result/${id}`);
     } catch (e: any) {
       setError(e?.message ?? '診断の実行に失敗しました。');

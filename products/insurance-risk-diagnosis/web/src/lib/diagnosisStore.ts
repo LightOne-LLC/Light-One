@@ -65,3 +65,31 @@ export async function deleteDiagnosisHistory(id: string): Promise<void> {
   const records = loadAll().filter((r) => r.id !== id);
   saveAll(records);
 }
+
+const DRAFT_STORAGE_KEY = 'insurance-risk-diagnosis:draft';
+
+// 診断フォームの入力途中データのみを保存する下書き機能。診断結果の保存(STORAGE_KEY)とは別のキー・別のライフサイクルで管理する。
+export function saveDraft(input: DiagnosisInput): void {
+  try {
+    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(input));
+  } catch {
+    // 下書き保存に失敗しても入力自体は継続できるため、エラーは無視する。
+  }
+}
+
+export function loadDraft(): DiagnosisInput | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as DiagnosisInput) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearDraft(): void {
+  try {
+    localStorage.removeItem(DRAFT_STORAGE_KEY);
+  } catch {
+    // 削除に失敗しても致命的ではないため無視する。
+  }
+}

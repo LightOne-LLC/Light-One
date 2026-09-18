@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from 'vitest';
-import { runDiagnosis, listDiagnosisHistory, getDiagnosisDetail, deleteDiagnosisHistory } from './diagnosisStore';
+import { runDiagnosis, listDiagnosisHistory, getDiagnosisDetail, deleteDiagnosisHistory, saveDraft, loadDraft, clearDraft } from './diagnosisStore';
 import type { DiagnosisInput } from '../types/diagnosis';
 
 class MemoryStorage {
@@ -70,5 +70,38 @@ describe('diagnosisStore', () => {
     const list = await listDiagnosisHistory();
     expect(list).toHaveLength(1);
     expect(list[0].id).toBe(id);
+  });
+});
+
+describe('diagnosisStore - 下書き保存', () => {
+  beforeEach(() => {
+    (globalThis as any).localStorage.clear();
+  });
+
+  test('下書きが存在しない場合はnullが返る', () => {
+    expect(loadDraft()).toBeNull();
+  });
+
+  test('saveDraftで保存した入力をloadDraftで復元できる', () => {
+    const input = sampleInput();
+    saveDraft(input);
+
+    expect(loadDraft()).toEqual(input);
+  });
+
+  test('clearDraftで下書きを削除するとloadDraftはnullを返す', () => {
+    saveDraft(sampleInput());
+    clearDraft();
+
+    expect(loadDraft()).toBeNull();
+  });
+
+  test('診断結果の保存(runDiagnosis)とは別のキーで管理され、互いに影響しない', async () => {
+    saveDraft(sampleInput());
+    await runDiagnosis(sampleInput());
+
+    expect(loadDraft()).not.toBeNull();
+    const list = await listDiagnosisHistory();
+    expect(list).toHaveLength(1);
   });
 });
