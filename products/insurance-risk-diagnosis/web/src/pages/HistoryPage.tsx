@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { HistoryItem } from '../types/diagnosis';
-import { listDiagnosisHistory } from '../lib/diagnosisStore';
+import { listDiagnosisHistory, deleteDiagnosisHistory } from '../lib/diagnosisStore';
 
 export function HistoryPage() {
   const [items, setItems] = useState<HistoryItem[] | null>(null);
@@ -12,6 +12,16 @@ export function HistoryPage() {
       .then(setItems)
       .catch((e) => setError(e?.message ?? '履歴の取得に失敗しました。'));
   }, []);
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('この診断履歴を削除しますか?')) return;
+    try {
+      await deleteDiagnosisHistory(id);
+      setItems((prev) => prev?.filter((item) => item.id !== id) ?? null);
+    } catch (e: any) {
+      setError(e?.message ?? '削除に失敗しました。');
+    }
+  };
 
   return (
     <div className="max-w-3xl mx-auto py-8 px-4">
@@ -28,25 +38,35 @@ export function HistoryPage() {
 
       <div className="space-y-2">
         {items?.map((item) => (
-          <Link
+          <div
             key={item.id}
-            to={`/result/${item.id}`}
-            className="block bg-white rounded-lg border border-slate-200 p-4 hover:border-indigo-300 transition"
+            className="bg-white rounded-lg border border-slate-200 p-4 hover:border-indigo-300 transition"
           >
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-slate-500">{new Date(item.createdAt).toLocaleString('ja-JP')}</span>
-              <span className="text-sm font-medium text-indigo-700">
-                必要死亡保障額: {item.requiredDeathCoverage.toLocaleString('ja-JP')}万円
-              </span>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1">
-              {item.suggestedProductTypes.map((t) => (
-                <span key={t} className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs">
-                  {t}
+            <Link to={`/result/${item.id}`} className="block">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-500">{new Date(item.createdAt).toLocaleString('ja-JP')}</span>
+                <span className="text-sm font-medium text-indigo-700">
+                  必要死亡保障額: {item.requiredDeathCoverage.toLocaleString('ja-JP')}万円
                 </span>
-              ))}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1">
+                {item.suggestedProductTypes.map((t) => (
+                  <span key={t} className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs">
+                    {t}
+                  </span>
+                ))}
+              </div>
+            </Link>
+            <div className="mt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => handleDelete(item.id)}
+                className="text-xs text-slate-400 hover:text-red-600"
+              >
+                削除
+              </button>
             </div>
-          </Link>
+          </div>
         ))}
       </div>
     </div>

@@ -60,3 +60,8 @@ export async function getDiagnosisDetail(id: string): Promise<{ id: string; inpu
   if (!record) throw new Error('診断結果が見つかりません。');
   return record;
 }
+
+export async function deleteDiagnosisHistory(id: string): Promise<void> {
+  const records = loadAll().filter((r) => r.id !== id);
+  saveAll(records);
+}
