@@ -219,7 +219,11 @@ function SwipeCard({
         </>
       )}
 
-      <div className="flex-1 overflow-y-auto no-scrollbar px-5 pb-4 pt-5">
+      {/* touch-none: without it, iOS Safari treats this scrollable region's
+          own native pan gesture as taking priority over the article's
+          pointer handlers, so swiping felt dead here while it worked fine
+          over the (non-scrolling) button footer below. */}
+      <div className="flex-1 touch-none overflow-y-auto no-scrollbar px-5 pb-4 pt-5">
         <div className="flex items-start justify-between gap-3">
           <h2 className="font-mincho text-[19px] font-semibold leading-tight text-foreground">{profile.name}</h2>
           <span className="font-jp shrink-0 rounded-full border border-gold bg-surface-secondary px-2.5 py-1 text-[13px] font-semibold text-gold">
