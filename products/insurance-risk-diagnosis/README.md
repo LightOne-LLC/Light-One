@@ -1,6 +1,9 @@
-# 保険リスク診断ツール
+# 保険リスク診断ツール(Financial Risk Diagnosis)
 
-個人・保険代理店向けに、入力情報から必要保障額とリスクを自動診断するツールです。
+個人・保険代理店向けに、入力情報から死亡・医療・就業不能・老後・介護・資産・相続の7領域にわたる
+Financial Risk Gap(必要な備え−公的保障・自己資産・既存の保険=不足額)を診断するツールです。
+単純な「年収×◯倍」ではなく、公的保障(遺族年金・高額療養費・傷病手当金・障害年金・介護保険等)を
+考慮したうえで、各リスクの判定理由(Why?)まで確認できる設計にしています。
 
 - フロントエンド: React + TypeScript + Tailwind CSS (Vite) / `web/`
 - 診断計算ロジック: `web/src/calc/`(ブラウザ内で実行する純粋関数)
@@ -32,17 +35,23 @@
 ```
 insurance-risk-diagnosis/
   firebase.json / .firebaserc
-  functions/        (未デプロイの参考実装。web/src/calcと同じロジック)
+  functions/        (未デプロイの参考実装。旧バージョンのロジックのまま、7領域化には未追従)
   web/              React SPA
-    src/calc/        診断ロジック本体(純粋関数)。functions/src/calcと同一内容
-    src/components/  ステップ入力フォーム・結果ダッシュボード
+    src/calc/        診断ロジック本体(純粋関数)。DiagnosisInput → 7領域のRiskCategoryResult → DiagnosisResult
+    src/components/  ステップ入力フォーム・結果ダッシュボード(RiskMap/FinancialGap/Why等)
     src/pages/       画面
-    src/lib/         Firebase Auth接続・診断履歴のlocalStorage読み書き・PDF出力
+    src/lib/         Firebase Auth接続・診断履歴/下書きのlocalStorage読み書き・PDF出力
 ```
 
 ## 診断ロジックについて
 
-`web/src/calc/params.ts` にすべての前提パラメータ(生活費割合・教育費テーブル・遺族年金の簡易概算係数など)を集約しています。特定の保険商品名・保険会社名は一切出力しません(保険の「種類」のみ提案)。
+- `web/src/calc/params.ts`: 生活費割合・教育費テーブル等、計算モデル全般の前提パラメータ
+- `web/src/calc/publicSystemParams.ts`: 公的保障制度(高額療養費・傷病手当金・障害年金・老齢年金・介護保険・相続税基礎控除)の金額・料率。出典と確認時点をコメントで明記しており、制度改定時はこのファイルのみ更新すればよい構造
+- `web/src/calc/riskProfile.ts`: 死亡・医療・就業不能・老後・介護・資産・相続の7領域を集約し、総合スコア(overallScore)と優先度(critical/high/medium/low)を算出
+
+特定の保険商品名・保険会社名は一切出力しません(保険の「種類」のみ提案)。相続・税務に関する内容は簡易チェックであり、個別の税務・法律相談の代替にはなりません。診断結果画面の前提条件(Assumptions)に、制度の適用時点と簡略化している旨を必ず表示します。
+
+**既知の制約**: `functions/` (未デプロイの参考実装)は今回の7領域化に追従していません。デプロイには使用していないため実害はありませんが、将来`functions/`側を復活させる場合は`web/src/calc`の内容を移植し直す必要があります。
 
 ## セットアップ
 
@@ -97,7 +106,7 @@ cd web && npm run dev
 cd web && npm test
 ```
 
-複数の家族構成パターン(独身/夫婦のみ/子供1人・2人/ひとり親/資産十分/団信有無/雇用形態違い)で必要保障額とスコアの妥当性を検証しています(Vitest、13件)。
+複数の家族構成パターン・雇用形態・7領域それぞれの境界値について、必要額・不足額・スコアの妥当性を検証しています(Vitest、34件)。
 
 ### 6. デプロイ
 
