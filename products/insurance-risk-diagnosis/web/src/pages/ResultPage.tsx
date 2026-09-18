@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import type { DiagnosisInput, DiagnosisResult } from '../types/diagnosis';
 import { getDiagnosisDetail, deleteDiagnosisHistory } from '../lib/diagnosisStore';
-import { riskLevelStyle } from '../lib/riskLevelStyle';
-import { Button } from '../components/ui';
+import { Button, ResultHero, LoadingState } from '../components/ui';
 import { RadarChartPanel } from '../components/dashboard/RadarChartPanel';
 import { RiskMapPanel } from '../components/dashboard/RiskMapPanel';
 import { FinancialGapPanel } from '../components/dashboard/FinancialGapPanel';
@@ -62,12 +61,11 @@ export function ResultPage() {
     }
   };
 
-  if (error) return <p className="text-center text-rose-600 py-16">{error}</p>;
-  if (!data) return <p className="text-center text-slate-400 py-16">読み込み中...</p>;
+  if (error) return <p className="text-center text-rose-600 py-16" role="alert">{error}</p>;
+  if (!data) return <LoadingState message="診断結果を読み込んでいます..." />;
 
   const { result } = data;
   const topCategory = result.categories.slice().sort((a, b) => b.score - a.score)[0];
-  const style = riskLevelStyle(topCategory?.level ?? 'low');
   const diagnosisDate = new Date(data.createdAt).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
 
   return (
@@ -88,25 +86,19 @@ export function ResultPage() {
       </div>
 
       <div id="pdf-report" className="space-y-5 sm:space-y-6">
-        {/* Level 1: 一目で分かる情報 — 総合評価・最重要リスク・理由・次の一歩 */}
-        <header className={`rounded-2xl border p-6 sm:p-10 ${style.badgeClass}`}>
-          <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
-            <p className="text-xs font-semibold tracking-widest uppercase text-slate-500">Your Financial Risk Profile</p>
-            <p className="text-xs text-slate-400">{diagnosisDate}</p>
-          </div>
-          <p className="text-5xl sm:text-6xl font-bold tracking-tight tabular-nums text-slate-900">
-            {result.overallScore}
-            <span className="text-xl sm:text-2xl font-medium text-slate-400"> / 100</span>
-          </p>
-          <p className="mt-3 text-sm text-slate-600 max-w-md">{overallMessage(result.overallScore)}</p>
-          {topCategory && (
-            <p className="mt-3 text-sm text-slate-700">
-              最も注意すべき領域: <span className="font-semibold">{topCategory.label}</span>({topCategory.score}点)
-            </p>
-          )}
-        </header>
+        {/* Level 1: 一目で分かる情報 — 総合評価・最重要リスク・理由・次の一歩。HeroとTop Riskは間隔を詰めて一続きに読ませる */}
+        <div className="space-y-2">
+          <ResultHero
+            overallScore={result.overallScore}
+            topLevel={topCategory?.level ?? 'low'}
+            topLabel={topCategory?.label}
+            topScore={topCategory?.score}
+            message={overallMessage(result.overallScore)}
+            date={diagnosisDate}
+          />
+          <TopRiskAreasPanel categories={result.categories} />
+        </div>
 
-        <TopRiskAreasPanel categories={result.categories} />
         <WhyPanel categories={result.categories} />
         <SuggestedActionsPanel categories={result.categories} productTypes={result.suggestedProductTypes} />
 

@@ -22,7 +22,7 @@ import { HealthStep } from '../components/steps/HealthStep';
 import { RetirementStep } from '../components/steps/RetirementStep';
 import { FormField } from '../components/steps/FormField';
 import { NEXT_STEPS } from '../lib/nextSteps';
-import { Card, Button, Badge, SectionHeader, ChoiceCardGroup } from '../components/ui';
+import { Card, Button, Badge, SectionHeader, ChoiceCardGroup, Metric, EmptyState, LoadingState, ResultHero } from '../components/ui';
 
 function richInput(): DiagnosisInput {
   return {
@@ -248,5 +248,51 @@ describe('ui kit - Card/Button/Badge/SectionHeader/ChoiceCardGroup', () => {
     expect(html).toContain('会社員');
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain('aria-pressed="false"');
+  });
+
+  test('Metricは数値と単位を表示する', () => {
+    const html = renderToStaticMarkup(<Metric value={68} unit="/ 100" label="総合スコア" />);
+    expect(html).toContain('68');
+    expect(html).toContain('/ 100');
+    expect(html).toContain('総合スコア');
+  });
+
+  test('EmptyStateはメッセージとactionを表示する', () => {
+    const html = renderToStaticMarkup(<EmptyState message="まだありません" action={<span>action</span>} />);
+    expect(html).toContain('まだありません');
+    expect(html).toContain('action');
+  });
+
+  test('LoadingStateはメッセージを表示する', () => {
+    const html = renderToStaticMarkup(<LoadingState message="読み込み中です" />);
+    expect(html).toContain('読み込み中です');
+  });
+
+  test('ResultHeroは総合スコア・最重要リスク・日付を表示する', () => {
+    const html = renderToStaticMarkup(
+      <ResultHero overallScore={72} topLevel="high" topLabel="就業不能" topScore={81} message="確認が必要です" date="2026年9月18日" />,
+    );
+    expect(html).toContain('72');
+    expect(html).toContain('就業不能');
+    expect(html).toContain('2026年9月18日');
+    expect(html).toContain('診断完了');
+  });
+});
+
+describe('FinancialGapPanel - 積み上げバーの安全性', () => {
+  test('公的保障+資産+既存保険が必要額を超えても100%を超えない(不足額0)', () => {
+    const categories = [{
+      key: 'death' as const, label: '死亡', score: 10, level: 'low' as const, reasons: [],
+      gap: { requiredAmount: 100, publicCoverage: 80, ownAssets: 50, existingInsurance: 20, shortfall: 0 },
+    }];
+    expect(() => renderToStaticMarkup(<FinancialGapPanel categories={categories} />)).not.toThrow();
+    const html = renderToStaticMarkup(<FinancialGapPanel categories={categories} />);
+    expect(html).toContain('0万円');
+  });
+
+  test('gapを持つカテゴリがなければ何もレンダリングしない', () => {
+    const categories = [{ key: 'asset' as const, label: '資産', score: 10, level: 'low' as const, reasons: [] }];
+    const html = renderToStaticMarkup(<FinancialGapPanel categories={categories} />);
+    expect(html).toBe('');
   });
 });

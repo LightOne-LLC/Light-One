@@ -41,7 +41,7 @@ export function ChoiceCardGroup<T extends string>({
               type="button"
               onClick={() => onChange(opt.value)}
               aria-pressed={selected}
-              className={`min-h-[44px] rounded-xl border px-3 py-2.5 text-sm font-medium text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 ${
+              className={`relative min-h-[44px] rounded-xl border px-3 py-2.5 pr-7 text-sm font-medium text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 ${
                 selected
                   ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
                   : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
@@ -49,6 +49,11 @@ export function ChoiceCardGroup<T extends string>({
             >
               <span className="block">{opt.label}</span>
               {opt.hint && <span className={`block text-xs mt-0.5 ${selected ? 'text-indigo-500' : 'text-slate-400'}`}>{opt.hint}</span>}
+              {selected && (
+                <span className="absolute top-2 right-2 flex items-center justify-center w-4 h-4 rounded-full bg-indigo-600 text-white text-[10px] leading-none" aria-hidden="true">
+                  ✓
+                </span>
+              )}
             </button>
           );
         })}

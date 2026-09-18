@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import type { HistoryItem } from '../types/diagnosis';
 import { listDiagnosisHistory, deleteDiagnosisHistory } from '../lib/diagnosisStore';
 import { riskLevelStyle, formatManYen } from '../lib/riskLevelStyle';
-import { Card, Badge, Button } from '../components/ui';
+import { Card, Badge, Button, Metric, EmptyState, LoadingState } from '../components/ui';
 
 export function HistoryPage() {
   const [items, setItems] = useState<HistoryItem[] | null>(null);
@@ -35,14 +35,16 @@ export function HistoryPage() {
       </div>
 
       {error && <p className="text-rose-600 text-sm mb-4" role="alert">{error}</p>}
-      {!items && !error && <p className="text-slate-400 text-sm">読み込み中...</p>}
+      {!items && !error && <LoadingState message="履歴を読み込んでいます..." />}
       {items && items.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-slate-200 p-12 text-center">
-          <p className="text-sm text-slate-400 mb-4">診断履歴はまだありません。</p>
-          <Link to="/diagnosis">
-            <Button variant="primary" size="sm">最初の診断を始める</Button>
-          </Link>
-        </div>
+        <EmptyState
+          message="診断履歴はまだありません。"
+          action={
+            <Link to="/diagnosis">
+              <Button variant="primary" size="sm">最初の診断を始める</Button>
+            </Link>
+          }
+        />
       )}
 
       <div className="space-y-3">
@@ -54,11 +56,8 @@ export function HistoryPage() {
               <Link to={`/result/${item.id}`} className="block">
                 <div className="flex justify-between items-center gap-4">
                   <div>
-                    <p className="text-xs text-slate-400">{new Date(item.createdAt).toLocaleString('ja-JP')}</p>
-                    <p className="text-2xl font-bold tabular-nums text-slate-900 mt-1">
-                      {item.overallScore}
-                      <span className="text-sm font-medium text-slate-400"> / 100</span>
-                    </p>
+                    <p className="text-xs text-slate-400 mb-1">{new Date(item.createdAt).toLocaleString('ja-JP')}</p>
+                    <Metric value={item.overallScore} unit="/ 100" size="md" />
                   </div>
                   <span className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium ${style.badgeClass}`}>{style.label}</span>
                 </div>
@@ -73,8 +72,9 @@ export function HistoryPage() {
                     <Badge key={r.label}>{r.label}</Badge>
                   ))}
                 </div>
+                <p className="mt-3 text-xs text-indigo-600 font-medium">結果を見る →</p>
               </Link>
-              <div className="mt-3 flex justify-end">
+              <div className="mt-2 flex justify-end">
                 <button
                   type="button"
                   onClick={() => handleDelete(item.id)}
