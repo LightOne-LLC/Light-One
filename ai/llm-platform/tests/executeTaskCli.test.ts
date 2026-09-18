@@ -26,9 +26,11 @@ function runCli(input: string): { stdout: string; status: number } {
  * external caller (e.g. the Automation Engine, via Python's `subprocess`)
  * would invoke it — stdin in, stdout out, no mocking of the CLI itself.
  * Only cases that don't require a reachable model are covered here (the
- * real-Ollama success/error paths were verified manually — see the
- * README's "Verified real-model run" section — since they depend on what
- * happens to be installed on the machine running the tests).
+ * real-Ollama success/error paths — for both `classify` and `generate` —
+ * were verified manually — see the README's "Verified real-model run"
+ * section — since they depend on what happens to be installed on the
+ * machine running the tests). `executeGenerate`'s own routing/plumbing
+ * logic (no network) is covered in `tests/integration.test.ts`.
  */
 describe('execute-task CLI', () => {
   it('runs the deterministic gate end to end for empty input, with no model call needed', () => {
@@ -47,7 +49,7 @@ describe('execute-task CLI', () => {
   });
 
   it('reports UNSUPPORTED_TASK_TYPE for a task_type the Router has no pipeline for', () => {
-    const { stdout, status } = runCli(JSON.stringify({ task_type: 'generate', domain: 'general', input: 'hello' }));
+    const { stdout, status } = runCli(JSON.stringify({ task_type: 'embed', domain: 'general', input: 'hello' }));
     expect(status).toBe(1);
     const parsed = JSON.parse(stdout);
     expect(parsed.error.code).toBe('UNSUPPORTED_TASK_TYPE');

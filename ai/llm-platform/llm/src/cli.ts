@@ -22,12 +22,23 @@ import { GeminiProvider } from './providers/gemini/geminiProvider.js';
  * without this package growing a persistent server, auth, or a new
  * abstraction layer.
  *
- * Only `task_type: "classify"` is supported, because
- * `LLMRouter.executeClassify` is the only full pipeline the Router
- * implements today — every other task_type in the wire format's union
- * is accepted by the schema but has no Router method yet. Claiming to
- * support them here would be inventing a capability that doesn't
- * exist, so unsupported task types fail loudly instead.
+ * `task_type: "classify"` and `task_type: "generate"` are supported —
+ * the two task types with a full Router pipeline today
+ * (`executeClassify` / `executeGenerate`). Every other task_type in the
+ * wire format's union is accepted by the schema but has no Router
+ * method yet. Claiming to support them here would be inventing a
+ * capability that doesn't exist, so unsupported task types fail loudly
+ * instead.
+ *
+ * `generate` was added alongside the Automation Engine bridge
+ * (`ai/automation-engine/app/llm_platform_bridge.py`): its `LLMPlanner`
+ * needs a single free-form prompt in, a single free-form text out — the
+ * same shape `LLMProvider.generate()` already has one level down.
+ * `classify`'s fixed `{category, confidence, reason}` output shape
+ * doesn't fit that (Ollama's `format: 'json'` only forces valid JSON
+ * syntax, not that specific shape, so a planner-style prompt reliably
+ * produces a `MalformedOutputError`, not a usable answer) — confirmed by
+ * actually trying it before adding this.
  *
  * Two optional fields beyond the typed `LLMTaskRequest` are read
  * directly off the request body: `system_prompt` (forwarded to
@@ -78,10 +89,10 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (request.task_type !== 'classify') {
+  if (request.task_type !== 'classify' && request.task_type !== 'generate') {
     writeError(
       'UNSUPPORTED_TASK_TYPE',
-      `task_type "${request.task_type}" is not implemented — only "classify" has a Router pipeline (LLMRouter.executeClassify) today`,
+      `task_type "${request.task_type}" is not implemented — only "classify" and "generate" have a Router pipeline today`,
     );
     return;
   }
@@ -91,8 +102,11 @@ async function main(): Promise<void> {
 
   try {
     const task = parseLLMTaskRequest(request);
-    const evaluated = await router.executeClassify(task, { systemPrompt: request.system_prompt, timeoutMs: request.timeout_ms });
-    process.stdout.write(JSON.stringify(evaluated) + '\n');
+    const result =
+      request.task_type === 'classify'
+        ? await router.executeClassify(task, { systemPrompt: request.system_prompt, timeoutMs: request.timeout_ms })
+        : await router.executeGenerate(task, { systemPrompt: request.system_prompt, timeoutMs: request.timeout_ms });
+    process.stdout.write(JSON.stringify(result) + '\n');
   } catch (err) {
     if (err instanceof LLMProviderError) {
       writeError(err.code, err.message);

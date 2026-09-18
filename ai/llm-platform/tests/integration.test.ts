@@ -81,3 +81,37 @@ describe('LLMTask -> Router -> Local Model -> Structured Output -> Evaluator -> 
     expect(receivedTimeoutMs).toBe(60_000);
   });
 });
+
+describe('LLMTask -> Router -> Local Model -> Result (generate, no Evaluator)', () => {
+  it('runs a generate task end to end and returns the provider text plus a trace, unevaluated', async () => {
+    const { router } = createTestRouter();
+
+    const task = parseLLMTaskRequest({ task_type: 'generate', domain: 'general', input: 'summarize this' });
+    const result = await router.executeGenerate(task);
+
+    expect(result.output.text).toContain('summarize this');
+    expect(result.trace).toMatchObject({ providerKind: 'local', modelId: 'general-local' });
+    expect(result.trace.durationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('forwards systemPrompt and timeoutMs from executeGenerate through to the provider request', async () => {
+    let received: { systemPrompt?: string; timeoutMs?: number } = {};
+    const recordingProvider: LLMProvider = {
+      name: 'recording-provider',
+      providerKind: 'local',
+      async generate(request) {
+        received = { systemPrompt: request.systemPrompt, timeoutMs: request.timeoutMs };
+        return { text: 'ok' };
+      },
+      async classify() {
+        throw new Error('not used by this test');
+      },
+    };
+    const router = new LLMRouter(ModelRegistry.loadDefault(), () => recordingProvider);
+
+    const task = parseLLMTaskRequest({ task_type: 'generate', domain: 'general', input: 'some text' });
+    await router.executeGenerate(task, { systemPrompt: 'be concise', timeoutMs: 60_000 });
+
+    expect(received).toEqual({ systemPrompt: 'be concise', timeoutMs: 60_000 });
+  });
+});
