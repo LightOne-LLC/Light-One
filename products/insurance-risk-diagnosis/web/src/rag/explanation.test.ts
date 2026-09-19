@@ -32,10 +32,20 @@ describe('buildDiagnosisExplanation', () => {
     );
   });
 
-  test('assumptionsはDiagnosisResult.assumptionsをそのまま保持する(改変しない)', () => {
+  test('assumptionsのtextはDiagnosisResult.assumptionsをそのまま保持する(改変しない)', () => {
     const result = runDiagnosis(richInput());
     const explanation = buildDiagnosisExplanation(result);
-    expect(explanation.assumptions).toEqual(result.assumptions);
+    expect(explanation.assumptions.map((a) => a.text)).toEqual(result.assumptions);
+  });
+
+  test('assumptionsのevidenceは捏造せず、direct matchする資料があるものだけに付く', () => {
+    const result = runDiagnosis(richInput());
+    const explanation = buildDiagnosisExplanation(result);
+    // riskProfile.tsのassumptionsは全行diagnosis-assumptions-generalの管轄内であるため全行に出典が付く
+    for (const assumption of explanation.assumptions) {
+      expect(assumption.evidence.length).toBeGreaterThan(0);
+      expect(assumption.evidence.every((s) => s.sourceId === 'diagnosis-assumptions-general')).toBe(true);
+    }
   });
 
   test('whyは既存のreasonsをそのまま保持する', () => {

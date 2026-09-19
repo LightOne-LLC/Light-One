@@ -1,8 +1,8 @@
 import type { DiagnosisResult, RiskCategoryKey, RiskCategoryResult, RiskLevelLabel } from '../types/diagnosis';
 import { NEXT_STEPS } from '../lib/nextSteps';
-import { buildEvidenceForCategory } from './evidenceMapping';
+import { buildEvidenceForCategory, findEvidenceForAssumption } from './evidenceMapping';
 import { buildActionEvidence } from './actionEvidence';
-import type { ActionEvidence, Evidence } from './types';
+import type { ActionEvidence, Evidence, RetrievedSource } from './types';
 
 /*
   Explanation Layer(構造化版)。
@@ -46,10 +46,21 @@ export interface CategoryExplanation {
   suggestedActions: ActionExplanation[];
 }
 
+/** DiagnosisResult.assumptions[]の1行と、それを裏付けるdirect evidence(あれば)。 */
+export interface AssumptionExplanation {
+  /** 診断エンジンが実際に生成した前提開示文。改変しない */
+  text: string;
+  evidence: RetrievedSource[];
+}
+
 export interface StructuredExplanation {
   categories: CategoryExplanation[];
-  /** 診断エンジン自身が開示している前提条件(DiagnosisResult.assumptionsをそのまま保持) */
-  assumptions: string[];
+  /**
+   * 診断エンジン自身が開示している前提条件。テキストは
+   * DiagnosisResult.assumptions[]をそのまま保持し、evidenceは
+   * findEvidenceForAssumption()によるdirect matchのみ(無ければ空配列)。
+   */
+  assumptions: AssumptionExplanation[];
 }
 
 function publicProtectionNoteFor(evidence: Evidence[]): string | undefined {
@@ -79,10 +90,12 @@ function explainCategoryStructured(category: RiskCategoryResult): CategoryExplan
 /**
  * 診断結果全体(DiagnosisResult)から、LLMを使わずに構造化された説明データを組み立てる。
  * DiagnosisResultは読み取り専用として扱い、score/level/reasons/assumptions等を一切変更しない。
+ * 将来LLMを接続する場合、このStructuredExplanation 1つが唯一の入力境界となる
+ * (カテゴリのwhy/evidenceだけでなく、assumptionsのevidenceもここに集約される)。
  */
 export function buildDiagnosisExplanation(result: DiagnosisResult): StructuredExplanation {
   return {
     categories: result.categories.map(explainCategoryStructured),
-    assumptions: result.assumptions,
+    assumptions: result.assumptions.map((text) => ({ text, evidence: findEvidenceForAssumption(text) })),
   };
 }
