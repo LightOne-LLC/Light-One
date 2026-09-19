@@ -10,7 +10,7 @@ import { Card, SectionHeader } from '../ui';
 export function AssumptionsPanel({ assumptions }: { assumptions: string[] }) {
   if (assumptions.length === 0) return null;
   return (
-    <Card as="section" variant="quiet">
+    <Card as="section" variant="quiet" className="animate-fade-in">
       <SectionHeader variant="compact" title="Assumptions(前提条件)" />
       <ul className="grid gap-y-1.5 sm:grid-cols-2 sm:gap-x-8">
         {assumptions.map((a, i) => {

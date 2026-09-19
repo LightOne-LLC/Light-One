@@ -179,7 +179,10 @@ export function ResultPage() {
         <footer className="pt-2">
           <AssumptionsPanel assumptions={result.assumptions} />
           <div className="flex items-baseline justify-between gap-4 flex-wrap mt-6 pt-5 border-t border-line">
-            <Eyebrow>LIGHT ONE — Financial Risk Intelligence</Eyebrow>
+            <div>
+              <Eyebrow>LUMEN — Financial Risk Diagnosis</Eyebrow>
+              <p className="text-[10px] text-ink-faint/70 mt-1">by Light One</p>
+            </div>
             <p className="text-[11px] text-ink-faint">
               本レポートは入力内容に基づく目安であり、特定の金融商品の推奨ではありません。
             </p>

@@ -1,6 +1,6 @@
 {
-  "name": "LIGHT ONE — Financial Risk Intelligence",
-  "short_name": "LIGHT ONE",
+  "name": "LUMEN — Financial Risk Diagnosis by Light One",
+  "short_name": "LUMEN",
   "description": "死亡・医療・就業不能・老後・介護・資産・相続の7領域から、あなたの家計と保障の不足を診断します。",
   "start_url": "/diagnosis",
   "scope": "/",

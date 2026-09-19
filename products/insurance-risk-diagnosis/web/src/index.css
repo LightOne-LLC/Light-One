@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
-  LIGHT ONE — Financial Risk Intelligence design system.
+  LUMEN(by Light One) — Financial Risk Diagnosis design system.
 
   Platinum Silver x Midnight Navy.
   高級感は「色」ではなく、面(surface)・余白・階層・数字の扱いで作る。
@@ -148,6 +148,58 @@ body {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
+/*
+  LUMEN(=light)ブランドの文字表現。
+  暗い面の上の見出しに、黒いdrop-shadowで「影をつける」のではなく、
+  ごく薄いハイライト(上)とごく薄い沈み込み(下)を同時に与えることで、
+  文字そのものに厚み・奥行きがあるように見せる(彫り込み/エンボスに近い)。
+  値は極めて小さく保ち、「影がある」と気づかれない程度に留める。
+*/
+.text-emboss-light {
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06),
+    0 -1px 1px rgba(6, 11, 22, 0.4);
+}
+
+/*
+  LUMENワードマーク。発光させるのではなく、文字面に光の当たり方の差を
+  つけることで素材感を出す(static。常時アニメーションはしない)。
+*/
+.lumen-wordmark {
+  color: #ffffff; /* background-clip: text 非対応環境向けのフォールバック(先に評価される) */
+  background-image: linear-gradient(120deg, #ffffff 15%, #dbeaf4 45%, #ffffff 75%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+@supports (background-clip: text) or (-webkit-background-clip: text) {
+  .lumen-wordmark {
+    color: transparent;
+  }
+}
+
+/*
+  「光が当たっている場所」を意図的に限定するための、hover専用の反射。
+  常時発光・常時アニメーションではなく、ポインタが乗った瞬間に一度だけ
+  斜めの光がごく淡く通り過ぎる程度に留める(glassmorphismにはしない)。
+*/
+.surface-sheen {
+  position: relative;
+  overflow: hidden;
+}
+.surface-sheen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 42%, rgba(255, 255, 255, 0.10) 50%, transparent 58%);
+  transform: translateX(-120%);
+  transition: transform 1.1s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+.surface-sheen:hover::after,
+.surface-sheen:focus-within::after {
+  transform: translateX(120%);
+}
+
 .hairline-light {
   border-top: 1px solid rgba(255, 255, 255, 0.14);
 }
@@ -174,12 +226,41 @@ body {
   animation: fade-in 0.3s ease-out;
 }
 
+/*
+  レポートに数値が静かに浮かび上がるための入場アニメーション。
+  bounce/overshoot/scaleは使わず、opacityとtranslateYのみ(GPU合成のみで
+  layoutに触れない)。既存の.animate-fade-inより少し長く・少し大きく動かし、
+  Hero等「章の顔」になる要素に使う。一覧の各行をずらして出す場合は
+  .delay-*を併用する(ごく短いstagger。7項目でも合計0.5秒未満に収める)。
+*/
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-rise {
+  animation: rise-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.delay-1 { animation-delay: 70ms; }
+.delay-2 { animation-delay: 140ms; }
+.delay-3 { animation-delay: 210ms; }
+.delay-4 { animation-delay: 280ms; }
+.delay-5 { animation-delay: 350ms; }
+.delay-6 { animation-delay: 420ms; }
+
 @media (prefers-reduced-motion: reduce) {
-  .animate-fade-in {
-    animation: none;
-  }
-  * {
+  /*
+    個別クラスを都度追跡するのではなく、animation/transitionを持つ
+    すべての要素を一律で「即座に最終状態」にする。情報が動きに依存して
+    欠落したり、操作がanimation完了待ちになったりしないことを保証する。
+  */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

@@ -19,8 +19,8 @@ import type { KnowledgeSource } from './types';
     該当エントリの version / effectiveDate / content / relatedReasonKeys を更新する運用とする。
   - url は一次情報の発行機関の公式サイト(トップページ)。個別ページへの深いリンクは
     リンク切れ・改定によるずれのリスクがあるため、本MVPでは組織の公式サイトを
-    確実な参照先として採用する。'LIGHT ONE'を発行元とするTier2エントリも、
-    その計算方法が最も強く関係する公的機関の公式サイトを url として付す
+    確実な参照先として採用する。'LUMEN'(診断サービス自身)を発行元とするTier2
+    エントリも、その計算方法が最も強く関係する公的機関の公式サイトを url として付す
     (存在確認できないURLを新規に作らない)。
 */
 
@@ -163,7 +163,7 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
   {
     sourceId: 'diagnosis-assumptions-general',
     title: '本診断の計算前提',
-    organization: 'LIGHT ONE',
+    organization: 'LUMEN',
     url: 'https://www.mhlw.go.jp/',
     category: 'general',
     content:
@@ -193,7 +193,7 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
   {
     sourceId: 'diagnosis-death-coverage-methodology',
     title: '死亡保障必要額の計算方法',
-    organization: 'LIGHT ONE',
+    organization: 'LUMEN',
     url: 'https://www.nenkin.go.jp/',
     category: 'death',
     content:
@@ -211,7 +211,7 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
   {
     sourceId: 'diagnosis-survivor-pension-simplification',
     title: '遺族年金額モデルの簡略化について',
-    organization: 'LIGHT ONE',
+    organization: 'LUMEN',
     url: 'https://www.nenkin.go.jp/',
     category: 'death',
     content:
@@ -229,7 +229,7 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
   {
     sourceId: 'diagnosis-living-cost-education-assumptions',
     title: '生活費・教育費モデルの前提',
-    organization: 'LIGHT ONE',
+    organization: 'LUMEN',
     url: 'https://www.stat.go.jp/',
     category: 'general',
     content:
@@ -250,7 +250,7 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
   {
     sourceId: 'diagnosis-disability-risk-methodology',
     title: '就業不能リスクの評価方法',
-    organization: 'LIGHT ONE',
+    organization: 'LUMEN',
     url: 'https://www.kyoukaikenpo.or.jp/',
     category: 'disability',
     content:
@@ -267,7 +267,7 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
   {
     sourceId: 'diagnosis-retirement-risk-methodology',
     title: '老後資金の評価方法',
-    organization: 'LIGHT ONE',
+    organization: 'LUMEN',
     url: 'https://www.nenkin.go.jp/',
     category: 'retirement',
     content:
@@ -284,7 +284,7 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
   {
     sourceId: 'diagnosis-care-risk-methodology',
     title: '介護資金の評価方法',
-    organization: 'LIGHT ONE',
+    organization: 'LUMEN',
     url: 'https://www.mhlw.go.jp/',
     category: 'care',
     content:
@@ -301,7 +301,7 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
   {
     sourceId: 'diagnosis-inheritance-risk-methodology',
     title: '相続税評価の簡易モデルについて',
-    organization: 'LIGHT ONE',
+    organization: 'LUMEN',
     url: 'https://www.nta.go.jp/',
     category: 'inheritance',
     content:

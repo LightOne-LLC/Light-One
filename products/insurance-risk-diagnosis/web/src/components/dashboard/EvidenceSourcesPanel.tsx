@@ -97,7 +97,7 @@ export function EvidenceSourcesPanel({ result }: { result: DiagnosisResult }) {
   const withEvidence = explanation.categories.filter((c) => c.evidence.length > 0).length;
 
   return (
-    <Card as="section" variant="quiet">
+    <Card as="section" variant="quiet" className="animate-fade-in">
       <SectionHeader
         variant="compact"
         title="Sources(制度・根拠資料の出典)"

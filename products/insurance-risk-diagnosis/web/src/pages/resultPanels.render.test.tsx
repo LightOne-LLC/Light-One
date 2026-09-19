@@ -114,7 +114,7 @@ describe('ResultPage dashboard panels - 実データでのレンダリング検�
   test('AssumptionsPanel: 公的制度の前提には出典indicatorが付く', () => {
     const html = renderToStaticMarkup(<AssumptionsPanel assumptions={result.assumptions} />);
     // riskProfile.tsのassumptions[0]は常に「本診断は...の公的制度をもとにした概算です」を含む
-    expect(html).toContain('LIGHT ONE');
+    expect(html).toContain('LUMEN');
   });
 
   test('CoverageBreakdown', () => {
@@ -328,7 +328,7 @@ describe('ui kit - Card/Button/Badge/SectionHeader/ChoiceCardGroup', () => {
     expect(html).toContain('72');
     expect(html).toContain('就業不能');
     expect(html).toContain('2026年9月18日');
-    expect(html).toContain('LIGHT ONE');
+    expect(html).toContain('LUMEN');
   });
 
   test('ResultHeroはtopDomainsが空でもクラッシュしない', () => {
