@@ -412,3 +412,41 @@ export function sanitizeDisplayName(value: string | undefined): string | undefin
   if (cleaned.length > MAX_DISPLAY_NAME_LENGTH) return undefined;
   return cleaned;
 }
+
+// 実メール(200件規模)の調査で、要員メールの「氏名：」の値そのものに
+// "S.F（男性）"のようにイニシャル+性別が直接続けて記載される形式が
+// 60件中26件で確認された。性別は今回のUI表示に不要な属性(タスク要件)の
+// ため、氏名の末尾からこの記載のみを取り除く。名前の途中や案件名に現れる
+// 一般的な括弧(技術注記等)は対象にしない、末尾の性別表記に限定した
+// パターンのみを対象にする。
+const TRAILING_GENDER_ANNOTATION = /[\s　]*[（(](?:男性|女性)[)）]\s*$/;
+
+/** 氏名の末尾に直接続く性別表記("（男性）"等)のみを取り除く。該当が無ければ
+ * そのまま返す(氏名内部の他の括弧は一切変更しない)。 */
+export function stripTrailingGenderAnnotation(value: string): string {
+  return value.replace(TRAILING_GENDER_ANNOTATION, '').trim();
+}
+
+// 実メール(200件規模、案件メール83件)の調査で、「会社名：」のような単一の
+// 明示ラベルは存在しなかった一方、「(株式会社|㈱|有限会社等)の◯◯です/と
+// 申します/でございます」という定型的な自己紹介文が82/83件で確認された
+// (日本のビジネスメールにおける標準的な名乗りの慣習)。まずこの自己紹介文
+// パターンを最優先で使い、無ければ本文中で最初に現れる会社名らしきトークン
+// (単独の署名行等)にフォールバックする。どちらも無ければ会社名を推測して
+// 生成しない(undefinedのまま)。
+const COMPANY_MARK = '(?:株式会社|㈱|（株）|\\(株\\)|有限会社)';
+const GREETING_COMPANY_RE = new RegExp(
+  `([^\\s　、。]{0,10}${COMPANY_MARK}[^\\s　、。]{0,15})の[^\\n、。]{1,20}(?:です|と申します|でございます)`,
+);
+const PLAIN_COMPANY_RE = new RegExp(`([^\\s　、。:：・]{0,15}${COMPANY_MARK}[^\\s　、。:：・]{0,15})`);
+
+/** 本文から会社名を抽出する(自己紹介文 > 単独の会社名らしき記載の優先順位)。
+ * どちらのパターンにも一致しなければundefinedを返し、呼び出し側で
+ * 「未記載」表示に委ねる(会社名を推測して生成しない)。 */
+export function extractCompanyName(body: string): string | undefined {
+  const greeting = body.match(GREETING_COMPANY_RE);
+  if (greeting) return greeting[1];
+  const plain = body.match(PLAIN_COMPANY_RE);
+  if (plain) return plain[1];
+  return undefined;
+}

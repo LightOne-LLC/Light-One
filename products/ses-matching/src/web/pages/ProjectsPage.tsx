@@ -25,6 +25,14 @@ export function ProjectsPage() {
                 ID: {project.id}
               </div>
             )}
+            <div className="card-row">
+              <span>案件出し会社</span>
+              <span>{project.sourceCompany ?? '未記載'}</span>
+            </div>
+            <div className="card-row">
+              <span>商流</span>
+              <span>{project.commercialFlow ?? '商流情報なし'}</span>
+            </div>
             {project.skills.length > 0 && (
               <div>
                 {project.skills.map((name) => (

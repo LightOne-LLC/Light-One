@@ -54,6 +54,20 @@ export function MatchingPage() {
         </select>
       )}
 
+      {useReal && selectedProject && (
+        <div className="card">
+          <div className="card-title">{resolveDisplayName('project', selectedProject.id, selectedProject.projectName, useReal)}</div>
+          <div className="card-row">
+            <span>案件出し会社</span>
+            <span>{selectedProject.sourceCompany ?? '未記載'}</span>
+          </div>
+          <div className="card-row">
+            <span>商流</span>
+            <span>{selectedProject.commercialFlow ?? '商流情報なし'}</span>
+          </div>
+        </div>
+      )}
+
       {results.length > 0 && (
         <div className="stat-row">
           <label>
@@ -101,6 +115,11 @@ export function MatchingPage() {
                   {engineer.skills.map((s) => s.name).join(' / ')}
                   {engineer.desiredLocations.length > 0 ? ` ・ ${engineer.desiredLocations.join('/')}` : ''}
                   {` ・ ${engineer.desiredRateMin}〜${engineer.desiredRateMax}万円`}
+                </span>
+              )}
+              {useReal && engineer && (
+                <span style={{ width: '100%', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  所属: {engineer.affiliatedCompany ?? '未記載'} ・ 商流: {engineer.commercialFlow ?? '商流情報なし'}
                 </span>
               )}
             </div>

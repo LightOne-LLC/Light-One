@@ -1,6 +1,7 @@
 import type { RawEmail } from '../gmail/types';
 import {
   extractBulletValueNoColonNumeric,
+  extractCompanyName,
   extractLabeledValue,
   extractNestedSkillSections,
   findRateInFreeText,
@@ -15,6 +16,7 @@ import {
   parseYesNo,
   sanitizeDisplayName,
   stripNoteSuffix,
+  stripTrailingGenderAnnotation,
 } from './extractors';
 import type { ParsedEmailResult } from './types';
 
@@ -25,6 +27,14 @@ const ENGINEER_KEYWORDS = ['要員', 'スキルシート', '希望単価', '稼�
 // 観測された(明示ラベル優先)。「氏名：」は要員メールのほぼ全件で観測された。
 const PROJECT_NAME_LABELS = ['案件名', 'PJ名', 'プロジェクト名', '案件タイトル'];
 const ENGINEER_NAME_LABELS = ['氏名', 'お名前', '名前'];
+
+// 実メール調査で「所属：」ラベルが要員メールの約9割で確認された。
+// 「会社名：」のような単一ラベルは案件メール側には存在しなかったため、
+// 案件側の会社名はextractCompanyName()(自己紹介文パターン)で取得する。
+const AFFILIATED_COMPANY_LABELS = ['所属', '所属会社', '所属企業'];
+// 「商流：」「☆商流：」の2表記が実メールで確認された(値は「貴社まで」
+// 「現場→弊社」のような短い自由文で、根拠なく構造化しない)。
+const COMMERCIAL_FLOW_LABELS = ['商流', '☆商流'];
 
 function countMatches(text: string, keywords: string[]): number {
   return keywords.reduce((sum, keyword) => sum + (text.includes(keyword) ? 1 : 0), 0);
@@ -80,6 +90,18 @@ function parseProjectCandidate(subject: string, body: string, id: string): Recor
   // 呼び出し側(UI)で内部IDによる安全なフォールバック表示に委ねる。
   const projectName = sanitizeDisplayName(extractLabeledValue(body, PROJECT_NAME_LABELS)) ?? sanitizeDisplayName(subject);
   if (projectName) candidate.projectName = projectName;
+
+  // 案件を出している会社。「会社名：」のような単一の明示ラベルは実メール上
+  // 確認できなかったため、日本のビジネスメールで標準的な自己紹介文
+  // (「◯◯株式会社の△△です」等)から取得する(extractCompanyName参照)。
+  // 取得できない場合は推測せずcandidateに含めない。
+  const sourceCompany = sanitizeDisplayName(extractCompanyName(body));
+  if (sourceCompany) candidate.sourceCompany = sourceCompany;
+
+  // 商流。実メールに書かれている表現をそのまま保持するだけで、構造化・
+  // 推測は行わない(例: "貴社まで" "現場→弊社")。
+  const commercialFlow = sanitizeDisplayName(extractLabeledValue(body, COMMERCIAL_FLOW_LABELS));
+  if (commercialFlow) candidate.commercialFlow = commercialFlow;
 
   const requiredValue = extractLabeledValue(body, ['必須スキル', '必要スキル']);
   const preferredValue = extractLabeledValue(body, ['歓迎スキル', '尚可スキル']);
@@ -137,9 +159,24 @@ function parseEngineerCandidate(subject: string, body: string, id: string): Reco
   // 表示用の人材名。「氏名：」ラベルが要員メールのほぼ全件で観測された
   // ため最優先とする(件名は要員メールでは氏名を表さないためフォール
   // バックにしない)。得られない場合はcandidateに含めず、呼び出し側(UI)
-  // で内部IDによる安全なフォールバック表示に委ねる。
-  const engineerName = sanitizeDisplayName(extractLabeledValue(body, ENGINEER_NAME_LABELS));
+  // で内部IDによる安全なフォールバック表示に委ねる。実メール調査で、値に
+  // "S.F（男性）"のように性別が直接続けて記載される形式(60件中26件)が
+  // 確認されたため、性別は表示不要な属性として取り除く。
+  const rawEngineerName = extractLabeledValue(body, ENGINEER_NAME_LABELS);
+  const engineerName = sanitizeDisplayName(rawEngineerName ? stripTrailingGenderAnnotation(rawEngineerName) : undefined);
   if (engineerName) candidate.engineerName = engineerName;
+
+  // 所属会社。実メール調査で「所属：」ラベルが要員メールの約9割で確認
+  // された。案件側のsourceCompanyとは意味が異なるため別フィールドとする
+  // (人材の所属会社であり、案件を出している会社ではない)。
+  const affiliatedCompany = sanitizeDisplayName(extractLabeledValue(body, AFFILIATED_COMPANY_LABELS));
+  if (affiliatedCompany) candidate.affiliatedCompany = affiliatedCompany;
+
+  // 商流。案件側と同じラベルを試すが、実メール調査では要員メール側に
+  // 明示的な商流ラベルはほぼ確認できなかった(該当すれば取得するのみで、
+  // 無ければ推測しない)。
+  const commercialFlow = sanitizeDisplayName(extractLabeledValue(body, COMMERCIAL_FLOW_LABELS));
+  if (commercialFlow) candidate.commercialFlow = commercialFlow;
 
   const skillsValue = extractLabeledValue(body, ['スキル']);
   if (skillsValue) candidate.skills = parseEngineerSkillList(skillsValue);

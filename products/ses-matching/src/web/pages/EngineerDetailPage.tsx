@@ -39,6 +39,18 @@ export function EngineerDetailPage() {
           ID: {engineer.id}
         </p>
       )}
+      {useReal && (
+        <div className="card">
+          <div className="card-row">
+            <span>所属会社</span>
+            <span>{engineer.affiliatedCompany ?? '未記載'}</span>
+          </div>
+          <div className="card-row">
+            <span>商流</span>
+            <span>{engineer.commercialFlow ?? '商流情報なし'}</span>
+          </div>
+        </div>
+      )}
       <p className="empty-note">
         案件 {resolveDisplayName('project', project.id, project.projectName, useReal)} に対する候補者詳細です。
       </p>

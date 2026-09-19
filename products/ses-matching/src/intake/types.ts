@@ -14,6 +14,13 @@ export interface ProjectRecord {
   // 取得できなかった場合は未設定のままとし、UI側が内部IDでフォールバック
   // 表示する(このフィールド自体を推測で埋めない)。
   projectName?: string;
+  // 案件を出している会社(自己紹介文等から抽出)。人材の所属会社
+  // (EngineerRecord.affiliatedCompany)とは意味が異なるため、意図的に
+  // 別フィールドとする(同じ名前にしない)。取得できなければ未設定。
+  sourceCompany?: string;
+  // 商流。実メールに書かれている表現をそのまま保持する自由テキスト
+  // (例: "貴社まで" "現場→弊社")。構造化・推測は行わない。
+  commercialFlow?: string;
   requiredSkills: RequiredSkill[];
   rateMin: number; // 万円/月
   rateMax: number; // 万円/月
@@ -32,6 +39,14 @@ export interface EngineerRecord {
   // として維持し、UI表示専用の名前とは明確に分離する。取得できなかった
   // 場合は未設定のままとし、UI側が内部IDでフォールバック表示する。
   engineerName?: string;
+  // 人材の所属会社(「所属：」ラベル等から抽出)。案件を出している会社
+  // (ProjectRecord.sourceCompany)とは意味が異なるため、意図的に別
+  // フィールドとする(同じ名前にしない)。取得できなければ未設定。
+  affiliatedCompany?: string;
+  // 商流。実メールに書かれている表現をそのまま保持する自由テキスト。
+  // 構造化・推測は行わない。要員メール側では明示的な記載が稀なため、
+  // 多くの場合未設定のままになる。
+  commercialFlow?: string;
   skills: EngineerSkill[];
   desiredRateMin: number;
   desiredRateMax: number;

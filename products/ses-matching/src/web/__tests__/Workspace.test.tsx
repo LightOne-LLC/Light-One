@@ -17,6 +17,8 @@ import { matchProjectToEngineers } from '../../matching/matchProjectToEngineers'
 const realProject: ProjectRecord = {
   id: 'real-project-1',
   projectName: 'クラウド基盤構築案件',
+  sourceCompany: '株式会社サンプルテック',
+  commercialFlow: '貴社まで',
   requiredSkills: [{ name: 'Java', minYears: 3, required: true }],
   rateMin: 60,
   rateMax: 80,
@@ -28,6 +30,8 @@ const realProject: ProjectRecord = {
 const realEngineerGood: EngineerRecord = {
   id: 'real-engineer-good',
   engineerName: 'エンジニアA',
+  affiliatedCompany: 'サンプルテック株式会社 社員',
+  commercialFlow: '現場→弊社',
   skills: [{ name: 'Java', years: 5 }],
   desiredRateMin: 65,
   desiredRateMax: 75,
@@ -69,6 +73,8 @@ const bulkResult: GmailBulkImportResult = {
     {
       id: 'real-project-1',
       title: 'AWSインフラ案件',
+      sourceCompany: '株式会社サンプルテック',
+      commercialFlow: '貴社まで',
       skills: ['Java'],
       rateMin: 60,
       rateMax: 80,
@@ -113,6 +119,9 @@ describe('Matching Workspace(実データがWorkspace全体を経由してEngine
     fireEvent.click(screen.getByText(/この結果をWorkspaceで見る/));
     await waitFor(() => expect(screen.getByText('AWSインフラ案件')).toBeTruthy());
     expect(screen.getByText('✓ Matching可能')).toBeTruthy();
+    // 案件出し会社・商流も案件カードに表示される
+    expect(screen.getByText('株式会社サンプルテック')).toBeTruthy();
+    expect(screen.getByText('貴社まで')).toBeTruthy();
 
     // 候補を見る → Matchingページで実Engineerのランキングが既存Matching
     // Engineeと一致する。名前が取得できたエンジニアは名前で、できなかった
@@ -129,6 +138,15 @@ describe('Matching Workspace(実データがWorkspace全体を経由してEngine
     );
     expect(renderedScores).toEqual(expectedRanking.map((r) => r.score));
 
+    // Matching画面上部で、案件出し会社・商流を確認できる(案件名/案件出し
+    // 会社/商流→マッチング候補、を1画面で追えることの一部)。
+    expect(screen.getByText('株式会社サンプルテック')).toBeTruthy();
+    expect(screen.getByText('貴社まで')).toBeTruthy();
+    // 候補カードでも、人材の所属会社・商流を確認できる(案件出し会社とは
+    // 別の値であり、混同していないことを直接確認する)。
+    expect(screen.getByText(/サンプルテック株式会社 社員/)).toBeTruthy();
+    expect(screen.getByText(/現場→弊社/)).toBeTruthy();
+
     // 候補をクリック → Engineer Detailでページタイトルが人材名になり、
     // スコア内訳が既存calcTotalScore()と一致する
     fireEvent.click(screen.getByText('エンジニアA'));
@@ -138,6 +156,9 @@ describe('Matching Workspace(実データがWorkspace全体を経由してEngine
     expect(screen.getByRole('heading', { level: 1, name: 'エンジニアA' })).toBeTruthy();
     expect(screen.getByText('ID: real-engineer-good')).toBeTruthy();
     expect(screen.getByText(/クラウド基盤構築案件/)).toBeTruthy();
+    // Engineer Detail上部で所属会社・商流を確認できる
+    expect(screen.getByText('サンプルテック株式会社 社員')).toBeTruthy();
+    expect(screen.getByText('現場→弊社')).toBeTruthy();
 
     const totalScoreEl = document.querySelector('.ranking-score');
     expect(totalScoreEl?.textContent).toBe(String(expectedBreakdown.totalScore));
@@ -231,6 +252,12 @@ describe('Matching Workspace(実データがWorkspace全体を経由してEngine
     expect(screen.getByText('人材ID: real-engineer-weak')).toBeTruthy();
     // 名前が表示されている候補は、内部IDも小さく併記する(デバッグ用途)。
     expect(screen.getByText('ID: real-engineer-good')).toBeTruthy();
+    // 所属会社・商流も表示され、取得できない候補は安全なfallback文言になる
+    // (realEngineerWeakはaffiliatedCompany/commercialFlowを設定していない)。
+    expect(screen.getByText('サンプルテック株式会社 社員')).toBeTruthy();
+    expect(screen.getByText('現場→弊社')).toBeTruthy();
+    expect(screen.getAllByText('未記載').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('商流情報なし').length).toBeGreaterThan(0);
   });
 
   it('実データが無い場合は既存dummy dataでのMatching(regression)が維持される', async () => {

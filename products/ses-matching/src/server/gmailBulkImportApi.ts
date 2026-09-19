@@ -97,10 +97,14 @@ function buildWorkspaceProject(
   // サニタイズ済みの値として設定されているため、ここでは値の有無だけ見る
   // (ロジックを重複実装しない)。
   const projectName = typeof candidate.projectName === 'string' ? candidate.projectName : undefined;
+  const sourceCompany = typeof candidate.sourceCompany === 'string' ? candidate.sourceCompany : undefined;
+  const commercialFlow = typeof candidate.commercialFlow === 'string' ? candidate.commercialFlow : undefined;
 
   return {
     id: typeof candidate.id === 'string' ? candidate.id : '',
     title: projectName ?? subject,
+    sourceCompany,
+    commercialFlow,
     skills,
     rateMin,
     rateMax,
