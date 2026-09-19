@@ -15,6 +15,7 @@ import {
   parseRequiredSkillList,
   parseYesNo,
   sanitizeDisplayName,
+  splitAffiliationValue,
   stripNoteSuffix,
   stripTrailingGenderAnnotation,
 } from './extractors';
@@ -166,16 +167,21 @@ function parseEngineerCandidate(subject: string, body: string, id: string): Reco
   const engineerName = sanitizeDisplayName(rawEngineerName ? stripTrailingGenderAnnotation(rawEngineerName) : undefined);
   if (engineerName) candidate.engineerName = engineerName;
 
-  // 所属会社。実メール調査で「所属：」ラベルが要員メールの約9割で確認
-  // された。案件側のsourceCompanyとは意味が異なるため別フィールドとする
-  // (人材の所属会社であり、案件を出している会社ではない)。
-  const affiliatedCompany = sanitizeDisplayName(extractLabeledValue(body, AFFILIATED_COMPANY_LABELS));
-  if (affiliatedCompany) candidate.affiliatedCompany = affiliatedCompany;
+  // 所属会社/商流。実メール調査(59件)で「所属：」ラベルの値の98%以上が
+  // 「弊社個人事業主」「弊社フリーランス」のような契約形態(商流)の記述
+  // であり、会社名では無かった(「弊社」は送信元BPエージェント自身を
+  // 指す一人称)。「所属」ラベルだから機械的に会社名として扱うのではなく、
+  // splitAffiliationValue()で値の中身(法人格表記の有無)を見て判定する
+  // (会社名と断定できる根拠が無ければ会社名を推測しない)。案件側の
+  // sourceCompanyとは意味が異なるため別フィールドとする。
+  const rawAffiliation = extractLabeledValue(body, AFFILIATED_COMPANY_LABELS);
+  const affiliation = rawAffiliation ? splitAffiliationValue(rawAffiliation) : undefined;
+  if (affiliation?.company) candidate.affiliatedCompany = affiliation.company;
 
-  // 商流。案件側と同じラベルを試すが、実メール調査では要員メール側に
-  // 明示的な商流ラベルはほぼ確認できなかった(該当すれば取得するのみで、
-  // 無ければ推測しない)。
-  const commercialFlow = sanitizeDisplayName(extractLabeledValue(body, COMMERCIAL_FLOW_LABELS));
+  // 商流。「商流：」「☆商流：」の明示ラベルを最優先する(実メールで確認
+  // された表記)。要員メール側にはこの明示ラベルはほぼ存在しないため、
+  // 無い場合は上記「所属」欄から得られた契約形態の記述を使う。
+  const commercialFlow = sanitizeDisplayName(extractLabeledValue(body, COMMERCIAL_FLOW_LABELS)) ?? affiliation?.flow;
   if (commercialFlow) candidate.commercialFlow = commercialFlow;
 
   const skillsValue = extractLabeledValue(body, ['スキル']);

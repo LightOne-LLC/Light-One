@@ -453,3 +453,44 @@ export function extractCompanyName(body: string): string | undefined {
   if (plain) return plain[1];
   return undefined;
 }
+
+// 実メール(要員メール59件)の調査で、「所属：」の値の98%以上
+// (54/55件)が「弊社個人事業主」「弊社フリーランス」「弊社プロパー」の
+// ような契約形態(商流)の記述であり、会社名ではなかった(「弊社」は
+// 送信元BPエージェント自身を指す一人称)。「所属」ラベルだから機械的に
+// 会社名として扱うのではなく、値の中身を見て判定する。
+//   - 法人格表記(株式会社/㈱/有限会社等)を含む場合のみ、その部分を
+//     会社名として抜き出し、残りを契約形態(商流)とする
+//     (例: "サクシード株式会社 社員" → 会社名"サクシード株式会社" +
+//     商流"社員")。
+//   - 法人格表記が無くても、「名称（社員）」のように既知の雇用形態語を
+//     伴う括弧表記がある場合は、括弧の前を会社名、中身を商流とする
+//     (例: "サクシード（社員）" → 会社名"サクシード" + 商流"社員")。
+//   - どちらにも該当しない場合、会社名と断定できる根拠が無いため、
+//     値全体を契約形態(商流)として扱い、会社名は推測しない
+//     (undefinedのまま)。
+const EMPLOYMENT_STATUS_WORDS = ['個人事業主', 'フリーランス', 'プロパー', '正社員', '契約社員', '業務委託', '準委任', '社員'];
+const TRAILING_STATUS_PAREN_RE = new RegExp(`^(.+?)[（(](${EMPLOYMENT_STATUS_WORDS.join('|')})[)）]\\s*$`);
+
+/** 「所属」欄の値を、会社名(あれば)と契約形態(商流)に分離する。
+ * 会社名が根拠を持って特定できない場合はcompanyをundefinedのままにし、
+ * 値全体をflowとして返す(推測で会社名を生成しない)。 */
+export function splitAffiliationValue(raw: string): { company?: string; flow?: string } {
+  const legalMatch = raw.match(new RegExp(`\\S*${COMPANY_MARK}\\S*`));
+  if (legalMatch) {
+    return {
+      company: sanitizeDisplayName(legalMatch[0]),
+      flow: sanitizeDisplayName(raw.replace(legalMatch[0], '')),
+    };
+  }
+
+  const parenMatch = raw.match(TRAILING_STATUS_PAREN_RE);
+  if (parenMatch) {
+    return {
+      company: sanitizeDisplayName(parenMatch[1]),
+      flow: sanitizeDisplayName(parenMatch[2]),
+    };
+  }
+
+  return { flow: sanitizeDisplayName(raw) };
+}

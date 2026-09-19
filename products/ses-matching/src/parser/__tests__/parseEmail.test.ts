@@ -402,7 +402,36 @@ describe('parseEmail (案件出し会社/所属会社/商流の抽出)', () => {
     expect(result.candidate.commercialFlow).toBe('現場→弊社');
   });
 
-  it('「所属：」ラベルから人材のaffiliatedCompanyを抽出する', () => {
+  // 実メール(要員メール59件)の調査で、「所属：」の値の98%以上が
+  // 「弊社個人事業主」「弊社フリーランス」のような契約形態(商流)の記述
+  // であり、会社名では無かった(「弊社」は送信元BPエージェント自身を
+  // 指す一人称)。「所属」ラベルだから機械的に会社名として扱うのではなく、
+  // 値の中身(法人格表記の有無)を見て判定する。
+  it.each([
+    ['弊社個人事業主'],
+    ['弊社フリーランス'],
+    ['弊社プロパー'],
+  ])('「所属: %s」は会社名ではなく契約形態(商流)として扱い、affiliatedCompanyは設定しない', (value) => {
+    const email: RawEmail = {
+      id: `email-engineer-flow-${value}`,
+      subject: 'スキルシート送付の件',
+      bodyText: [
+        '氏名: 山田太郎',
+        `所属: ${value}`,
+        'スキル: Java(5年)',
+        '希望単価: 70万円',
+        '希望勤務地: 東京都',
+        '稼働可能日: 2026-04-01',
+      ].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed') return;
+    expect(result.candidate.affiliatedCompany).toBeUndefined();
+    expect(result.candidate.commercialFlow).toBe(value);
+  });
+
+  it('「所属：」の値に法人格表記(株式会社等)がある場合は、会社名部分だけをaffiliatedCompanyへ、残りをcommercialFlowへ分離する', () => {
     const email: RawEmail = {
       id: 'email-engineer-company-001',
       subject: 'スキルシート送付の件',
@@ -418,7 +447,28 @@ describe('parseEmail (案件出し会社/所属会社/商流の抽出)', () => {
     const result = parseEmail(email);
     expect(result.status).toBe('parsed');
     if (result.status !== 'parsed') return;
-    expect(result.candidate.affiliatedCompany).toBe('サンプルテック株式会社 社員');
+    expect(result.candidate.affiliatedCompany).toBe('サンプルテック株式会社');
+    expect(result.candidate.commercialFlow).toBe('社員');
+  });
+
+  it('法人格表記が無くても、「会社名（雇用形態）」の括弧表記であれば会社名と雇用形態を分離する', () => {
+    const email: RawEmail = {
+      id: 'email-engineer-company-005',
+      subject: 'スキルシート送付の件',
+      bodyText: [
+        '氏名: 山田太郎',
+        '所属: サクシード（社員）',
+        'スキル: Java(5年)',
+        '希望単価: 70万円',
+        '希望勤務地: 東京都',
+        '稼働可能日: 2026-04-01',
+      ].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed') return;
+    expect(result.candidate.affiliatedCompany).toBe('サクシード');
+    expect(result.candidate.commercialFlow).toBe('社員');
   });
 
   it('人材の所属会社と案件を出している会社は別フィールドであり、混同しない', () => {
@@ -432,7 +482,7 @@ describe('parseEmail (案件出し会社/所属会社/商流の抽出)', () => {
       subject: 'スキルシート送付の件',
       bodyText: [
         '氏名: 山田太郎',
-        '所属: 弊社フリーランス',
+        '所属: サンプルテック株式会社 社員',
         'スキル: Java(5年)',
         '希望単価: 70万円',
         '希望勤務地: 東京都',
@@ -443,17 +493,18 @@ describe('parseEmail (案件出し会社/所属会社/商流の抽出)', () => {
     expect(engineerResult.status).toBe('parsed');
     if (engineerResult.status !== 'parsed') return;
     expect(engineerResult.candidate).not.toHaveProperty('sourceCompany');
-    expect(engineerResult.candidate.affiliatedCompany).toBe('弊社フリーランス');
+    expect(engineerResult.candidate.affiliatedCompany).toBe('サンプルテック株式会社');
   });
 
-  it('所属ラベルが無ければaffiliatedCompanyを設定しない(推測しない)', () => {
+  it('所属ラベルが無ければaffiliatedCompanyもcommercialFlowも設定しない(推測しない)', () => {
     const result = parseEmail(engineerEmail);
     expect(result.status).toBe('parsed');
     if (result.status !== 'parsed') return;
     expect(result.candidate.affiliatedCompany).toBeUndefined();
+    expect(result.candidate.commercialFlow).toBeUndefined();
   });
 
-  it('所属会社はあるが商流の記載が無い要員メールは、affiliatedCompanyのみ設定しcommercialFlowは設定しない(推測しない)', () => {
+  it('所属会社はあるが商流(契約形態)の記載が無い要員メールは、affiliatedCompanyのみ設定しcommercialFlowは設定しない(推測しない)', () => {
     const email: RawEmail = {
       id: 'email-engineer-company-003',
       subject: 'スキルシート送付の件',
@@ -473,13 +524,13 @@ describe('parseEmail (案件出し会社/所属会社/商流の抽出)', () => {
     expect(result.candidate.commercialFlow).toBeUndefined();
   });
 
-  it('要員メールに「商流：」ラベルが明示されている場合は、affiliatedCompanyとは別にcommercialFlowを取得する', () => {
+  it('要員メールに「商流：」ラベルが明示されている場合は、「所属」由来の契約形態より優先してcommercialFlowに使う', () => {
     const email: RawEmail = {
       id: 'email-engineer-flow-001',
       subject: 'スキルシート送付の件',
       bodyText: [
         '氏名: 山田太郎',
-        '所属: Innovations株式会社',
+        '所属: 弊社フリーランス',
         '商流: エンド → 元請 → 自社',
         'スキル: Java(5年)',
         '希望単価: 70万円',
@@ -490,39 +541,32 @@ describe('parseEmail (案件出し会社/所属会社/商流の抽出)', () => {
     const result = parseEmail(email);
     expect(result.status).toBe('parsed');
     if (result.status !== 'parsed') return;
-    expect(result.candidate.affiliatedCompany).toBe('Innovations株式会社');
+    expect(result.candidate.affiliatedCompany).toBeUndefined();
     expect(result.candidate.commercialFlow).toBe('エンド → 元請 → 自社');
-    // 所属会社の値がそのまま商流に紛れ込んでいないことを直接確認する。
-    expect(result.candidate.commercialFlow).not.toBe(result.candidate.affiliatedCompany);
-    expect(result.candidate.commercialFlow as string).not.toContain('Innovations');
   });
 
-  it('回帰: 所属ラベルの値("弊社フリーランス"等)がcommercialFlowへ誤って入らない(所属会社を商流と誤認しない)', () => {
-    const cases = [
-      '所属: 弊社フリーランス',
-      '所属: 弊社個人事業主',
-      '所属: サンプルテック株式会社 社員',
-    ];
-    for (const affiliationLine of cases) {
-      const email: RawEmail = {
-        id: `email-engineer-flow-regression-${affiliationLine}`,
-        subject: 'スキルシート送付の件',
-        bodyText: [
-          '氏名: 山田太郎',
-          affiliationLine,
-          'スキル: Java(5年)',
-          '希望単価: 70万円',
-          '希望勤務地: 東京都',
-          '稼働可能日: 2026-04-01',
-        ].join('\n'),
-      };
-      const result = parseEmail(email);
-      expect(result.status).toBe('parsed');
-      if (result.status !== 'parsed') return;
-      // 商流ラベル自体が無いため、所属の値がcommercialFlowへ流用されては
-      // いけない(推測禁止)。
-      expect(result.candidate.commercialFlow).toBeUndefined();
-    }
+  it('回帰: BPエージェント自身の会社名(自己紹介文由来)は要員のaffiliatedCompanyに紛れ込まない', () => {
+    const email: RawEmail = {
+      id: 'email-engineer-agent-company-001',
+      subject: 'スキルシート送付の件',
+      bodyText: [
+        '株式会社キャリアビートの田中と申します。',
+        '氏名: 山田太郎',
+        '所属: 弊社個人事業主',
+        'スキル: Java(5年)',
+        '希望単価: 70万円',
+        '希望勤務地: 東京都',
+        '稼働可能日: 2026-04-01',
+      ].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed') return;
+    // 本文中に「株式会社キャリアビート」という送信元エージェント名が
+    // あっても、要員自身のaffiliatedCompanyとしては採用されない
+    // (「所属」の値そのものに法人格表記が無いため)。
+    expect(result.candidate.affiliatedCompany).toBeUndefined();
+    expect(result.candidate.commercialFlow).toBe('弊社個人事業主');
   });
 
   it('氏名の値に性別が直接続く実メール形式("S.F（男性）"等)から、性別のみを取り除いて氏名を取得する', () => {
