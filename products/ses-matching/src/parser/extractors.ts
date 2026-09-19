@@ -435,10 +435,13 @@ export function stripTrailingGenderAnnotation(value: string): string {
 // (単独の署名行等)にフォールバックする。どちらも無ければ会社名を推測して
 // 生成しない(undefinedのまま)。
 const COMPANY_MARK = '(?:株式会社|㈱|（株）|\\(株\\)|有限会社)';
+// 英字の社名(例: "Innovations株式会社")が10〜15文字を超えることがあるため、
+// 前後の文字数上限は実メールで観測された範囲より十分大きく取る
+// (空白・句読点で自然に区切られるため、長すぎる自由文を巻き込む心配はない)。
 const GREETING_COMPANY_RE = new RegExp(
-  `([^\\s　、。]{0,10}${COMPANY_MARK}[^\\s　、。]{0,15})の[^\\n、。]{1,20}(?:です|と申します|でございます)`,
+  `([^\\s　、。]{0,25}${COMPANY_MARK}[^\\s　、。]{0,25})の[^\\n、。]{1,20}(?:です|と申します|でございます)`,
 );
-const PLAIN_COMPANY_RE = new RegExp(`([^\\s　、。:：・]{0,15}${COMPANY_MARK}[^\\s　、。:：・]{0,15})`);
+const PLAIN_COMPANY_RE = new RegExp(`([^\\s　、。:：・]{0,25}${COMPANY_MARK}[^\\s　、。:：・]{0,25})`);
 
 /** 本文から会社名を抽出する(自己紹介文 > 単独の会社名らしき記載の優先順位)。
  * どちらのパターンにも一致しなければundefinedを返し、呼び出し側で

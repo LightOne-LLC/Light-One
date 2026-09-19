@@ -347,6 +347,25 @@ describe('parseEmail (案件出し会社/所属会社/商流の抽出)', () => {
     expect(result.candidate.sourceCompany).toBeUndefined();
   });
 
+  it('英字を含む長めの社名(10文字超)を先頭から欠落させずに取得する(実メールで確認された回帰)', () => {
+    const email: RawEmail = {
+      id: 'email-project-company-005',
+      subject: '案件のご紹介',
+      bodyText: [
+        '必須スキル: Java(3年以上)',
+        '単価: 60万円',
+        '勤務地: 東京都',
+        '稼働開始: 2026-04-01',
+        '---',
+        'Innovations株式会社',
+      ].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed') return;
+    expect(result.candidate.sourceCompany).toBe('Innovations株式会社');
+  });
+
   it('「商流：」ラベルの値をそのままcommercialFlowとして保持する(構造化・推測はしない)', () => {
     const email: RawEmail = {
       id: 'email-project-flow-001',
