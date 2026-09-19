@@ -41,11 +41,19 @@ function extractColonValue(body: string, labels: string[]): string | undefined {
   return undefined;
 }
 
-/** 「【ラベル】値」形式を本文全体から探す(次の【または末尾までが値)。
- * 改行の有無に関わらず動作する。ラベル名は内部の空白を無視して比較する。 */
+/** 「【ラベル】値」形式を本文全体から探す(次の【、次の■見出し、または
+ * 末尾までが値)。改行の有無に関わらず動作する。ラベル名は内部の空白を
+ * 無視して比較する。同一メール内で【】見出しと■見出しが混在する実データ
+ * (例:「【尚可スキル】...■条件...」)で、■を境界として認識しないと
+ * 後続の無関係なフィールドや署名ブロックまで値に取り込んでしまう不具合が
+ * 見つかったため、■もセクション境界として扱う。ただし「【スキル】■必須
+ * ...■尚可...」のように■必須/■尚可/■歓迎がそのセクション自身の内部
+ * 構造(extractNestedSkillSectionsが解釈する)として使われる実データも
+ * あるため、これらは境界とみなさない(除外しないと必須/尚可の内容が
+ * スキル値へ入る前に切り捨てられてしまう)。 */
 function extractBracketValue(body: string, labels: string[]): string | undefined {
   const normalizedTargets = labels.map(normalizeLabel);
-  const re = /【\s*([^】]{1,20})\s*】([\s\S]*?)(?=【|$)/g;
+  const re = /【\s*([^】]{1,20})\s*】([\s\S]*?)(?=【|■(?!\s*(?:必須|尚可|歓迎))|$)/g;
   let match: RegExpExecArray | null;
   while ((match = re.exec(body)) !== null) {
     if (normalizedTargets.includes(normalizeLabel(match[1]))) {
@@ -57,12 +65,15 @@ function extractBracketValue(body: string, labels: string[]): string | undefined
 }
 
 /** 「■ラベル 値」形式(■のみで閉じカッコが無い見出し)を本文全体から探す。
- * 次の■または末尾までが値。BP要員紹介メールで観察された
+ * 次の■、次の【】見出し、または末尾までが値。BP要員紹介メールで観察された
  * "■スキル\n値"(改行区切り)と、HTML由来で1行に潰れた
- * "■スキル 値 ■次の見出し"の両方に対応する。 */
+ * "■スキル 値 ■次の見出し"の両方に対応する。■見出しの後に【】見出しが続く
+ * 実データ(extractBracketValueと逆方向の混在パターン)で、■のみを境界と
+ * すると後続の無関係なフィールドや署名まで値に取り込んでしまうため、
+ * 【もセクション境界として扱う。 */
 function extractSectionValue(body: string, labels: string[]): string | undefined {
   for (const label of labels) {
-    const match = body.match(new RegExp(`■\\s*${escapeRegExp(label)}\\s*([\\s\\S]*?)(?=■|$)`));
+    const match = body.match(new RegExp(`■\\s*${escapeRegExp(label)}\\s*([\\s\\S]*?)(?=■|【|$)`));
     if (match) {
       const value = match[1].replace(/\s+/g, ' ').trim();
       if (value) return value;
@@ -71,17 +82,45 @@ function extractSectionValue(body: string, labels: string[]): string | undefined
   return undefined;
 }
 
-/** 「・ラベル：値」形式(箇条書きの「・」で始まるコロン形式)を本文全体から
+// 「・」以外にも「◆必須スキル：...◆尚可スキル：...◆勤務地：...」のように
+// 同一メール内で全フィールドが「◆」で箇条書きされる実データが見つかった。
+// ただしこの種のテンプレートでは、値自体が「・Azureの...経験 ・Azure環境の
+// ...経験」のように「・」で複数項目に分かれて続くため、「・」を単純に
+// 禁止文字へ含めると1項目目で値が途切れてしまう。そのため、開始記号が
+// 「・」自身の場合のみ「・」も値の終端とみなし、開始記号が「◆」の場合は
+// 「・」を値の一部として許容する。
+//
+// 開始記号(BULLET_MARKERS、この関数がラベル自体を検出しに行く対象)には、
+// 実データで確証の取れた「◆」のみを追加する。「□」「■」開始のラベルは、
+// 複数行の箇条書き継続や「尚可：」等のサブラベル分離を伴う、より複雑な
+// 実データ形式(extractLabeledBulletBlockが専用に対応する)でも使われて
+// おり、ここに含めるとより丁寧な処理を素通りしてしまう不具合が実データ
+// 検証で見つかったため、追加しない。
+//
+// 一方、値の終端(STOP_MARKER_SRC)には「□■★▼●」も含める — BP要員紹介
+// メールの「■基本情報\n・最寄駅：渋谷駅\n■希望条件\n...」のように、
+// 「・」始まりの値が次の「■」見出しの手前で終わることを要求する既存の
+// 実データ形式があるため(開始記号としては使わないが、終端記号としては
+// 必要)。
+const BULLET_MARKERS = ['・', '◆'];
+const STOP_MARKER_SRC = '□■◆★▼●';
+
+/** 「・ラベル：値」形式(箇条書きの「・」等で始まるコロン形式)を本文全体から
  * 探す。BP要員紹介メールで観察された「・単金（税抜）：100万円 ・希望：…」
  * のように、HTML由来で本文全体が1行に潰れ複数の「・ラベル：値」が空白
  * 区切りで並ぶケースに対応するため、行単位ではなく本文全体から次の
- * 「・」または「■」または末尾までを値とする。 */
+ * 箇条書き記号または末尾までを値とする。 */
 function extractBulletColonValue(body: string, labels: string[]): string | undefined {
   for (const label of labels) {
-    const match = body.match(new RegExp(`・\\s*${escapeRegExp(label)}\\s*[:：]\\s*([^・■]*)`));
-    if (match) {
-      const value = match[1].replace(/\s+/g, ' ').trim();
-      if (value) return value;
+    for (const marker of BULLET_MARKERS) {
+      const stopSet = marker === '・' ? `・${STOP_MARKER_SRC}` : STOP_MARKER_SRC;
+      const match = body.match(
+        new RegExp(`${escapeRegExp(marker)}\\s*${escapeRegExp(label)}\\s*[:：]\\s*([^${stopSet}]*)`),
+      );
+      if (match) {
+        const value = match[1].replace(/\s+/g, ' ').trim();
+        if (value) return value;
+      }
     }
   }
   return undefined;
@@ -115,13 +154,15 @@ export function stripNoteSuffix(value: string): string {
   return index === -1 ? value : value.slice(0, index).trim();
 }
 
-/** 「■ラベル■値」形式(■で開閉された見出し)を本文全体から探す。次の■または
- * 末尾までが値。株式会社キャリアビート形式の案件メールで観察された
- * "■期間■\n2026年10月 ~ 2027年3月"等に対応する。単独の■(閉じ側が無い
- * extractSectionValue)と区別するため、ラベル直後に必ず■を要求する。 */
+/** 「■ラベル■値」形式(■で開閉された見出し)を本文全体から探す。次の■、
+ * 次の【】見出し、または末尾までが値。株式会社キャリアビート形式の案件
+ * メールで観察された"■期間■\n2026年10月 ~ 2027年3月"等に対応する。
+ * 単独の■(閉じ側が無いextractSectionValue)と区別するため、ラベル直後に
+ * 必ず■を要求する。extractSectionValueと同様、■見出しの後に【】見出しが
+ * 続く実データで無関係な値まで取り込まないよう、【もセクション境界とする。 */
 function extractDoubleMarkerSectionValue(body: string, labels: string[]): string | undefined {
   for (const label of labels) {
-    const match = body.match(new RegExp(`■\\s*${escapeRegExp(label)}\\s*■\\s*([\\s\\S]*?)(?=■|$)`));
+    const match = body.match(new RegExp(`■\\s*${escapeRegExp(label)}\\s*■\\s*([\\s\\S]*?)(?=■|【|$)`));
     if (match) {
       const value = match[1].replace(/\s+/g, ' ').trim();
       if (value) return value;
@@ -178,7 +219,12 @@ export function parseRateRange(value: string): { min: number; max: number } | un
     return { min: converted, max: converted };
   }
 
-  const rangeMatch = normalized.match(/(\d+(?:\.\d+)?)\s*万?円?\s*[〜～~\-−]\s*(\d+(?:\.\d+)?)\s*万円?/);
+  // 「70～max90万」のように、範囲の上限数値の直前に装飾的な"max"表記が
+  // 挟まる実データ(Astro案件テンプレート等)が見つかった。これを認識
+  // できないと数値が2つあるのに範囲とみなせず、単価が丸ごと未取得になる
+  // (以前は件名フォールバックが上限のみを固定値として拾ってしまい、
+  // 本来の下限を隠して"90万固定"のように誤解させていたため、これも修正)。
+  const rangeMatch = normalized.match(/(\d+(?:\.\d+)?)\s*万?円?\s*[〜～~\-−]\s*(?:[Mm][Aa][Xx]\s*)?(\d+(?:\.\d+)?)\s*万円?/);
   if (rangeMatch) {
     const min = Number(rangeMatch[1]);
     const max = Number(rangeMatch[2]);
@@ -193,7 +239,9 @@ export function parseRateRange(value: string): { min: number; max: number } | un
  * 隣接している場合のみ採用する(ラベル文脈が無いため、より保守的にする)。 */
 export function findRateInFreeText(text: string): { min: number; max: number } | undefined {
   const normalized = text.replace(/,/g, '');
-  const rangeMatch = normalized.match(/(\d+(?:\.\d+)?)\s*万?\s*円?\s*[〜～~\-−]\s*(\d+(?:\.\d+)?)\s*万円?/);
+  const rangeMatch = normalized.match(
+    /(\d+(?:\.\d+)?)\s*万?\s*円?\s*[〜～~\-−]\s*(?:[Mm][Aa][Xx]\s*)?(\d+(?:\.\d+)?)\s*万円?/,
+  );
   if (rangeMatch) {
     const min = Number(rangeMatch[1]);
     const max = Number(rangeMatch[2]);
@@ -290,16 +338,45 @@ export function parseRequiredSkillList(value: string, required: boolean): Requir
   });
 }
 
-/** 「<<必須>>」/「<<尚可>>」(稀に【必須】【尚可】)のサブ見出しで必須/尚可が
- * 分かれた「■スキル■」セクション内から、それぞれの生テキストを取り出す。
- * 株式会社キャリアビート形式の案件メールで観察された。extractLabeledValue
- * が既に本文の空白を1つずつのスペースへ正規化した後の値を受け取る前提。 */
+// 実メール(500件規模)の調査で、「必須」「尚可」を示すサブ見出しの表記が
+// <<必須>>/【必須】だけでなく、~必須~(チルダ)・■必須(単独の■、閉じ無し)・
+// 「必須スキル：」「必須要件：」「必須：」(コロン形式、歓迎側は
+// 「歓迎スキル：」「歓迎：」「尚可スキル：」「尚可要件：」「尚可：」)でも
+// 使われることを確認した。1つの正規表現に一般化し、個別の表記ごとに
+// 専用関数を増やさない。
+const REQUIRED_MARKER_SRC = '<<\\s*必須\\s*>>|【\\s*必須\\s*】|~\\s*必須\\s*~|■\\s*必須\\s*■?|必須(?:スキル|要件)?\\s*[:：]';
+const PREFERRED_MARKER_SRC =
+  '<<\\s*尚可\\s*>>|【\\s*尚可\\s*】|~\\s*尚可\\s*~|■\\s*尚可\\s*■?|尚可(?:スキル|要件)?\\s*[:：]|歓迎(?:スキル)?\\s*[:：]';
+
+/** 「<<必須>>」「【必須】」「~必須~」「■必須」「必須スキル：」等のサブ見出しで
+ * 必須/尚可が分かれた「■スキル■」セクション内から、それぞれの生テキストを
+ * 取り出す。株式会社キャリアビート形式・その他複数のBP会社の案件メールで
+ * 観察された表記ゆれを1つの一般化した境界検出でまとめて扱う(次のいずれか
+ * のマーカー、または末尾までが値)。extractLabeledValueが既に本文の空白を
+ * 1つずつのスペースへ正規化した後の値を受け取る前提。 */
 export function extractNestedSkillSections(skillSectionValue: string): { required?: string; preferred?: string } {
-  const requiredMatch = skillSectionValue.match(/(?:<<\s*必須\s*>>|【\s*必須\s*】)([\s\S]*?)(?=<<|【|$)/);
-  const preferredMatch = skillSectionValue.match(/(?:<<\s*尚可\s*>>|【\s*尚可\s*】)([\s\S]*?)(?=<<|【|$)/);
-  const required = requiredMatch?.[1]?.trim();
-  const preferred = preferredMatch?.[1]?.trim();
-  return { required: required || undefined, preferred: preferred || undefined };
+  const markers: { isRequired: boolean; start: number; end: number }[] = [];
+  const requiredRe = new RegExp(REQUIRED_MARKER_SRC, 'g');
+  const preferredRe = new RegExp(PREFERRED_MARKER_SRC, 'g');
+  let m: RegExpExecArray | null;
+  while ((m = requiredRe.exec(skillSectionValue)) !== null) {
+    markers.push({ isRequired: true, start: m.index, end: m.index + m[0].length });
+  }
+  while ((m = preferredRe.exec(skillSectionValue)) !== null) {
+    markers.push({ isRequired: false, start: m.index, end: m.index + m[0].length });
+  }
+  markers.sort((a, b) => a.start - b.start);
+
+  let required: string | undefined;
+  let preferred: string | undefined;
+  for (let i = 0; i < markers.length; i++) {
+    const nextStart = markers[i + 1]?.start ?? skillSectionValue.length;
+    const value = skillSectionValue.slice(markers[i].end, nextStart).trim();
+    if (!value) continue;
+    if (markers[i].isRequired) required ??= value;
+    else preferred ??= value;
+  }
+  return { required, preferred };
 }
 
 /** 「・」始まりの箇条書き(1行1要件)を、行内の中点(例:"法令・規格対応")と
@@ -322,6 +399,154 @@ function splitBulletRequirementLines(value: string): string[] {
  * 明示的な抽出はしない(自然文からの年数推測になり得るため)。 */
 export function parseNestedRequirementList(value: string, required: boolean): RequiredSkill[] {
   return splitBulletRequirementLines(value).map((name) => ({ name, minYears: 0, required }));
+}
+
+// 実メール(500件規模)の調査で、「(数字)/□/■/◆/★/▼/●等)ラベル：」という
+// 見出し行の直後に、「・」または「•」で始まる箇条書きが複数行続く形式が
+// 多数確認された(例: "2)必須スキル：\n•	AWS...\n•	IT..."、
+// "□スキル：※注記\n　・Java...\n　尚可：\n　・Vue.js...")。見出し行自体は
+// 既存のextractColonValueが前提とする「行頭からラベル」に一致しない
+// (数字・記号のプレフィックスがあるため)うえ、値が複数行にまたがるため、
+// 既存のextractLabeledValueチェーンでは取得できなかった。この専用関数で
+// 対応する(必須スキル等、精度が重要なフィールドの追加フォールバックとして
+// のみ使う想定)。
+// 改行を含まない空白(半角/全角スペース・タブ)だけを指す文字クラス。
+// 通常の\sは\nも含んでしまい、全角スペースだけの空行を挟んだ次の見出し行
+// (例:「尚可：」)まで意図せず連結してしまう不具合が実データ検証で見つかった
+// ため、行内の空白と改行を明確に区別する。
+const HSPACE = ' \\t　';
+const LIST_MARKER_PREFIX_SRC = `(?:\\d+[)）]|[□■◆★▼●])?[${HSPACE}]*`;
+// 次の見出しが存在しない場合、抽出範囲が本文末尾の署名ブロック(社名・氏名・
+// メールアドレス)まで無制限に伸びてしまう不具合が実データ検証で見つかった。
+// 行単位の判定だけでは、HTMLの改行崩れで署名がスキル箇条書きと同じ行/
+// 「・」始まりの行に連結されてしまう実データ(例:
+// 「・APIのテスト...商流：貴社プロパーまで...株式会社ヘルスベイシス
+// ...E-mail：kakimi@h-basis.co.jp...」のような1行化された本文)を
+// 見逃すため、行の内訳に関わらずブロック全体からメールアドレスらしき
+// 文字列/法人格表記が最初に現れる位置で強制的に切り詰める。
+const SIGNATURE_LEGAL_MARK_RE = /(株式会社|（株）|\(株\)|㈱|有限会社|合同会社)/;
+const EMAIL_LIKE_RE = /[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}/;
+// 単価/勤務地/商流等、既に案件側で個別フィールドとして扱っている別ラベルが
+// 改行崩れによりスキル箇条書きと同じ行へ連結され、無関係な値が
+// requiredSkillsへ混入する実データが見つかった。既存の各フィールド抽出で
+// 使っているラベル語彙をそのまま流用し、これらが現れた位置で打ち切る
+// (新しい推測ルールを追加するのではなく、既知のラベル一致のみに限定する)。
+const OTHER_FIELD_LABELS = [
+  '単価',
+  '金額',
+  '契約金額',
+  '単金',
+  '勤務地',
+  '作業場所',
+  '商流',
+  '☆商流',
+  '期間',
+  '契約',
+  '面談',
+  '勤務時間',
+  '勤務',
+  '外国籍',
+  '人数',
+  '稼働開始',
+  '開始日',
+  '作業期間',
+  'リモート',
+  '通勤',
+  '出社',
+  '日本語レベル',
+];
+const OTHER_FIELD_BOUNDARY_RE = new RegExp(`(?:${OTHER_FIELD_LABELS.map(escapeRegExp).join('|')})[${HSPACE}]*[:：]`);
+
+// マッチ位置そのものではなく、その行(または、extractBracketValue等が
+// 既に改行をスペースへ正規化済みの値の場合は直前の区切りスペース)まで
+// 遡って切り詰める。マッチ位置そのもので切ると「サクシード株式会社」の
+// うち「サクシード」部分のような社名の断片が末尾に残ってしまう
+// (実データで確認)ため、行/セグメント全体を除外する。
+function cutBeforeLine(text: string, index: number): string {
+  const boundary = Math.max(text.lastIndexOf('\n', index), text.lastIndexOf(' ', index));
+  return text.slice(0, boundary + 1).trim();
+}
+
+export function truncateAtSignature(text: string): string {
+  const emailIndex = text.match(EMAIL_LIKE_RE)?.index;
+  const legalIndex = text.match(SIGNATURE_LEGAL_MARK_RE)?.index;
+  const candidates = [emailIndex, legalIndex].filter((i): i is number => typeof i === 'number');
+  if (candidates.length === 0) return text;
+  return cutBeforeLine(text, Math.min(...candidates));
+}
+
+export function truncateAtOtherFieldLabel(text: string): string {
+  const index = text.match(OTHER_FIELD_BOUNDARY_RE)?.index;
+  if (index === undefined) return text;
+  return cutBeforeLine(text, index);
+}
+
+/** 「(数字)/□等)ラベル：」見出し行の直後に複数行続く箇条書きを1つの値として
+ * 集める。見出し行自体にある「※」注記(記入方法の案内文であり要件そのもの
+ * ではない)はstripNoteSuffixと同じ考え方で除外する。subLabelsを指定すると、
+ * ブロック内でそのサブラベル(「尚可：」等)が現れた行から後を別の値として
+ * 分離して返す(必須/尚可の混在防止)。次の見出し行(同じプレフィックス
+ * パターン)、空行、または本文末尾までを対象範囲とする。会社名と断定
+ * できる根拠が無ければ推測しないのと同じ考え方で、該当が無ければ
+ * undefinedを返す。 */
+export function extractLabeledBulletBlock(
+  body: string,
+  labels: string[],
+  subLabels: string[] = [],
+): { main?: string; sub?: string } {
+  for (const label of labels) {
+    const headingRe = new RegExp(`^${LIST_MARKER_PREFIX_SRC}${escapeRegExp(label)}[${HSPACE}]*[:：]?[${HSPACE}]*(.*)$`, 'm');
+    const heading = headingRe.exec(body);
+    if (!heading) continue;
+
+    const sameLine = stripNoteSuffix(heading[1]).trim();
+    const afterIndex = heading.index + heading[0].length;
+    const rest = body.slice(afterIndex);
+    // 空行(全角スペースのみの見た目上の空行を含む)は区切りとして扱わない
+    // — 実データで、尚可等のサブラベルの直前にこのような行が挟まる
+    // ケースが確認された。次の見出し行、または本文末尾までを対象とする。
+    // ただしsubLabels(「尚可：」等)自体はブロック内部の要素であり、次の
+    // 見出しとして扱ってはならない — 除外しないと尚可行の手前でブロックが
+    // 途切れ、尚可以降の内容がsubへ分離される前に失われてしまう。
+    const subLabelExclusion =
+      subLabels.length > 0 ? `(?!(?:${subLabels.map(escapeRegExp).join('|')})[${HSPACE}]*[:：])` : '';
+    const boundary = rest.match(
+      new RegExp(`\\n${LIST_MARKER_PREFIX_SRC}${subLabelExclusion}[^${HSPACE}・•\\n]{1,12}[${HSPACE}]*[:：]`),
+    );
+    const rawBlock = (sameLine + '\n' + (boundary ? rest.slice(0, boundary.index) : rest)).trim();
+    // 次の見出しが検出できず、かつ本文がHTML由来で改行が失われている場合、
+    // ここまでの範囲に署名(社名・氏名・メールアドレス)がそのまま連結されて
+    // 残ってしまう。行単位の区切りに関わらず、その手前で強制的に切り詰める。
+    const block = truncateAtOtherFieldLabel(truncateAtSignature(rawBlock));
+    if (!block) continue;
+
+    let mainText = block;
+    let subText: string | undefined;
+    if (subLabels.length > 0) {
+      const subRe = new RegExp(
+        `\\n?${LIST_MARKER_PREFIX_SRC}(?:${subLabels.map(escapeRegExp).join('|')})[${HSPACE}]*[:：]?[${HSPACE}]*`,
+      );
+      const subMatch = mainText.match(subRe);
+      if (subMatch?.index !== undefined) {
+        subText = mainText.slice(subMatch.index + subMatch[0].length).trim();
+        mainText = mainText.slice(0, subMatch.index).trim();
+      }
+    }
+
+    // 各行先頭の箇条書き記号("・"/"•")を取り除いてから" ・ "で結合し直す
+    // (元の記号を残したまま区切り記号を追加すると二重に付いてしまうため)。
+    const normalize = (s: string) =>
+      s
+        .split(/\r?\n/)
+        .map((line) => line.trim().replace(/^[•・]\s*/, ''))
+        .filter((line) => line.length > 0)
+        .join(' ・ ')
+        .trim();
+    const main = normalize(mainText);
+    const sub = subText ? normalize(subText) : undefined;
+    if (main || sub) return { main: main || undefined, sub };
+  }
+  return {};
 }
 
 /** 要員側のスキル列挙("Java(5年)、JavaScript(70ヶ月)")をEngineerSkill[]へ変換する。 */
@@ -441,7 +666,20 @@ const COMPANY_MARK = '(?:株式会社|㈱|（株）|\\(株\\)|有限会社)';
 const GREETING_COMPANY_RE = new RegExp(
   `([^\\s　、。]{0,25}${COMPANY_MARK}[^\\s　、。]{0,25})の[^\\n、。]{1,20}(?:です|と申します|でございます)`,
 );
-const PLAIN_COMPANY_RE = new RegExp(`([^\\s　、。:：・]{0,25}${COMPANY_MARK}[^\\s　、。:：・]{0,25})`);
+const PLAIN_COMPANY_RE = new RegExp(`([^\\s　、。:：・]{0,25}${COMPANY_MARK}[^\\s　、。:：・]{0,25})`, 'g');
+
+// 案件メールでは、本文冒頭が「[メールボックス所有会社]　ご担当者　様」
+// 「[同左]御中」のような、送信元ではなく受信者(メールボックス所有会社)
+// 自身への宛名で始まる実データが確認された(project id 1a0b2a2596931e9d:
+// 「株式会社Light One\nご担当者　様\n\nNBWの王　敬東でございます。」
+// のように、本当の送信元(NBW)は法人格表記を伴わない自己紹介文で名乗って
+// おり、GREETING_COMPANY_REには一致しない)。単純に「本文中で最初に現れる
+// 法人格表記」を送信元と断定すると、この宛名部分を誤って送信元会社と
+// 判定してしまう。本文冒頭の会社名だけで送信元と判断してはならないため、
+// 法人格表記の直後(至近距離)に「様」「御中」「ご担当者」等の宛名の敬称が
+// 続く場合は受信者への宛名とみなして候補から除外し、次の法人格表記を探す。
+const RECIPIENT_SALUTATION_RE = /(様|御中|ご担当者)/;
+const RECIPIENT_SALUTATION_WINDOW = 20;
 
 /** 本文から会社名を抽出する(自己紹介文 > 単独の会社名らしき記載の優先順位)。
  * どちらのパターンにも一致しなければundefinedを返し、呼び出し側で
@@ -449,8 +687,15 @@ const PLAIN_COMPANY_RE = new RegExp(`([^\\s　、。:：・]{0,25}${COMPANY_MARK
 export function extractCompanyName(body: string): string | undefined {
   const greeting = body.match(GREETING_COMPANY_RE);
   if (greeting) return greeting[1];
-  const plain = body.match(PLAIN_COMPANY_RE);
-  if (plain) return plain[1];
+
+  const plainRe = new RegExp(PLAIN_COMPANY_RE);
+  let match: RegExpExecArray | null;
+  while ((match = plainRe.exec(body)) !== null) {
+    const matchEnd = match.index + match[0].length;
+    const after = body.slice(matchEnd, matchEnd + RECIPIENT_SALUTATION_WINDOW);
+    if (RECIPIENT_SALUTATION_RE.test(after)) continue;
+    return match[1];
+  }
   return undefined;
 }
 

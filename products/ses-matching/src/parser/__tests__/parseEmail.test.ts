@@ -340,6 +340,54 @@ describe('parseEmail (案件出し会社/所属会社/商流の抽出)', () => {
     expect(result.candidate.sourceCompany).toBe('サンプルテック株式会社');
   });
 
+  it('本文冒頭の「[受信者の会社名]　ご担当者　様」という宛名を送信元と誤認しない(実データで確認された回帰)', () => {
+    const email: RawEmail = {
+      id: 'email-project-company-recipient-salutation',
+      subject: '【NBW案件情報】サーバ設計・構築',
+      bodyText: [
+        '株式会社Light One',
+        'ご担当者　様',
+        '',
+        'いつもお世話になっております。',
+        'NBWの王　敬東でございます。',
+        '',
+        '弊社案件情報を、ご送付させて頂きます。',
+        '必須スキル: Java(3年以上)',
+        '単価: 60万円',
+        '勤務地: 東京都',
+        '稼働開始: 2026-04-01',
+        '---',
+        'NBW株式会社',
+        '王　敬東',
+      ].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed') return;
+    expect(result.candidate.sourceCompany).toBe('NBW株式会社');
+  });
+
+  it('宛名の会社名の後に他の法人格表記が無ければ、宛名だけで送信元をでっち上げない', () => {
+    const email: RawEmail = {
+      id: 'email-project-company-recipient-salutation-only',
+      subject: '案件のご紹介',
+      bodyText: [
+        '合同会社LightOne　様',
+        '',
+        'いつもお世話になっております。',
+        '案件情報をお送りいたします。',
+        '必須スキル: Java(3年以上)',
+        '単価: 60万円',
+        '勤務地: 東京都',
+        '稼働開始: 2026-04-01',
+      ].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed') return;
+    expect(result.candidate.sourceCompany).toBeUndefined();
+  });
+
   it('会社名らしき記載が本文に一切無ければsourceCompanyを設定しない(推測しない)', () => {
     const result = parseEmail(projectEmail);
     expect(result.status).toBe('parsed');
@@ -1294,5 +1342,182 @@ describe('parseEmail (■スキル■ + <<必須>>/<<尚可>>ネスト形式の�
     // <<必須>>/<<尚可>>の見出しが無いため、根拠なく「必須」に仕分けせず
     // requiredSkills自体を取得しない(捏造しない)。
     expect(result.candidate.requiredSkills).toBeUndefined();
+  });
+});
+
+// 実データ監査(500件)で見つかった、既存の必須スキル系ラベル・見出し記号
+// だけでは取得できていなかった追加のバリアント。
+describe('parseEmail (必須/尚可スキルの追加ラベル・見出し記号バリアント)', () => {
+  it('【必須】/【尚可】の単独ブラケット見出し(スキル自体のラベルが無い)から取得する(実データ回帰)', () => {
+    const email: RawEmail = {
+      id: 'email-project-bracket-hissu-shouka-001',
+      subject: '案件のご紹介',
+      bodyText: [
+        '【案件名】',
+        'サーバ設計・構築',
+        '【必須】',
+        '・Windowsサーバ設計・構築経験',
+        '・Linuxサーバ設計・構築経験',
+        '【尚可】',
+        '・クラウド環境の構築経験',
+        '【単価】',
+        '～80万円（固定）',
+      ].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'project') return;
+
+    expect(result.candidate.requiredSkills).toEqual([
+      { name: 'Windowsサーバ設計・構築経験', minYears: 0, required: true },
+      { name: 'Linuxサーバ設計・構築経験', minYears: 0, required: true },
+      { name: 'クラウド環境の構築経験', minYears: 0, required: false },
+    ]);
+  });
+
+  it('【スキル】■必須/■尚可のように、ブラケット見出しの内部に■必須/■尚可のサブ構造が続く形式に対応する(実データ回帰)', () => {
+    const email: RawEmail = {
+      id: 'email-project-bracket-then-maru-sub-001',
+      subject: '案件のご紹介',
+      bodyText: [
+        '【スキル】',
+        '■必須',
+        '・Webアプリケーション開発経験',
+        '■尚可',
+        '・クラシックASPの経験',
+        '【場　所】',
+        '築地市場',
+        '【単　価】',
+        '50～55万円/月',
+      ].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'project') return;
+
+    expect(result.candidate.requiredSkills).toEqual([
+      { name: 'Webアプリケーション開発経験', minYears: 0, required: true },
+      { name: 'クラシックASPの経験', minYears: 0, required: false },
+    ]);
+    // ■必須/■尚可の内部構造を境界と誤認せず、次の【場　所】まで正しく
+    // スキル値の範囲を区切れていることの確認(location側が汚染されない)。
+    expect(result.candidate.location).toBe('築地市場');
+  });
+
+  it('◆必須スキル：/◆尚可スキル：のように、全フィールドが同じ記号(◆)で箇条書きされる形式に対応する(実データ回帰)', () => {
+    const email: RawEmail = {
+      id: 'email-project-diamond-bullet-001',
+      subject: '案件のご紹介',
+      bodyText: [
+        '◆必須スキル： ・Azureの要件定義、設計、構築経験 ・Azure環境におけるインフラ構築経験',
+        '◆尚可スキル： ・Azure API Managementの経験 ・生成AIサービスのAPI連携経験',
+        '◆勤務地：東京',
+        '◆単価：70万円',
+      ].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'project') return;
+
+    expect(result.candidate.requiredSkills).toEqual([
+      { name: 'Azureの要件定義、設計、構築経験', minYears: 0, required: true },
+      { name: 'Azure環境におけるインフラ構築経験', minYears: 0, required: true },
+      { name: 'Azure API Managementの経験', minYears: 0, required: false },
+      { name: '生成AIサービスのAPI連携経験', minYears: 0, required: false },
+    ]);
+    // ◆で区切られる次のフィールド(勤務地)がスキル値へ混入していないことの確認。
+    expect(result.candidate.location).toBe('東京');
+  });
+
+  it('番号付き見出し「N)スキル：」の直後に続く複数行の箇条書きを、尚可：サブラベルで必須/尚可に分けて取得する(実データ回帰)', () => {
+    const email: RawEmail = {
+      id: 'email-project-box-bullet-continuation-001',
+      subject: '案件のご紹介',
+      bodyText: [
+        '□スキル：※必要スキルではありますが少し不足の場合はコメントと共にご提案ください',
+        '　　　　　　・Java   設計～開発経験',
+        '　　　　　　',
+        '　　　　　　尚可：',
+        '　　　　　　・Vue.js   開発経験',
+        '',
+        '□単価　：70～80万前後（精算あり）',
+      ].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'project') return;
+
+    expect(result.candidate.requiredSkills).toEqual([
+      { name: 'Java   設計～開発経験', minYears: 0, required: true },
+      { name: 'Vue.js   開発経験', minYears: 0, required: false },
+    ]);
+  });
+
+  it('次に認識できる見出しが無い場合でも、署名ブロック(社名・氏名・メールアドレス)をrequiredSkillsへ絶対に取り込まない(PII漏洩防止の回帰)', () => {
+    const email: RawEmail = {
+      id: 'email-project-bullet-block-signature-safety-001',
+      subject: '案件のご紹介',
+      bodyText: [
+        '必須スキル：',
+        '・Ruby on Railsを用いたWebアプリ開発・運用経験5年以上',
+        '・リードエンジニアの経験',
+        '',
+        'サクシード株式会社',
+        '谷藤　麻里子',
+        'info2016@sucseed.jp',
+      ].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'project') return;
+
+    const skills = result.candidate.requiredSkills as { name: string }[] | undefined;
+    expect(skills).toEqual([
+      { name: 'Ruby on Railsを用いたWebアプリ開発・運用経験5年以上', minYears: 0, required: true },
+      { name: 'リードエンジニアの経験', minYears: 0, required: true },
+    ]);
+    for (const skill of skills ?? []) {
+      expect(skill.name).not.toContain('サクシード');
+      expect(skill.name).not.toContain('@');
+    }
+  });
+
+  it('スキル一覧はあるが必須/尚可の区別が無い(サブラベル分離が見つからない)場合は、根拠なく必須に分類しない', () => {
+    const email: RawEmail = {
+      id: 'email-project-ambiguous-skill-list-001',
+      subject: '案件のご紹介',
+      bodyText: [
+        '□スキル：※必要スキルではありますが少し不足の場合はコメントと共にご提案ください',
+        '　　　　　　・ネットワーク（NW）・インフラ経験',
+        '　　　　　　・WAN 設計構築',
+        '',
+        '□単価　：70～90万前後',
+      ].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'project') return;
+
+    expect(result.candidate.requiredSkills).toBeUndefined();
+  });
+});
+
+// 実データ監査(500件)で見つかった、範囲の上限数値の直前に装飾的な"max"が
+// 挟まる単価表記(Astro案件テンプレート)。以前はこれを認識できず、件名の
+// 上限数値のみを固定値として拾ってしまい、本来の下限を隠していた
+// (例: "70～max90万"を"90万固定"のように誤解させる)。
+describe('parseEmail (単価の"70～max90万"のような装飾語入り範囲表記)', () => {
+  it('区切り記号と上限数値の間に"max"が挟まっていても正しい範囲として取得する', () => {
+    const email: RawEmail = {
+      id: 'email-project-rate-max-qualifier-001',
+      subject: '70～max90万▼案件のご紹介',
+      bodyText: ['必須スキル: Java', '単価　：70～max90万前後（精算あり）', '勤務地: 東京都'].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed' || result.recordType !== 'project') return;
+
+    expect(result.candidate.rateMin).toBe(70);
+    expect(result.candidate.rateMax).toBe(90);
   });
 });

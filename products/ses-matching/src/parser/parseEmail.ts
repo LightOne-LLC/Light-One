@@ -3,6 +3,7 @@ import {
   extractBulletValueNoColonNumeric,
   extractCompanyName,
   extractGreetingCompanyName,
+  extractLabeledBulletBlock,
   extractLabeledValue,
   extractNestedSkillSections,
   extractSignatureCompanyName,
@@ -19,6 +20,7 @@ import {
   sanitizeDisplayName,
   stripNoteSuffix,
   stripTrailingGenderAnnotation,
+  truncateAtSignature,
 } from './extractors';
 import type { ParsedEmailResult } from './types';
 
@@ -109,29 +111,72 @@ function parseProjectCandidate(subject: string, body: string, id: string): Recor
   const commercialFlow = sanitizeDisplayName(extractLabeledValue(body, COMMERCIAL_FLOW_LABELS));
   if (commercialFlow) candidate.commercialFlow = commercialFlow;
 
-  const requiredValue = extractLabeledValue(body, ['必須スキル', '必要スキル']);
-  const preferredValue = extractLabeledValue(body, ['歓迎スキル', '尚可スキル']);
+  // extractLabeledValueの各セクション抽出は、見出し記号の様式が本文内で
+  // 混在する(【】見出しの後に■見出しが続く等)実データで、次の見出しを
+  // 認識できず末尾の署名ブロック(社名・氏名・メールアドレス)まで値に
+  // 取り込んでしまう不具合が確認された。誤抽出するとマッチング精度を
+  // 壊すため、requiredSkills/尚可スキルの値には安全側の切り詰めを必ず通す。
+  const requiredValue = truncateAtSignature(
+    extractLabeledValue(body, ['必須スキル', '必要スキル', '必須スキル・経験', '必須要件', '必須']) ?? '',
+  ) || undefined;
+  const preferredValue =
+    truncateAtSignature(extractLabeledValue(body, ['歓迎スキル', '尚可スキル', '尚可要件', '尚可', '歓迎']) ?? '') ||
+    undefined;
   // 株式会社キャリアビート形式で観察された「■スキル■」+「<<必須>>」/
   // 「<<尚可>>」(稀に【必須】【尚可】)のネスト構造。明示的な必須/歓迎スキル
   // ラベルが無い場合のみのフォールバックとして使う(優先順位を維持)。
-  const skillSectionValue = requiredValue || preferredValue ? undefined : extractLabeledValue(body, ['スキル']);
+  const rawSkillSectionValue = requiredValue || preferredValue ? undefined : extractLabeledValue(body, ['スキル']);
+  const skillSectionValue = rawSkillSectionValue ? truncateAtSignature(rawSkillSectionValue) || undefined : undefined;
   const nestedSkills = skillSectionValue ? extractNestedSkillSections(skillSectionValue) : {};
+
+  // 見出し行の直後に「・」「•」箇条書きが複数行続く形式(番号/□等の見出し
+  // + 尚可：等のサブラベルで必須/尚可が分かれるケースを含む)。上記2経路の
+  // いずれでも取得できなかった場合のみのフォールバックとして使う
+  // (優先順位を維持し、誤って先勝ちさせない)。
+  const needsBulletFallback = !requiredValue && !preferredValue && !nestedSkills.required && !nestedSkills.preferred;
+  const PREFERRED_SUB_LABELS = ['尚可要件', '尚可スキル', '尚可', '歓迎スキル', '歓迎'];
+  const bulletBlockRequired = needsBulletFallback
+    ? extractLabeledBulletBlock(body, ['必須スキル・経験', '必須要件', '必須スキル', '必要スキル'], PREFERRED_SUB_LABELS)
+    : {};
+  // 「スキル」という見出し単独では、必須/尚可のどちらかを示す根拠が本文中
+  // に無く、内容全体を「必須」と決めつけると捏造になる。そのため、この
+  // 汎用見出しは、見出し内部で実際に尚可等のサブラベル分離が検出できた
+  // 場合(例:「□スキル：...尚可：...」)のみ採用する。
+  const bulletBlockGeneric =
+    needsBulletFallback && !bulletBlockRequired.main
+      ? extractLabeledBulletBlock(body, ['スキル'], PREFERRED_SUB_LABELS)
+      : {};
+  const bulletBlock = bulletBlockRequired.main ? bulletBlockRequired : bulletBlockGeneric.sub ? bulletBlockGeneric : {};
+
+  // 「◆必須スキル： ・Azureの要件定義、設計、構築経験 ・Azure環境における…」
+  // のように、ラベル直後の値自体が「・」区切りの自然文列挙になる実データが
+  // 見つかった。この形式にparseRequiredSkillList(短い技術名+年数のカンマ/
+  // スラッシュ区切り列挙を想定)を使うと、文中の読点「、」でも誤って
+  // 分割してしまう(例:"Azureの要件定義、設計、構築経験"が3件に分裂)。
+  // 値が「・」始まりかどうかで、自然文の箇条書き(parseNestedRequirementList)
+  // か、短い技術名列挙(parseRequiredSkillList)かを判定する。
+  const parseSkillValue = (value: string, required: boolean) =>
+    /^[・•]/.test(value.trim()) ? parseNestedRequirementList(value, required) : parseRequiredSkillList(value, required);
 
   const requiredSkills = [
     ...(requiredValue
-      ? parseRequiredSkillList(requiredValue, true)
+      ? parseSkillValue(requiredValue, true)
       : nestedSkills.required
         ? parseNestedRequirementList(nestedSkills.required, true)
-        : []),
+        : bulletBlock.main
+          ? parseNestedRequirementList(bulletBlock.main, true)
+          : []),
     ...(preferredValue
-      ? parseRequiredSkillList(preferredValue, false)
+      ? parseSkillValue(preferredValue, false)
       : nestedSkills.preferred
         ? parseNestedRequirementList(nestedSkills.preferred, false)
-        : []),
+        : bulletBlock.sub
+          ? parseNestedRequirementList(bulletBlock.sub, false)
+          : []),
   ];
   if (requiredSkills.length > 0) candidate.requiredSkills = requiredSkills;
 
-  const rateValue = extractLabeledValue(body, ['単価', '金額', '契約金額']);
+  const rateValue = extractLabeledValue(body, ['単価', '金額', '契約金額', '単金']);
   const rateRange = rateValue ? parseRateRange(rateValue) : findRateInFreeText(subject);
   if (rateRange) {
     candidate.rateMin = rateRange.min;
