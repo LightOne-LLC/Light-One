@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { buildEvidenceForCategory, buildEvidenceForCategories } from './evidenceMapping';
+import { buildEvidenceForCategory, buildEvidenceForCategories, findDirectSourcesForReason } from './evidenceMapping';
 import { KNOWLEDGE_BASE } from './knowledgeBase';
 import type { RiskCategoryResult } from '../types/diagnosis';
 
@@ -76,6 +76,23 @@ describe('buildEvidenceForCategories', () => {
     const map = buildEvidenceForCategories([category({ key: 'medical' }), category({ key: 'care', label: '介護', reasons: ['介護保険制度により自己負担は原則1割'] })]);
     expect(map.size).toBe(2);
     expect(map.get('care')?.some((e) => e.source.sourceId === 'public-long-term-care-insurance')).toBe(true);
+  });
+});
+
+describe('findDirectSourcesForReason', () => {
+  test('1行のreason文字列から、そのカテゴリに関するdirect一致資料だけを返す', () => {
+    const sources = findDirectSourcesForReason('葬儀費用等の一時費用: 200万円', 'death');
+    expect(sources.some((s) => s.sourceId === 'diagnosis-death-coverage-methodology')).toBe(true);
+  });
+
+  test('一致しないカテゴリ(medical等)を巻き込まない', () => {
+    const sources = findDirectSourcesForReason('葬儀費用等の一時費用: 200万円', 'death');
+    expect(sources.every((s) => s.category === 'death' || s.category === 'general')).toBe(true);
+  });
+
+  test('一致するフレーズが無い場合は空配列(捏造しない)', () => {
+    const sources = findDirectSourcesForReason('xyzzy-nonexistent-term-quux-12345', 'death');
+    expect(sources).toEqual([]);
   });
 });
 

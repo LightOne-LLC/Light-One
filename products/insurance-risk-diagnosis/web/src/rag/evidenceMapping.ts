@@ -1,7 +1,7 @@
-import type { RiskCategoryResult } from '../types/diagnosis';
+import type { RiskCategoryKey, RiskCategoryResult } from '../types/diagnosis';
 import { KNOWLEDGE_BASE } from './knowledgeBase';
 import { search, toRetrievedSource } from './retrieval';
-import type { Evidence } from './types';
+import type { Evidence, RetrievedSource } from './types';
 
 /*
   Evidence Mapping。
@@ -87,4 +87,20 @@ export function buildEvidenceForCategories(categories: RiskCategoryResult[], lim
     map.set(category.key, buildEvidenceForCategory(category, limit));
   }
   return map;
+}
+
+/**
+ * 1本の計算根拠(reason)文字列について、direct matchする資料だけを返す。
+ * CoverageBreakdown等、カテゴリ全体ではなく計算式の行単位で出典を示したい画面向けの
+ * 軽量ヘルパー。related(keyword)フォールバックは行わない — 行単位では
+ * 「直接使われた根拠か、無いか」だけを明示し、あいまいな関連付けを作らない。
+ */
+export function findDirectSourcesForReason(reason: string, category: RiskCategoryKey): RetrievedSource[] {
+  const candidates = KNOWLEDGE_BASE.filter((s) => s.applicableRiskCategories.includes(category));
+  const results: RetrievedSource[] = [];
+  for (const source of candidates) {
+    const matchedKey = source.relatedReasonKeys.find((key) => reason.includes(key));
+    if (matchedKey) results.push(toRetrievedSource(source, DIRECT_MATCH_SCORE, [matchedKey]));
+  }
+  return results;
 }

@@ -116,6 +116,12 @@ describe('ResultPage dashboard panels - 実データでのレンダリング検�
     expect(html).toContain('死亡リスク');
   });
 
+  test('CoverageBreakdown: 葬儀費用等の一時費用の行は必ず計算方法の出典が付く', () => {
+    // FUNERAL_AND_MISC_COSTは常にreasonsに含まれる固定項目のため、入力に依存せず出典が付く
+    const html = renderToStaticMarkup(<CoverageBreakdown deathCoverage={result.deathCoverage} />);
+    expect(html).toContain('出典:');
+  });
+
   test('EvidenceSourcesPanel', () => {
     const html = renderToStaticMarkup(<EvidenceSourcesPanel categories={result.categories} />);
     expect(html).toContain('Sources');
