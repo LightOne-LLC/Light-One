@@ -74,16 +74,15 @@ export function CoverageBreakdown({ deathCoverage }: { deathCoverage: DeathCover
                 <span className="mt-[7px] w-2 h-px bg-line-strong shrink-0" aria-hidden="true" />
                 <span className="min-w-0">
                   {r}
+                  {/*
+                    ここではリンク付きの詳細は出さない。同じ出典はこの下のSourcesパネル
+                    (EvidenceSourcesPanel)に集約して表示するため、行単位では
+                    「どこが出典か」だけを示す小さなindicatorに留める。
+                  */}
                   {sources.map((s) => (
-                    <a
-                      key={s.sourceId}
-                      href={s.url}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="ml-2 text-[11px] text-ink-faint hover:text-navy underline underline-offset-2 whitespace-nowrap"
-                    >
+                    <span key={s.sourceId} className="ml-2 text-[11px] text-ink-faint whitespace-nowrap">
                       出典: {s.organization}
-                    </a>
+                    </span>
                   ))}
                 </span>
               </li>

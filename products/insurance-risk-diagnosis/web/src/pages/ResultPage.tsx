@@ -155,7 +155,7 @@ export function ResultPage() {
         <ReportSection index="05" title="判定の根拠">
           <div className="space-y-5">
             <WhyPanel categories={result.categories} />
-            <EvidenceSourcesPanel categories={result.categories} />
+            <EvidenceSourcesPanel result={result} />
             <details>
               <summary className="cursor-pointer list-none">
                 <Card variant="quiet" className="flex items-center justify-between gap-3 hover:border-line-strong transition-colors">

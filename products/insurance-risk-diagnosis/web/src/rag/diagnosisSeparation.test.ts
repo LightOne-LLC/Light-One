@@ -2,7 +2,7 @@ import { describe, test, expect } from 'vitest';
 import { runDiagnosis } from '../calc';
 import type { DiagnosisInput } from '../types/diagnosis';
 import { explainCategories } from './explain';
-import { buildEvidenceForCategories } from './evidenceMapping';
+import { buildEvidenceForCategories, findDirectSourcesForReason, findEvidenceForAssumption } from './evidenceMapping';
 import { buildDiagnosisExplanation } from './explanation';
 
 /*
@@ -58,6 +58,10 @@ describe('RAG導入による既存診断エンジンへの非干渉', () => {
     explainCategories(before.categories);
     buildEvidenceForCategories(before.categories);
     buildDiagnosisExplanation(before);
+    for (const category of before.categories) {
+      for (const reason of category.reasons) findDirectSourcesForReason(reason, category.key);
+    }
+    for (const assumption of before.assumptions) findEvidenceForAssumption(assumption);
     const after = runDiagnosis(input);
 
     expect(after.overallScore).toBe(before.overallScore);

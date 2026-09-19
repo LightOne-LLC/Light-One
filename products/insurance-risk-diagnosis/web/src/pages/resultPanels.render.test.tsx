@@ -111,6 +111,12 @@ describe('ResultPage dashboard panels - 実データでのレンダリング検�
     expect(html).toContain('Assumptions');
   });
 
+  test('AssumptionsPanel: 公的制度の前提には出典indicatorが付く', () => {
+    const html = renderToStaticMarkup(<AssumptionsPanel assumptions={result.assumptions} />);
+    // riskProfile.tsのassumptions[0]は常に「本診断は...の公的制度をもとにした概算です」を含む
+    expect(html).toContain('LIGHT ONE');
+  });
+
   test('CoverageBreakdown', () => {
     const html = renderToStaticMarkup(<CoverageBreakdown deathCoverage={result.deathCoverage} />);
     expect(html).toContain('死亡リスク');
@@ -123,8 +129,21 @@ describe('ResultPage dashboard panels - 実データでのレンダリング検�
   });
 
   test('EvidenceSourcesPanel', () => {
-    const html = renderToStaticMarkup(<EvidenceSourcesPanel categories={result.categories} />);
+    const html = renderToStaticMarkup(<EvidenceSourcesPanel result={result} />);
     expect(html).toContain('Sources');
+  });
+
+  test('EvidenceSourcesPanel: 出典が無い領域には誤解を招かない明示文が出る', () => {
+    // assetカテゴリのreasonsを、どの資料ともキーワード的に一致しない文字列に差し替え、
+    // 「出典なし」の分岐を確実に発火させる。
+    const resultWithNoAssetEvidence = {
+      ...result,
+      categories: result.categories.map((c) =>
+        c.key === 'asset' ? { ...c, reasons: ['xyzzy-nonexistent-term-quux-12345'] } : c,
+      ),
+    };
+    const html = renderToStaticMarkup(<EvidenceSourcesPanel result={resultWithNoAssetEvidence} />);
+    expect(html).toContain('公的制度・モデル前提の出典を参照していません');
   });
 
   test('空データ(子供なし・配偶者なし・履歴0件相当)でもクラッシュしない', () => {
@@ -133,7 +152,7 @@ describe('ResultPage dashboard panels - 実データでのレンダリング検�
     expect(() => renderToStaticMarkup(<FinancialGapPanel categories={emptyResult.categories} />)).not.toThrow();
     expect(() => renderToStaticMarkup(<WhyPanel categories={emptyResult.categories} />)).not.toThrow();
     expect(() => renderToStaticMarkup(<TopRiskAreasPanel categories={emptyResult.categories} />)).not.toThrow();
-    expect(() => renderToStaticMarkup(<EvidenceSourcesPanel categories={emptyResult.categories} />)).not.toThrow();
+    expect(() => renderToStaticMarkup(<EvidenceSourcesPanel result={emptyResult} />)).not.toThrow();
   });
 });
 

@@ -45,12 +45,15 @@ export interface KnowledgeSource {
    */
   applicableRiskCategories: RiskCategoryKey[];
   /**
-   * 決定論的診断エンジン(web/src/calc)のreasons[]文字列に実際に出現する固定フレーズ。
-   * ここに列挙した文字列がRiskCategoryResult.reasonsのいずれかに部分一致した場合、
-   * 「キーワード類似」ではなく「この判定の計算過程で直接使われた根拠」として
-   * 高い確度で紐付けられる(Evidence Mappingのdirect match)。
-   * 診断エンジンのreasons文言が変わった場合はここも追従させる。
-   * 該当する固定フレーズが無い資料は空配列とし、無理に一致させない。
+   * 決定論的診断エンジン(web/src/calc)が実際に生成する文字列に出現する固定フレーズ。
+   * 対象は RiskCategoryResult.reasons[](カテゴリ単位の判定理由)と
+   * DiagnosisResult.assumptions[](前提条件の開示文)の両方。
+   * ここに列挙した文字列がいずれかに部分一致した場合、「キーワード類似」ではなく
+   * 「この判定/前提の生成に直接使われた根拠」として高い確度で紐付けられる
+   * (Evidence Mappingのdirect match)。
+   * 診断エンジンの文言が変わった場合はここも追従させる。
+   * 該当する固定フレーズが無い資料は空配列とし、無理に一致させない
+   * (例: 検索で偶然引っかかりうる汎用語をここに入れない)。
    */
   relatedReasonKeys: string[];
   /** その他の補助情報(公開日・更新日が分かる場合のみ設定) */

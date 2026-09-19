@@ -104,3 +104,20 @@ export function findDirectSourcesForReason(reason: string, category: RiskCategor
   }
   return results;
 }
+
+/**
+ * DiagnosisResult.assumptions[](カテゴリに属さない、診断全体の前提開示文)の1行について、
+ * direct matchする資料を返す。assumptionsはどのカテゴリにも属さないため、
+ * findDirectSourcesForReasonと異なりapplicableRiskCategoriesでは絞り込まず、
+ * knowledge base全体からrelatedReasonKeysの一致だけで判定する。
+ * related(keyword)フォールバックは行わない — 「前提条件」という性質上、
+ * あいまいな関連付けよりも「出典なし」を正しい状態として扱う方を優先する。
+ */
+export function findEvidenceForAssumption(assumption: string): RetrievedSource[] {
+  const results: RetrievedSource[] = [];
+  for (const source of KNOWLEDGE_BASE) {
+    const matchedKey = source.relatedReasonKeys.find((key) => assumption.includes(key));
+    if (matchedKey) results.push(toRetrievedSource(source, DIRECT_MATCH_SCORE, [matchedKey]));
+  }
+  return results;
+}

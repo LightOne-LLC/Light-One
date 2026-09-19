@@ -174,9 +174,21 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
     effectiveDate: EFFECTIVE_DATE,
     retrievedDate: RETRIEVED_DATE,
     version: '1.0',
-    tags: ['前提条件', 'assumptions', '概算', '制度改定'],
+    // '概算'のような汎用語をtagに含めると、各カテゴリのreasonsに頻出する
+    // 「簡易概算」等の語と偶然一致し、無関係なカテゴリにまで'related'として
+    // 表示されてしまう(=検索でたまたま引っ掛かっただけの状態)。
+    // このエントリの本来の役割はDiagnosisResult.assumptions[]の出典であり、
+    // カテゴリ別reasonsとの偶然の一致では出さない。
+    tags: ['前提条件', 'assumptions', '制度改定'],
     applicableRiskCategories: ['death', 'medical', 'disability', 'retirement', 'care', 'asset', 'inheritance'],
-    relatedReasonKeys: [],
+    // DiagnosisResult.assumptions[](riskProfile.ts)に実際に出現する文言。
+    // category.reasons[]向けではなく、findEvidenceForAssumption()専用のdirect match。
+    relatedReasonKeys: [
+      '公的制度をもとにした概算です',
+      '保険商品・保険会社を推奨するものではなく',
+      '相続・税務に関する内容は簡易チェックであり',
+      '実際のライフイベントや制度改正により結果は変動します',
+    ],
   },
   {
     sourceId: 'diagnosis-death-coverage-methodology',
@@ -230,6 +242,9 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
     version: '1.0',
     tags: ['生活費', '教育費', '家計調査', '子供の学習費調査', 'モデル前提'],
     applicableRiskCategories: ['death', 'disability', 'retirement', 'asset'],
+    // '年分:'は3文字と短いが、education.tsの教育費内訳行(「...残りX年分: Y万円」)にのみ
+    // 出現する固定区切りであることを確認済み(death/disability/retirement/assetの
+    // 他のreasonsはいずれも「ヶ月分」「年間」等、異なる表記を使っており衝突しない)。
     relatedReasonKeys: ['年間生活費目安', '年間生活費(入力値)', '年分:'],
   },
   {
@@ -264,7 +279,7 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
     version: '1.0',
     tags: ['老後資金', '退職金', '老後生活費'],
     applicableRiskCategories: ['retirement'],
-    relatedReasonKeys: [],
+    relatedReasonKeys: ['老後生活費の目安'],
   },
   {
     sourceId: 'diagnosis-care-risk-methodology',
@@ -281,7 +296,7 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
     version: '1.0',
     tags: ['介護資金', '介護期間', '住宅改修'],
     applicableRiskCategories: ['care'],
-    relatedReasonKeys: [],
+    relatedReasonKeys: ['平均的な自己負担目安'],
   },
   {
     sourceId: 'diagnosis-inheritance-risk-methodology',
