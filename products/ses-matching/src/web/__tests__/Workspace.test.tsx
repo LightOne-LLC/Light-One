@@ -13,7 +13,9 @@ import { matchProjectToEngineers } from '../../matching/matchProjectToEngineers'
 
 // realEngineerWeakはあえてengineerNameを設定しない — 人材名が取得できない
 // 実メールのケース(内部IDフォールバック表示)を、既存の各テストの流れの中で
-// 自然にカバーするため。
+// 自然にカバーするため。affiliatedCompanyは設定するがcommercialFlowは
+// 設定しない(「所属会社はあるが商流の記載は無い」実メールで最も多いケース
+// を兼ねてカバーする)。
 const realProject: ProjectRecord = {
   id: 'real-project-1',
   projectName: 'クラウド基盤構築案件',
@@ -42,6 +44,7 @@ const realEngineerGood: EngineerRecord = {
 
 const realEngineerWeak: EngineerRecord = {
   id: 'real-engineer-weak',
+  affiliatedCompany: '直請けテック株式会社',
   skills: [{ name: 'PHP', years: 2 }],
   desiredRateMin: 100,
   desiredRateMax: 120,
@@ -252,11 +255,15 @@ describe('Matching Workspace(実データがWorkspace全体を経由してEngine
     expect(screen.getByText('人材ID: real-engineer-weak')).toBeTruthy();
     // 名前が表示されている候補は、内部IDも小さく併記する(デバッグ用途)。
     expect(screen.getByText('ID: real-engineer-good')).toBeTruthy();
-    // 所属会社・商流も表示され、取得できない候補は安全なfallback文言になる
-    // (realEngineerWeakはaffiliatedCompany/commercialFlowを設定していない)。
+    // 所属会社・商流も表示される。realEngineerGoodは両方あり、
+    // realEngineerWeakは所属会社のみありcommercialFlowは無い
+    // (「所属会社はあるが商流の記載は無い」実メールで最多のケース)。
     expect(screen.getByText('サンプルテック株式会社 社員')).toBeTruthy();
     expect(screen.getByText('現場→弊社')).toBeTruthy();
-    expect(screen.getAllByText('未記載').length).toBeGreaterThan(0);
+    // getByTextは一致が複数あると例外を投げるため、この1件が通ること自体が
+    // 「所属会社の値が商流欄に重複して表示されていないこと」の確認になる
+    // (所属会社を商流と誤認しない回帰確認)。
+    expect(screen.getByText('直請けテック株式会社')).toBeTruthy();
     expect(screen.getAllByText('商流情報なし').length).toBeGreaterThan(0);
   });
 

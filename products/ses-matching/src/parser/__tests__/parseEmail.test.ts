@@ -453,6 +453,78 @@ describe('parseEmail (案件出し会社/所属会社/商流の抽出)', () => {
     expect(result.candidate.affiliatedCompany).toBeUndefined();
   });
 
+  it('所属会社はあるが商流の記載が無い要員メールは、affiliatedCompanyのみ設定しcommercialFlowは設定しない(推測しない)', () => {
+    const email: RawEmail = {
+      id: 'email-engineer-company-003',
+      subject: 'スキルシート送付の件',
+      bodyText: [
+        '氏名: 山田太郎',
+        '所属: Innovations株式会社',
+        'スキル: Java(5年)',
+        '希望単価: 70万円',
+        '希望勤務地: 東京都',
+        '稼働可能日: 2026-04-01',
+      ].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed') return;
+    expect(result.candidate.affiliatedCompany).toBe('Innovations株式会社');
+    expect(result.candidate.commercialFlow).toBeUndefined();
+  });
+
+  it('要員メールに「商流：」ラベルが明示されている場合は、affiliatedCompanyとは別にcommercialFlowを取得する', () => {
+    const email: RawEmail = {
+      id: 'email-engineer-flow-001',
+      subject: 'スキルシート送付の件',
+      bodyText: [
+        '氏名: 山田太郎',
+        '所属: Innovations株式会社',
+        '商流: エンド → 元請 → 自社',
+        'スキル: Java(5年)',
+        '希望単価: 70万円',
+        '希望勤務地: 東京都',
+        '稼働可能日: 2026-04-01',
+      ].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed') return;
+    expect(result.candidate.affiliatedCompany).toBe('Innovations株式会社');
+    expect(result.candidate.commercialFlow).toBe('エンド → 元請 → 自社');
+    // 所属会社の値がそのまま商流に紛れ込んでいないことを直接確認する。
+    expect(result.candidate.commercialFlow).not.toBe(result.candidate.affiliatedCompany);
+    expect(result.candidate.commercialFlow as string).not.toContain('Innovations');
+  });
+
+  it('回帰: 所属ラベルの値("弊社フリーランス"等)がcommercialFlowへ誤って入らない(所属会社を商流と誤認しない)', () => {
+    const cases = [
+      '所属: 弊社フリーランス',
+      '所属: 弊社個人事業主',
+      '所属: サンプルテック株式会社 社員',
+    ];
+    for (const affiliationLine of cases) {
+      const email: RawEmail = {
+        id: `email-engineer-flow-regression-${affiliationLine}`,
+        subject: 'スキルシート送付の件',
+        bodyText: [
+          '氏名: 山田太郎',
+          affiliationLine,
+          'スキル: Java(5年)',
+          '希望単価: 70万円',
+          '希望勤務地: 東京都',
+          '稼働可能日: 2026-04-01',
+        ].join('\n'),
+      };
+      const result = parseEmail(email);
+      expect(result.status).toBe('parsed');
+      if (result.status !== 'parsed') return;
+      // 商流ラベル自体が無いため、所属の値がcommercialFlowへ流用されては
+      // いけない(推測禁止)。
+      expect(result.candidate.commercialFlow).toBeUndefined();
+    }
+  });
+
   it('氏名の値に性別が直接続く実メール形式("S.F（男性）"等)から、性別のみを取り除いて氏名を取得する', () => {
     const email: RawEmail = {
       id: 'email-engineer-gender-001',
