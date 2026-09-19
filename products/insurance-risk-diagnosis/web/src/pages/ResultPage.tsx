@@ -14,6 +14,7 @@ import { PublicProtectionPanel } from '../components/dashboard/PublicProtectionP
 import { SuggestedActionsPanel } from '../components/dashboard/SuggestedActionsPanel';
 import { AssumptionsPanel } from '../components/dashboard/AssumptionsPanel';
 import { CoverageBreakdown } from '../components/dashboard/CoverageBreakdown';
+import { EvidenceSourcesPanel } from '../components/dashboard/EvidenceSourcesPanel';
 import { exportElementToPdf } from '../lib/pdf';
 
 function overallMessage(score: number): string {
@@ -97,6 +98,12 @@ export function ResultPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-10">
+      {/*
+        ページ内の見出し(ReportSectionのh2)はいずれも「01 優先して確認する領域」のような
+        章題であり、ページ全体を表すh1が無いとスクリーンリーダーの見出し階層が
+        h2から始まってしまう。視覚デザインは変えず、読み上げ専用のh1を先頭に置く。
+      */}
+      <h1 className="sr-only">保険リスク診断結果</h1>
       <div className="flex items-center justify-between gap-3 flex-wrap pb-5 mb-7 border-b border-line print:hidden">
         <Link to="/history" className="inline-flex items-center gap-2 text-[13px] text-ink-muted hover:text-navy transition-colors py-2">
           <span aria-hidden="true">←</span> 履歴一覧
@@ -154,6 +161,7 @@ export function ResultPage() {
         <ReportSection index="05" title="判定の根拠">
           <div className="space-y-5">
             <WhyPanel categories={result.categories} />
+            <EvidenceSourcesPanel result={result} />
             <details>
               <summary className="cursor-pointer list-none">
                 <Card variant="quiet" className="flex items-center justify-between gap-3 hover:border-line-strong transition-colors">
@@ -171,7 +179,10 @@ export function ResultPage() {
         <footer className="pt-2">
           <AssumptionsPanel assumptions={result.assumptions} />
           <div className="flex items-baseline justify-between gap-4 flex-wrap mt-6 pt-5 border-t border-line">
-            <Eyebrow>LIGHT ONE — Financial Risk Intelligence</Eyebrow>
+            <div>
+              <Eyebrow>LUMEN — Financial Risk Diagnosis</Eyebrow>
+              <p className="text-[10px] text-ink-faint/70 mt-1">by Light One</p>
+            </div>
             <p className="text-[11px] text-ink-faint">
               本レポートは入力内容に基づく目安であり、特定の金融商品の推奨ではありません。
             </p>

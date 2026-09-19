@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { RequireAuth } from './components/auth/RequireAuth';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { LoadingState } from './components/ui';
 
 const LoginPage = lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.LoginPage })));
@@ -30,10 +31,12 @@ function Header() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 sm:gap-4 min-w-0">
           <Link to="/history" className="text-[13px] font-semibold tracking-[0.26em] text-navy whitespace-nowrap">
-            LIGHT ONE
+            LUMEN
           </Link>
           <span className="hidden sm:block w-px h-3.5 bg-line-strong shrink-0" aria-hidden="true" />
-          <span className="hidden sm:block eyebrow text-ink-faint whitespace-nowrap">Financial Risk Intelligence</span>
+          <span className="hidden sm:block eyebrow text-ink-faint whitespace-nowrap">Financial Risk Diagnosis</span>
+          <span className="hidden lg:block w-px h-3.5 bg-line-soft shrink-0" aria-hidden="true" />
+          <span className="hidden lg:block text-[10px] text-ink-faint/70 whitespace-nowrap">by Light One</span>
           {pageLabel && (
             <>
               <span className="block sm:hidden w-px h-3.5 bg-line-strong shrink-0" aria-hidden="true" />
@@ -61,36 +64,38 @@ export default function App() {
   return (
     <div className="min-h-screen page-ground">
       <Header />
-      <Suspense fallback={<LoadingState message="読み込み中" />}>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route
-            path="/diagnosis"
-            element={
-              <RequireAuth>
-                <DiagnosisFormPage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/result/:id"
-            element={
-              <RequireAuth>
-                <ResultPage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/history"
-            element={
-              <RequireAuth>
-                <HistoryPage />
-              </RequireAuth>
-            }
-          />
-          <Route path="*" element={<Navigate to="/diagnosis" replace />} />
-        </Routes>
-      </Suspense>
+      <ErrorBoundary>
+        <Suspense fallback={<LoadingState message="読み込み中" />}>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route
+              path="/diagnosis"
+              element={
+                <RequireAuth>
+                  <DiagnosisFormPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/result/:id"
+              element={
+                <RequireAuth>
+                  <ResultPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/history"
+              element={
+                <RequireAuth>
+                  <HistoryPage />
+                </RequireAuth>
+              }
+            />
+            <Route path="*" element={<Navigate to="/diagnosis" replace />} />
+          </Routes>
+        </Suspense>
+      </ErrorBoundary>
     </div>
   );
 }

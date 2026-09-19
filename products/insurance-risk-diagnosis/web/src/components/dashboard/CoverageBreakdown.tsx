@@ -1,5 +1,6 @@
 import type { DeathCoverageResult } from '../../types/diagnosis';
 import { splitManYen } from '../../lib/riskLevelStyle';
+import { findDirectSourcesForReason } from '../../rag';
 import { Card, SectionHeader, Metric, Eyebrow } from '../ui';
 
 function fmt(n: number) {
@@ -66,12 +67,27 @@ export function CoverageBreakdown({ deathCoverage }: { deathCoverage: DeathCover
       <details className="mt-6 pt-4 border-t border-line">
         <summary className="text-[13px] text-navy cursor-pointer select-none">計算根拠の詳細を見る</summary>
         <ul className="mt-3 space-y-1.5">
-          {deathCoverage.reasons.map((r, i) => (
-            <li key={i} className="flex gap-2.5 text-xs leading-relaxed text-ink-muted">
-              <span className="mt-[7px] w-2 h-px bg-line-strong shrink-0" aria-hidden="true" />
-              <span className="min-w-0">{r}</span>
-            </li>
-          ))}
+          {deathCoverage.reasons.map((r, i) => {
+            const sources = findDirectSourcesForReason(r, 'death');
+            return (
+              <li key={i} className="flex gap-2.5 text-xs leading-relaxed text-ink-muted">
+                <span className="mt-[7px] w-2 h-px bg-line-strong shrink-0" aria-hidden="true" />
+                <span className="min-w-0">
+                  {r}
+                  {/*
+                    ここではリンク付きの詳細は出さない。同じ出典はこの下のSourcesパネル
+                    (EvidenceSourcesPanel)に集約して表示するため、行単位では
+                    「どこが出典か」だけを示す小さなindicatorに留める。
+                  */}
+                  {sources.map((s) => (
+                    <span key={s.sourceId} className="ml-2 text-[11px] text-ink-faint whitespace-nowrap">
+                      出典: {s.organization}
+                    </span>
+                  ))}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       </details>
     </Card>

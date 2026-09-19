@@ -15,6 +15,7 @@ import { SuggestedActionsPanel } from '../components/dashboard/SuggestedActionsP
 import { AssumptionsPanel } from '../components/dashboard/AssumptionsPanel';
 import { CoverageBreakdown } from '../components/dashboard/CoverageBreakdown';
 import { RadarChartPanel } from '../components/dashboard/RadarChartPanel';
+import { EvidenceSourcesPanel } from '../components/dashboard/EvidenceSourcesPanel';
 import { BasicInfoStep } from '../components/steps/BasicInfoStep';
 import { AssetStep } from '../components/steps/AssetStep';
 import { InsuranceStep } from '../components/steps/InsuranceStep';
@@ -94,14 +95,55 @@ describe('ResultPage dashboard panels - 実データでのレンダリング検�
     expect(html).toContain('Suggested Actions');
   });
 
+  test('SuggestedActionsPanel: 確認事項に出典リンクが付く場合がある', () => {
+    // deathカテゴリが確実にchecklist(critical/high)に含まれるよう明示的にスコアを与える。
+    const categoriesWithDeathCritical = result.categories.map((c) =>
+      c.key === 'death' ? { ...c, score: 90, level: 'critical' as const } : c,
+    );
+    const html = renderToStaticMarkup(
+      <SuggestedActionsPanel categories={categoriesWithDeathCritical} productTypes={result.suggestedProductTypes} />,
+    );
+    expect(html).toContain('出典:');
+  });
+
   test('AssumptionsPanel', () => {
     const html = renderToStaticMarkup(<AssumptionsPanel assumptions={result.assumptions} />);
     expect(html).toContain('Assumptions');
   });
 
+  test('AssumptionsPanel: 公的制度の前提には出典indicatorが付く', () => {
+    const html = renderToStaticMarkup(<AssumptionsPanel assumptions={result.assumptions} />);
+    // riskProfile.tsのassumptions[0]は常に「本診断は...の公的制度をもとにした概算です」を含む
+    expect(html).toContain('LUMEN');
+  });
+
   test('CoverageBreakdown', () => {
     const html = renderToStaticMarkup(<CoverageBreakdown deathCoverage={result.deathCoverage} />);
     expect(html).toContain('死亡リスク');
+  });
+
+  test('CoverageBreakdown: 葬儀費用等の一時費用の行は必ず計算方法の出典が付く', () => {
+    // FUNERAL_AND_MISC_COSTは常にreasonsに含まれる固定項目のため、入力に依存せず出典が付く
+    const html = renderToStaticMarkup(<CoverageBreakdown deathCoverage={result.deathCoverage} />);
+    expect(html).toContain('出典:');
+  });
+
+  test('EvidenceSourcesPanel', () => {
+    const html = renderToStaticMarkup(<EvidenceSourcesPanel result={result} />);
+    expect(html).toContain('Sources');
+  });
+
+  test('EvidenceSourcesPanel: 出典が無い領域には誤解を招かない明示文が出る', () => {
+    // assetカテゴリのreasonsを、どの資料ともキーワード的に一致しない文字列に差し替え、
+    // 「出典なし」の分岐を確実に発火させる。
+    const resultWithNoAssetEvidence = {
+      ...result,
+      categories: result.categories.map((c) =>
+        c.key === 'asset' ? { ...c, reasons: ['xyzzy-nonexistent-term-quux-12345'] } : c,
+      ),
+    };
+    const html = renderToStaticMarkup(<EvidenceSourcesPanel result={resultWithNoAssetEvidence} />);
+    expect(html).toContain('特定の公的制度を根拠にしておらず');
   });
 
   test('空データ(子供なし・配偶者なし・履歴0件相当)でもクラッシュしない', () => {
@@ -110,6 +152,7 @@ describe('ResultPage dashboard panels - 実データでのレンダリング検�
     expect(() => renderToStaticMarkup(<FinancialGapPanel categories={emptyResult.categories} />)).not.toThrow();
     expect(() => renderToStaticMarkup(<WhyPanel categories={emptyResult.categories} />)).not.toThrow();
     expect(() => renderToStaticMarkup(<TopRiskAreasPanel categories={emptyResult.categories} />)).not.toThrow();
+    expect(() => renderToStaticMarkup(<EvidenceSourcesPanel result={emptyResult} />)).not.toThrow();
   });
 });
 
@@ -285,7 +328,7 @@ describe('ui kit - Card/Button/Badge/SectionHeader/ChoiceCardGroup', () => {
     expect(html).toContain('72');
     expect(html).toContain('就業不能');
     expect(html).toContain('2026年9月18日');
-    expect(html).toContain('LIGHT ONE');
+    expect(html).toContain('LUMEN');
   });
 
   test('ResultHeroはtopDomainsが空でもクラッシュしない', () => {

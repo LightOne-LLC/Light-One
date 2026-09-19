@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { RiskCategoryResult, RiskGap } from '../../types/diagnosis';
 import { formatManYen, splitManYen } from '../../lib/riskLevelStyle';
 import { Card, SectionHeader, Metric, Eyebrow } from '../ui';
@@ -9,10 +10,20 @@ const SEGMENTS = [
 ] as const;
 
 // 必要額を100%とした積み上げバー: 公的保障・自己資産・既存保険で埋まった分と、残る不足額を視覚化する。
+// マウント直後は幅0から始め、次のフレームで実際の幅に遷移させることで、
+// 「背景トラック → 各区分が静かに伸びる」という順序を1本のバーの中で表現する。
+// reduced motionでは transition-duration がCSS側で即時化されるため、瞬時に最終状態になる。
 function GapBar({ gap }: { gap: RiskGap }) {
   const { requiredAmount, publicCoverage, ownAssets, existingInsurance, shortfall } = gap;
+  const [grown, setGrown] = useState(false);
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setGrown(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
   if (requiredAmount <= 0) return null;
-  const pct = (v: number) => Math.max(0, Math.min(100, (v / requiredAmount) * 100));
+  const pct = (v: number) => (grown ? Math.max(0, Math.min(100, (v / requiredAmount) * 100)) : 0);
 
   let remaining = requiredAmount;
   const publicSeg = Math.min(publicCoverage, remaining);
@@ -23,16 +34,18 @@ function GapBar({ gap }: { gap: RiskGap }) {
   remaining -= existingSeg;
   const shortfallSeg = Math.max(0, Math.min(shortfall, remaining));
 
+  const barClass = 'transition-[width] duration-[900ms] ease-out';
+
   return (
     <div
       className="flex h-1.5 rounded-full overflow-hidden bg-surface-sunken"
       role="img"
       aria-label={`必要額${formatManYen(requiredAmount)}のうち不足額${formatManYen(shortfall)}`}
     >
-      {publicSeg > 0 && <div className="bg-risk-low" style={{ width: `${pct(publicSeg)}%` }} />}
-      {assetsSeg > 0 && <div className="bg-navy-soft" style={{ width: `${pct(assetsSeg)}%` }} />}
-      {existingSeg > 0 && <div className="bg-platinum" style={{ width: `${pct(existingSeg)}%` }} />}
-      {shortfallSeg > 0 && <div className="bg-risk-critical" style={{ width: `${pct(shortfallSeg)}%` }} />}
+      {publicSeg > 0 && <div className={`bg-risk-low ${barClass}`} style={{ width: `${pct(publicSeg)}%` }} />}
+      {assetsSeg > 0 && <div className={`bg-navy-soft ${barClass}`} style={{ width: `${pct(assetsSeg)}%` }} />}
+      {existingSeg > 0 && <div className={`bg-platinum ${barClass}`} style={{ width: `${pct(existingSeg)}%` }} />}
+      {shortfallSeg > 0 && <div className={`bg-risk-critical ${barClass}`} style={{ width: `${pct(shortfallSeg)}%` }} />}
     </div>
   );
 }
@@ -42,14 +55,17 @@ function GapBar({ gap }: { gap: RiskGap }) {
   1行のレコードとして読ませる。カードをグリッドに並べると数値どうしの比較が
   できなくなるため、同じ左端に金額を揃えた行のリストにする。
 */
-function GapRecord({ category }: { category: RiskCategoryResult }) {
+function GapRecord({ category, delayIndex }: { category: RiskCategoryResult; delayIndex: number }) {
   const gap = category.gap;
   if (!gap) return null;
   const covered = Math.max(0, gap.requiredAmount - gap.shortfall);
   const coveredPct = gap.requiredAmount > 0 ? Math.round((covered / gap.requiredAmount) * 100) : 100;
 
   return (
-    <li className="py-6 first:pt-0 last:pb-0 border-b border-line-soft last:border-0">
+    <li
+      className="py-6 first:pt-0 last:pb-0 border-b border-line-soft last:border-0 animate-rise"
+      style={{ animationDelay: `${Math.min(delayIndex, 5) * 60}ms` }}
+    >
       <div className="flex items-baseline justify-between gap-4 mb-1">
         <h3 className="text-[15px] font-semibold text-ink">{category.label}</h3>
         <p className="text-[11px] text-ink-faint tabular-nums">
@@ -99,7 +115,7 @@ export function FinancialGapPanel({ categories }: { categories: RiskCategoryResu
         description="必要な資金に対して、公的保障・自己資産・既存の保険でどこまで備えられているかを示します。"
       />
 
-      <div className="material-brushed border border-line-soft rounded-panel p-5 sm:p-6 mb-7">
+      <div className="material-brushed border border-line-soft rounded-panel p-5 sm:p-6 mb-7 animate-rise">
         <Eyebrow className="mb-2">最も大きい不足額 — {largest.label}</Eyebrow>
         <Metric value={headline.value} unit={headline.unit} size="xl" tone={largest.gap!.shortfall > 0 ? 'danger' : 'default'} />
         <p className="mt-3 text-[13px] leading-relaxed text-ink-muted max-w-lg">
@@ -109,8 +125,8 @@ export function FinancialGapPanel({ categories }: { categories: RiskCategoryResu
       </div>
 
       <ul>
-        {withGap.map((c) => (
-          <GapRecord key={c.key} category={c} />
+        {withGap.map((c, i) => (
+          <GapRecord key={c.key} category={c} delayIndex={i} />
         ))}
       </ul>
     </Card>

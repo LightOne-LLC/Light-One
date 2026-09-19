@@ -1,5 +1,6 @@
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 import type { RiskCategoryResult } from '../../types/diagnosis';
+import { usePrefersReducedMotion } from '../../lib/usePrefersReducedMotion';
 import { Card, SectionHeader } from '../ui';
 
 // チャートもブランドの配色に従わせる。既定のindigo/紫系は使わない。
@@ -9,9 +10,10 @@ const INK_MUTED = '#5c6577';
 
 export function RadarChartPanel({ categories }: { categories: RiskCategoryResult[] }) {
   const data = categories.map((c) => ({ subject: c.label, score: c.score }));
+  const reducedMotion = usePrefersReducedMotion();
 
   return (
-    <Card variant="panel">
+    <Card variant="panel" className="animate-rise">
       <SectionHeader
         variant="compact"
         title="リスクスコア分布"
@@ -22,7 +24,17 @@ export function RadarChartPanel({ categories }: { categories: RiskCategoryResult
           <PolarGrid stroke={LINE} />
           <PolarAngleAxis dataKey="subject" tick={{ fontSize: 12, fill: INK_MUTED }} />
           <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10, fill: '#8b93a3' }} axisLine={false} />
-          <Radar name="リスクスコア" dataKey="score" stroke={NAVY} fill={NAVY} fillOpacity={0.14} strokeWidth={1.5} />
+          <Radar
+            name="リスクスコア"
+            dataKey="score"
+            stroke={NAVY}
+            fill={NAVY}
+            fillOpacity={0.14}
+            strokeWidth={1.5}
+            isAnimationActive={!reducedMotion}
+            animationDuration={900}
+            animationEasing="ease-out"
+          />
         </RadarChart>
       </ResponsiveContainer>
     </Card>

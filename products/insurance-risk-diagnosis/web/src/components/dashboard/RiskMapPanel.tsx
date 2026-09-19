@@ -26,10 +26,14 @@ export function RiskMapPanel({ categories }: { categories: RiskCategoryResult[] 
       </div>
 
       <ul>
-        {categories.map((c) => {
+        {categories.map((c, i) => {
           const style = riskLevelStyle(c.level);
           return (
-            <li key={c.key} className="py-3.5 border-b border-line-soft last:border-0">
+            <li
+              key={c.key}
+              className="py-3.5 border-b border-line-soft last:border-0 animate-rise"
+              style={{ animationDelay: `${Math.min(i, 6) * 50}ms` }}
+            >
               <div className="sm:grid sm:grid-cols-[6.5rem_1fr_3rem_5.5rem] sm:items-center sm:gap-4">
                 <div className="flex items-baseline justify-between gap-3 sm:block mb-2 sm:mb-0">
                   <span className="text-sm font-medium text-ink">{c.label}</span>

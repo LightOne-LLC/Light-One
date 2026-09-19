@@ -22,18 +22,18 @@ export function ResultHero({
   positionLabel?: string;
 }) {
   return (
-    <Card variant="hero" as="header">
+    <Card variant="hero" as="header" className="surface-sheen">
       <div className="absolute -top-28 -right-20 w-72 h-72 rounded-full bg-ice/10 blur-3xl pointer-events-none" aria-hidden="true" />
       <div className="absolute -bottom-32 -left-16 w-64 h-64 rounded-full bg-white/[0.04] blur-3xl pointer-events-none" aria-hidden="true" />
 
-      <div className="relative flex items-baseline justify-between flex-wrap gap-x-4 gap-y-1">
-        <p className="text-[11px] font-semibold tracking-[0.3em] text-white">LIGHT ONE</p>
+      <div className="relative flex items-baseline justify-between flex-wrap gap-x-4 gap-y-1 animate-rise">
+        <p className="lumen-wordmark text-[11px] font-semibold tracking-[0.3em]">LUMEN</p>
         <p className="text-[11px] text-white/45 tabular-nums">{date}</p>
       </div>
-      <hr className="rule-fade-light relative mt-4 mb-8 sm:mb-10" />
+      <hr className="rule-fade-light relative mt-4 mb-8 sm:mb-10 animate-rise delay-1" />
 
       <div className="relative grid gap-8 lg:gap-14 lg:grid-cols-[minmax(0,auto)_1fr] lg:items-start">
-        <div className="lg:pr-4">
+        <div className="lg:pr-4 animate-rise delay-2">
           <Metric
             label="Overall position"
             value={overallScore}
@@ -49,7 +49,7 @@ export function ResultHero({
           )}
         </div>
 
-        <div className="lg:border-l lg:border-white/10 lg:pl-14">
+        <div className="lg:border-l lg:border-white/10 lg:pl-14 animate-rise delay-3">
           <Eyebrow tone="light" className="mb-3">Financial Risk Profile</Eyebrow>
           <p className="text-lg sm:text-xl leading-relaxed tracking-[-0.01em] text-white/85 max-w-xl">{message}</p>
 

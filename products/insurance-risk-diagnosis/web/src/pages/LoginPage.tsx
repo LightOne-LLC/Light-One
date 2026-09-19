@@ -58,26 +58,29 @@ export function LoginPage() {
         */}
         <div className="grid gap-14 lg:grid-cols-[1.1fr_minmax(0,25rem)] lg:gap-20 lg:items-center">
           <div>
-            <div className="flex items-center gap-3 mb-10">
-              <p className="text-xs font-semibold tracking-[0.34em] text-white">LIGHT ONE</p>
+            <div className="flex items-baseline gap-3 mb-2 animate-rise">
+              <p className="lumen-wordmark text-sm font-semibold tracking-[0.34em]">LUMEN</p>
               <span className="w-px h-3 bg-white/25" aria-hidden="true" />
-              <Eyebrow tone="light">Financial Risk Intelligence</Eyebrow>
+              <Eyebrow tone="light">Financial Risk Diagnosis</Eyebrow>
             </div>
+            <p className="text-[10px] font-medium tracking-[0.22em] uppercase text-white/35 mb-10 animate-rise delay-1">
+              by Light One
+            </p>
 
-            <h1 className="text-[32px] sm:text-5xl lg:text-[54px] font-bold tracking-[-0.03em] text-white leading-[1.12]">
+            <h1 className="text-emboss-light text-[32px] sm:text-5xl lg:text-[54px] font-bold tracking-[-0.03em] text-white leading-[1.12] animate-rise delay-1">
               あなたの人生に、
               <br />
               どんな金融リスクがあるか。
             </h1>
 
-            <p className="mt-6 text-[15px] sm:text-lg leading-relaxed text-white/60 max-w-lg">
+            <p className="mt-6 text-[15px] sm:text-lg leading-relaxed text-white/60 max-w-lg animate-rise delay-2">
               保険・資産・老後・介護・保障を、ひとつの視点から整理します。
               商品を売るためではなく、いまの状態を正確に知るための診断です。
             </p>
 
-            <hr className="rule-fade-light mt-10 mb-8" />
+            <hr className="rule-fade-light mt-10 mb-8 animate-rise delay-3" />
 
-            <dl className="grid gap-6 sm:grid-cols-3">
+            <dl className="grid gap-6 sm:grid-cols-3 animate-rise delay-3">
               {CREDENTIALS.map((c) => (
                 <div key={c.value}>
                   <dt className="font-display-num text-2xl font-bold text-white">
@@ -90,8 +93,8 @@ export function LoginPage() {
             </dl>
           </div>
 
-          <div className="w-full">
-            <Card variant="feature" as="section" className="shadow-hero">
+          <div className="w-full animate-rise delay-2">
+            <Card variant="feature" as="section" className="shadow-hero surface-sheen">
               <Eyebrow className="mb-5">{mode === 'signin' ? 'Sign in' : 'Create account'}</Eyebrow>
 
               <form onSubmit={handleSubmit} className="space-y-5">

@@ -83,7 +83,7 @@ export function HistoryPage() {
 
       {/* 最新の1件は結論として大きく扱い、過去分は比較できる台帳として畳む */}
       {latest && (
-        <Card variant="feature" as="section" className="mb-10">
+        <Card variant="feature" as="section" className="mb-10 animate-rise surface-sheen">
           <div className="grid gap-7 sm:gap-10 lg:grid-cols-[minmax(0,auto)_1fr] lg:items-start">
             <div className="lg:pr-6">
               <Metric label="Latest position" value={latest.overallScore} unit="/ 100" size="xl" />
@@ -151,7 +151,11 @@ export function HistoryPage() {
               const style = riskLevelStyle(item.topRisks[0]?.level ?? 'low');
               const older = past[i + 1] ?? undefined;
               return (
-                <li key={item.id} className="flex items-center gap-3 border-b border-line-soft hover:bg-surface/70 transition-colors">
+                <li
+                  key={item.id}
+                  className="flex items-center gap-3 border-b border-line-soft hover:bg-surface/70 transition-colors animate-rise"
+                  style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
+                >
                   <Link
                     to={`/result/${item.id}`}
                     className="flex-1 min-w-0 grid grid-cols-[1fr_auto] sm:grid-cols-[9.5rem_5.5rem_1fr_auto] items-center gap-x-4 gap-y-1 py-4"

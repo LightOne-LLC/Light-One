@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { formatForDisplay, parseNumberFieldInput } from './NumberField';
+import { formatForDisplay, parseNumberFieldInput, clampNumber } from './NumberField';
 
 // 「数値入力欄の0が消せない」バグの核心ロジックを、実DOM/ブラウザなしで検証する。
 describe('NumberField - formatForDisplay(初期表示/外部同期時の表示ルール)', () => {
@@ -33,5 +33,28 @@ describe('NumberField - parseNumberFieldInput(入力中のテキスト→親へ�
 
   test('数値化できない入力はnullを返し、更新を保留する(表示は妨げない)', () => {
     expect(parseNumberFieldInput('abc')).toBeNull();
+  });
+});
+
+describe('NumberField - clampNumber(極端な数値の入力に対する確定時の丸め)', () => {
+  test('maxを超える値はmaxに丸められる(例: 年齢に99999999を入力)', () => {
+    expect(clampNumber(99999999, 0, 120)).toBe(120);
+  });
+
+  test('minを下回る値はminに丸められる(例: 負の年齢)', () => {
+    expect(clampNumber(-50, 0, 120)).toBe(0);
+  });
+
+  test('範囲内の値はそのまま返す', () => {
+    expect(clampNumber(45, 0, 120)).toBe(45);
+  });
+
+  test('min/maxが未指定の項目(金額等)はクランプしない', () => {
+    expect(clampNumber(999999999999)).toBe(999999999999);
+  });
+
+  test('minのみ指定されている場合、maxは無制限', () => {
+    expect(clampNumber(999999999999, 0)).toBe(999999999999);
+    expect(clampNumber(-1, 0)).toBe(0);
   });
 });
