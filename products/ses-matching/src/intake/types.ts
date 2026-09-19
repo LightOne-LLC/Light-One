@@ -9,6 +9,11 @@ import type { DateValue, EngineerSkill, JapaneseLevel, RequiredSkill } from '../
 
 export interface ProjectRecord {
   id: string;
+  // 表示用の案件名(実メールの「案件名：」ラベル、無ければ件名から抽出)。
+  // idは内部識別子として維持し、UI表示専用の名前とは明確に分離する。
+  // 取得できなかった場合は未設定のままとし、UI側が内部IDでフォールバック
+  // 表示する(このフィールド自体を推測で埋めない)。
+  projectName?: string;
   requiredSkills: RequiredSkill[];
   rateMin: number; // 万円/月
   rateMax: number; // 万円/月
@@ -23,6 +28,10 @@ export interface ProjectRecord {
 
 export interface EngineerRecord {
   id: string;
+  // 表示用の人材名(実メールの「氏名：」ラベル等から抽出)。idは内部識別子
+  // として維持し、UI表示専用の名前とは明確に分離する。取得できなかった
+  // 場合は未設定のままとし、UI側が内部IDでフォールバック表示する。
+  engineerName?: string;
   skills: EngineerSkill[];
   desiredRateMin: number;
   desiredRateMax: number;

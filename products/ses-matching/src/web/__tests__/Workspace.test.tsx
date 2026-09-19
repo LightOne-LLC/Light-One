@@ -11,8 +11,12 @@ import { matchProjectToEngineers } from '../../matching/matchProjectToEngineers'
 // すべて匿名の合成(synthetic)データ。実Gmail/OAuthには一切アクセスしない
 // (Dashboardのfetch呼び出しをモックして注入する)。
 
+// realEngineerWeakはあえてengineerNameを設定しない — 人材名が取得できない
+// 実メールのケース(内部IDフォールバック表示)を、既存の各テストの流れの中で
+// 自然にカバーするため。
 const realProject: ProjectRecord = {
   id: 'real-project-1',
+  projectName: 'クラウド基盤構築案件',
   requiredSkills: [{ name: 'Java', minYears: 3, required: true }],
   rateMin: 60,
   rateMax: 80,
@@ -23,6 +27,7 @@ const realProject: ProjectRecord = {
 
 const realEngineerGood: EngineerRecord = {
   id: 'real-engineer-good',
+  engineerName: 'エンジニアA',
   skills: [{ name: 'Java', years: 5 }],
   desiredRateMin: 65,
   desiredRateMax: 75,
@@ -110,9 +115,13 @@ describe('Matching Workspace(実データがWorkspace全体を経由してEngine
     expect(screen.getByText('✓ Matching可能')).toBeTruthy();
 
     // 候補を見る → Matchingページで実Engineerのランキングが既存Matching
-    // Engineeと一致する
+    // Engineeと一致する。名前が取得できたエンジニアは名前で、できなかった
+    // エンジニアは内部IDフォールバック("人材ID: ...")で表示される
+    // (内部IDは捨てず、フォールバック表示として保持する)。
     fireEvent.click(screen.getByText('候補を見る →'));
-    await waitFor(() => expect(screen.getByText('real-engineer-good')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('エンジニアA')).toBeTruthy());
+    expect(screen.getByText('人材ID: real-engineer-weak')).toBeTruthy();
+    expect(screen.queryByText('real-engineer-good')).toBeNull();
 
     const expectedRanking = matchProjectToEngineers(realProject, [realEngineerGood, realEngineerWeak]);
     const renderedScores = Array.from(document.querySelectorAll('.ranking-score')).map((el) =>
@@ -120,10 +129,15 @@ describe('Matching Workspace(実データがWorkspace全体を経由してEngine
     );
     expect(renderedScores).toEqual(expectedRanking.map((r) => r.score));
 
-    // 候補をクリック → Engineer Detailでスコア内訳が既存calcTotalScore()と一致する
-    fireEvent.click(screen.getByText('real-engineer-good'));
+    // 候補をクリック → Engineer Detailでページタイトルが人材名になり、
+    // スコア内訳が既存calcTotalScore()と一致する
+    fireEvent.click(screen.getByText('エンジニアA'));
     const expectedBreakdown = calcTotalScore(toProjectInput(realProject), toEngineerInput(realEngineerGood));
     await waitFor(() => expect(screen.getByText('候補者情報')).toBeTruthy());
+
+    expect(screen.getByRole('heading', { level: 1, name: 'エンジニアA' })).toBeTruthy();
+    expect(screen.getByText('ID: real-engineer-good')).toBeTruthy();
+    expect(screen.getByText(/クラウド基盤構築案件/)).toBeTruthy();
 
     const totalScoreEl = document.querySelector('.ranking-score');
     expect(totalScoreEl?.textContent).toBe(String(expectedBreakdown.totalScore));
@@ -146,30 +160,30 @@ describe('Matching Workspace(実データがWorkspace全体を経由してEngine
     fireEvent.click(screen.getByText(/この結果をWorkspaceで見る/));
     await waitFor(() => expect(screen.getByText('候補を見る →')).toBeTruthy());
     fireEvent.click(screen.getByText('候補を見る →'));
-    await waitFor(() => expect(screen.getByText('real-engineer-good')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('エンジニアA')).toBeTruthy());
   }
 
   it('最低スコアフィルタで候補を絞り込める(Matching Engineのscore自体は変更しない)', async () => {
     await renderWorkspaceAtRealMatching();
-    expect(screen.getByText('real-engineer-weak')).toBeTruthy();
+    expect(screen.getByText('人材ID: real-engineer-weak')).toBeTruthy();
 
     const expectedRanking = matchProjectToEngineers(realProject, [realEngineerGood, realEngineerWeak]);
     const weakScore = expectedRanking.find((r) => r.engineerId === 'real-engineer-weak')?.score ?? 0;
 
     fireEvent.change(screen.getByLabelText('最低スコア'), { target: { value: String(weakScore + 1) } });
 
-    expect(screen.getByText('real-engineer-good')).toBeTruthy();
-    expect(screen.queryByText('real-engineer-weak')).toBeNull();
+    expect(screen.getByText('エンジニアA')).toBeTruthy();
+    expect(screen.queryByText('人材ID: real-engineer-weak')).toBeNull();
   });
 
   it('リモート希望のみフィルタで、リモートを希望しない候補を除外できる', async () => {
     await renderWorkspaceAtRealMatching();
-    expect(screen.getByText('real-engineer-weak')).toBeTruthy();
+    expect(screen.getByText('人材ID: real-engineer-weak')).toBeTruthy();
 
     fireEvent.click(screen.getByLabelText('リモート希望のみ'));
 
-    expect(screen.getByText('real-engineer-good')).toBeTruthy();
-    expect(screen.queryByText('real-engineer-weak')).toBeNull();
+    expect(screen.getByText('エンジニアA')).toBeTruthy();
+    expect(screen.queryByText('人材ID: real-engineer-weak')).toBeNull();
   });
 
   it('validationに失敗した案件は「⚠ 情報不足」と不足フィールドを表示し、候補は見られない', async () => {
@@ -200,6 +214,23 @@ describe('Matching Workspace(実データがWorkspace全体を経由してEngine
     expect(screen.getByText('不足: 勤務地')).toBeTruthy();
     expect(screen.getByText('不足: 開始日')).toBeTruthy();
     expect(screen.queryByText('候補を見る →')).toBeNull();
+    // titleが取得できていない案件は、内部IDを安全な文言で補って表示する
+    // (idを完全に捨てず、フォールバックとして保持する)。
+    expect(screen.getByText('案件ID: invalid-project-1')).toBeTruthy();
+  });
+
+  it('Engineersページで実データの人材名を表示し、取得できない場合は内部IDへフォールバックする', async () => {
+    mockBulkFetch();
+    render(
+      <MemoryRouter initialEntries={['/engineers']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('エンジニアA')).toBeTruthy());
+    expect(screen.getByText('人材ID: real-engineer-weak')).toBeTruthy();
+    // 名前が表示されている候補は、内部IDも小さく併記する(デバッグ用途)。
+    expect(screen.getByText('ID: real-engineer-good')).toBeTruthy();
   });
 
   it('実データが無い場合は既存dummy dataでのMatching(regression)が維持される', async () => {

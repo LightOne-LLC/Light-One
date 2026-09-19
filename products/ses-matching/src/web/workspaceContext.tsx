@@ -17,7 +17,9 @@ const WorkspaceContext = createContext<WorkspaceContextValue | undefined>(undefi
 
 // PWA起動時の自動読み込み・手動再取得のどちらもこの件数で統一する
 // (既存のbulk API・仕様は一切変更しない、単にここで呼ぶ際の件数)。
-const AUTO_LOAD_LIMIT = 100;
+// サーバー側のMAX_LIMIT(gmailBulkImportApi.ts)も200に合わせてあるため、
+// ここで200を指定してもクランプされない。
+const AUTO_LOAD_LIMIT = 200;
 
 /**
  * 実Gmail取り込み結果(既存 /api/gmail/fetch)を、ページ遷移をまたいで

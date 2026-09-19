@@ -387,3 +387,28 @@ export function parseJapaneseLevel(value: string): JapaneseLevel | undefined {
   }
   return undefined;
 }
+
+// 表示名として不自然に長い値(ラベル抽出の巻き込み失敗や、営業担当者名・
+// 電話番号まで含む長い件名を件名フォールバックとして採用してしまうケース)
+// を、根拠なく受け入れないための上限。実メールで観測された適切な案件名/
+// 氏名ラベルの値は全て十分短く(概ね30文字程度まで)、この上限を超えない。
+const MAX_DISPLAY_NAME_LENGTH = 50;
+
+/** ラベル抽出結果(または件名)を、案件名/氏名として表示するための後処理。
+ * 前後の空白と、抽出時に稀に巻き込まれる余分なコロン(ラベルの二重表記等に
+ * よるもの)のみを取り除く。括弧類は"（C#/ASP.NET）"や"【新規案件】"のように
+ * 案件名・件名の正当な一部として現れるため、意図的に取り除かない
+ * (一律に取り除くと内容を壊す実例を確認済み)。空になった場合や長すぎる
+ * 場合(件名フォールバックで営業担当者名・電話番号まで含んでしまうケース等、
+ * 根拠のない値)はundefinedを返して呼び出し側にIDフォールバックさせる。 */
+export function sanitizeDisplayName(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const cleaned = value
+    .trim()
+    .replace(/^[:：]+\s*/, '')
+    .replace(/\s*[:：]+$/, '')
+    .trim();
+  if (!cleaned) return undefined;
+  if (cleaned.length > MAX_DISPLAY_NAME_LENGTH) return undefined;
+  return cleaned;
+}

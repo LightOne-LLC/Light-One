@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { matchProjectToEngineers } from '../../matching/matchProjectToEngineers';
+import { resolveDisplayName } from '../displayName';
 import { scoreColorClass } from '../scoreColor';
 import { useMatchingPools } from '../useMatchingPools';
 
@@ -47,7 +48,7 @@ export function MatchingPage() {
         >
           {projectList.map((project) => (
             <option key={project.id} value={project.id}>
-              {project.id}
+              {resolveDisplayName('project', project.id, project.projectName, useReal)}
             </option>
           ))}
         </select>
@@ -91,7 +92,9 @@ export function MatchingPage() {
               onClick={() => selectedProject && navigate(`/matching/${selectedProject.id}/engineer/${result.engineerId}`)}
             >
               <span className="ranking-rank">{index + 1}</span>
-              <span className="ranking-id">{result.engineerId}</span>
+              <span className="ranking-id">
+                {resolveDisplayName('engineer', result.engineerId, engineer?.engineerName, useReal)}
+              </span>
               <span className={`ranking-score ${scoreColorClass(result.score)}`}>{result.score}</span>
               {engineer && (
                 <span style={{ width: '100%', fontSize: '0.75rem', color: 'var(--text-muted)' }}>

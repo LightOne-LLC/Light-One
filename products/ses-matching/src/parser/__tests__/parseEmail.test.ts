@@ -163,6 +163,108 @@ describe('parseEmail', () => {
   });
 });
 
+// 実メール(100〜200件規模)の調査に基づく、UI表示用の案件名/人材名抽出。
+// idは内部識別子として維持し続け、ここではUI表示専用の値のみを扱う。
+describe('parseEmail (案件名/人材名の抽出、営業デモでの表示名対応)', () => {
+  it('「案件名：」ラベルがあれば、それをprojectNameとして抽出する', () => {
+    const result = parseEmail(projectEmail);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed') return;
+    expect(result.candidate.projectName).toBe('大手金融系システム開発');
+  });
+
+  it('案件名ラベルが無い場合は件名をprojectNameのフォールバックとして使う', () => {
+    const email: RawEmail = {
+      id: 'email-project-002',
+      subject: '【新規案件】Javaエンジニア募集',
+      bodyText: [
+        '必須スキル: Java(3年以上)',
+        '単価: 60万円〜80万円',
+        '勤務地: 東京都',
+        '稼働開始: 2026-04-01',
+      ].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed') return;
+    expect(result.candidate.projectName).toBe('【新規案件】Javaエンジニア募集');
+  });
+
+  it('件名が長すぎる場合(営業担当者名・電話番号等を含む実メールで観測されたパターン)は根拠なく採用せずprojectNameを設定しない', () => {
+    const email: RawEmail = {
+      id: 'email-project-003',
+      subject:
+        '案件：【超急募◆単価90万・面談1回即決】長期!愛知(常駐)◆大手製造業向けソフトウェア外販化推進 【キャリアビート 担当：09000000000】',
+      bodyText: ['必須スキル: Java(3年以上)', '単価: 90万円', '勤務地: 愛知県', '稼働開始: 2026-04-01'].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed') return;
+    expect(result.candidate.projectName).toBeUndefined();
+  });
+
+  it('案件名に括弧を含む技術注記があっても、記号を壊さずそのまま保持する(括弧の一律除去はしない)', () => {
+    const email: RawEmail = {
+      id: 'email-project-004',
+      subject: '案件のご案内',
+      bodyText: [
+        '案件名: Webアプリケーション開発（C#/ASP.NET/T-SQL）',
+        '必須スキル: C#(3年以上)',
+        '単価: 70万円',
+        '勤務地: 東京都',
+        '稼働開始: 2026-04-01',
+      ].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed') return;
+    expect(result.candidate.projectName).toBe('Webアプリケーション開発（C#/ASP.NET/T-SQL）');
+  });
+
+  it('「氏名：」ラベルがあれば、それをengineerNameとして抽出する', () => {
+    const email: RawEmail = {
+      id: 'email-engineer-002',
+      subject: 'スキルシート送付の件',
+      bodyText: [
+        '氏名: 山田太郎',
+        'スキル: Java(5年)',
+        '希望単価: 70万円',
+        '希望勤務地: 東京都',
+        '稼働可能日: 2026-04-01',
+      ].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed') return;
+    expect(result.candidate.engineerName).toBe('山田太郎');
+  });
+
+  it('氏名ラベルが無い場合はengineerNameを設定しない(件名は人材名のフォールバックにしない)', () => {
+    const result = parseEmail(engineerEmail);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed') return;
+    expect(result.candidate.engineerName).toBeUndefined();
+  });
+
+  it('ラベル抽出時に紛れ込んだ余分な前後のコロンは取り除く(実メールで観測された抽出境界の揺れ)', () => {
+    const email: RawEmail = {
+      id: 'email-engineer-003',
+      subject: 'スキルシート送付の件',
+      bodyText: [
+        '氏名: ：山田太郎',
+        'スキル: Java(5年)',
+        '希望単価: 70万円',
+        '希望勤務地: 東京都',
+        '稼働可能日: 2026-04-01',
+      ].join('\n'),
+    };
+    const result = parseEmail(email);
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed') return;
+    expect(result.candidate.engineerName).toBe('山田太郎');
+  });
+});
+
 describe('parseEmail -> 既存Validation -> Matching への接続', () => {
   it('案件メール由来のProjectRecordがvalidationを通過し、既存Matching Engineに接続できる', () => {
     const parsed = parseEmail(projectEmail);

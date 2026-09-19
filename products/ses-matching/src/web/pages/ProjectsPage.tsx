@@ -19,7 +19,12 @@ export function ProjectsPage() {
         {realProjects.length === 0 && <p className="empty-note">案件がありません。</p>}
         {realProjects.map((project) => (
           <div key={project.id} className="card">
-            <div className="card-title">{project.title ?? project.id}</div>
+            <div className="card-title">{project.title ?? `案件ID: ${project.id}`}</div>
+            {project.title && (
+              <div className="empty-note" style={{ fontSize: '0.75rem' }}>
+                ID: {project.id}
+              </div>
+            )}
             {project.skills.length > 0 && (
               <div>
                 {project.skills.map((name) => (

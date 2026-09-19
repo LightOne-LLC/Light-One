@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { matchProjectToEngineers } from '../../matching/matchProjectToEngineers';
 import { GmailBulkImport } from '../components/GmailBulkImport';
 import { GmailImport } from '../components/GmailImport';
+import { resolveDisplayName } from '../displayName';
 import { scoreColorClass } from '../scoreColor';
 import { useMatchingPools } from '../useMatchingPools';
 
@@ -9,6 +10,7 @@ export function DashboardPage() {
   const { projectList, engineerPool, useReal } = useMatchingPools();
   const latestProject = projectList[0];
   const topCandidate = latestProject ? matchProjectToEngineers(latestProject, engineerPool)[0] : undefined;
+  const topEngineer = topCandidate ? engineerPool.find((e) => e.id === topCandidate.engineerId) : undefined;
 
   return (
     <>
@@ -37,11 +39,11 @@ export function DashboardPage() {
           className="card"
           style={{ display: 'block', color: 'inherit', textDecoration: 'none' }}
         >
-          <div className="card-title">{latestProject.id}</div>
+          <div className="card-title">{resolveDisplayName('project', latestProject.id, latestProject.projectName, useReal)}</div>
           <div className="card-row">
             <span>1位候補</span>
             <span>
-              {topCandidate.engineerId} —{' '}
+              {resolveDisplayName('engineer', topCandidate.engineerId, topEngineer?.engineerName, useReal)} —{' '}
               <span className={`ranking-score ${scoreColorClass(topCandidate.score)}`}>{topCandidate.score}</span>
             </span>
           </div>

@@ -112,7 +112,7 @@ const unrelatedEmail: RawEmail = {
 };
 
 describe('clampLimit', () => {
-  it('デフォルト値(50)を返す(未指定)', () => {
+  it('デフォルト値(200)を返す(未指定)', () => {
     expect(clampLimit(undefined)).toBe(DEFAULT_LIMIT);
   });
 
@@ -126,7 +126,7 @@ describe('clampLimit', () => {
     expect(clampLimit(null)).toBe(DEFAULT_LIMIT);
   });
 
-  it('MAX_LIMIT(100)を超える値は上限に丸める(ユーザー入力をそのままGmail APIへ渡さない)', () => {
+  it('MAX_LIMIT(200)を超える値は上限に丸める(ユーザー入力をそのままGmail APIへ渡さない)', () => {
     expect(clampLimit(9999)).toBe(MAX_LIMIT);
   });
 
@@ -316,6 +316,23 @@ describe('performGmailBulkImport (Matching Workspace用のview model)', () => {
     expect(invalid?.validation.errors).toContain('rateMin');
     expect(invalid?.validation.errors).toContain('location');
     expect(invalid?.validation.errors).toContain('startDate');
+  });
+
+  it('本文に「案件名：」ラベルがある場合は、件名より優先してtitleに使う(営業デモでの表示名対応)', async () => {
+    const projectWithNameLabel: RawEmail = {
+      id: 'email-project-named',
+      subject: '案件のご案内',
+      bodyText: [
+        '案件名: 大手金融系システム開発',
+        '必須スキル: Java(3年以上)',
+        '単価: 60万円〜80万円',
+        '勤務地: 東京都',
+        '稼働開始: 2026-04-01',
+      ].join('\n'),
+    };
+    const result = await performGmailBulkImport(50, async () => [projectWithNameLabel]);
+    const project = result.projects?.find((p) => p.id === 'email-project-named');
+    expect(project?.title).toBe('大手金融系システム開発');
   });
 
   it('projects/validProjects/validEngineersにも本文(bodyText)・from・件名以外の個人情報を含めない', async () => {

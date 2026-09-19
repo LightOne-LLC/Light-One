@@ -13,12 +13,18 @@ import {
   parseRateRange,
   parseRequiredSkillList,
   parseYesNo,
+  sanitizeDisplayName,
   stripNoteSuffix,
 } from './extractors';
 import type { ParsedEmailResult } from './types';
 
 const PROJECT_KEYWORDS = ['案件', '募集', '必須スキル', '商流'];
 const ENGINEER_KEYWORDS = ['要員', 'スキルシート', '希望単価', '稼働可能日', '経歴'];
+
+// 実メール(100〜200件規模)の調査で「案件名：」ラベルが最も高頻度・高信頼で
+// 観測された(明示ラベル優先)。「氏名：」は要員メールのほぼ全件で観測された。
+const PROJECT_NAME_LABELS = ['案件名', 'PJ名', 'プロジェクト名', '案件タイトル'];
+const ENGINEER_NAME_LABELS = ['氏名', 'お名前', '名前'];
 
 function countMatches(text: string, keywords: string[]): number {
   return keywords.reduce((sum, keyword) => sum + (text.includes(keyword) ? 1 : 0), 0);
@@ -65,6 +71,15 @@ function detectEmailType(subject: string, body: string): 'project' | 'engineer' 
 
 function parseProjectCandidate(subject: string, body: string, id: string): Record<string, unknown> {
   const candidate: Record<string, unknown> = { id };
+
+  // 表示用の案件名。「案件名：」等の明示ラベルを最優先、無ければ件名を
+  // フォールバックとして使う(既にPIIではない表示用途として既存コードで
+  // 使われている値)。件名フォールバックは、営業担当者名・電話番号まで
+  // 埋め込まれた長い件名を根拠なく採用しないよう、sanitizeDisplayNameの
+  // 長さ上限でも制限される。どちらも得られない場合はcandidateに含めず、
+  // 呼び出し側(UI)で内部IDによる安全なフォールバック表示に委ねる。
+  const projectName = sanitizeDisplayName(extractLabeledValue(body, PROJECT_NAME_LABELS)) ?? sanitizeDisplayName(subject);
+  if (projectName) candidate.projectName = projectName;
 
   const requiredValue = extractLabeledValue(body, ['必須スキル', '必要スキル']);
   const preferredValue = extractLabeledValue(body, ['歓迎スキル', '尚可スキル']);
@@ -118,6 +133,13 @@ function parseProjectCandidate(subject: string, body: string, id: string): Recor
 
 function parseEngineerCandidate(subject: string, body: string, id: string): Record<string, unknown> {
   const candidate: Record<string, unknown> = { id };
+
+  // 表示用の人材名。「氏名：」ラベルが要員メールのほぼ全件で観測された
+  // ため最優先とする(件名は要員メールでは氏名を表さないためフォール
+  // バックにしない)。得られない場合はcandidateに含めず、呼び出し側(UI)
+  // で内部IDによる安全なフォールバック表示に委ねる。
+  const engineerName = sanitizeDisplayName(extractLabeledValue(body, ENGINEER_NAME_LABELS));
+  if (engineerName) candidate.engineerName = engineerName;
 
   const skillsValue = extractLabeledValue(body, ['スキル']);
   if (skillsValue) candidate.skills = parseEngineerSkillList(skillsValue);
