@@ -1,6 +1,7 @@
 import type { RiskCategoryResult, RiskCategoryKey } from '../../types/diagnosis';
 import { NEXT_STEPS } from '../../lib/nextSteps';
 import { riskLevelStyle } from '../../lib/riskLevelStyle';
+import { buildActionEvidence } from '../../rag';
 import { Card, SectionHeader, StatusChip, Eyebrow } from '../ui';
 
 // 各アクションが「何を達成するための確認なのか」。手順だけを並べると作業リストになり、
@@ -33,6 +34,9 @@ export function SuggestedActionsPanel({ categories, productTypes }: { categories
       <ol className="space-y-7">
         {checklist.map((c, i) => {
           const style = riskLevelStyle(c.level);
+          // 各確認事項(NEXT_STEPS)がどの根拠資料に基づくかを追跡できるようにする。
+          // NEXT_STEPS自体の内容・順序・優先度は変更しない — 表示のみの追加情報。
+          const stepEvidence = buildActionEvidence(c.key, NEXT_STEPS[c.key]);
           return (
             <li key={c.key} className="grid grid-cols-[auto_1fr] gap-x-4 sm:gap-x-6">
               <span className="font-display-num text-2xl sm:text-3xl font-bold leading-none text-line-strong tabular-nums pt-1" aria-hidden="true">
@@ -55,12 +59,27 @@ export function SuggestedActionsPanel({ categories, productTypes }: { categories
                 <div className="material-brushed border border-line-soft rounded-panel p-4 sm:p-5">
                   <Eyebrow className="mb-3">確認すること</Eyebrow>
                   <ul className="space-y-2">
-                    {NEXT_STEPS[c.key].map((step) => (
-                      <li key={step} className="flex items-start gap-2.5 text-[13px] leading-relaxed text-ink">
-                        <span className="mt-[7px] w-3 h-px bg-platinum shrink-0" aria-hidden="true" />
-                        <span className="min-w-0">{step}</span>
-                      </li>
-                    ))}
+                    {NEXT_STEPS[c.key].map((step, stepIndex) => {
+                      const source = stepEvidence[stepIndex]?.sources[0];
+                      return (
+                        <li key={step} className="flex items-start gap-2.5 text-[13px] leading-relaxed text-ink">
+                          <span className="mt-[7px] w-3 h-px bg-platinum shrink-0" aria-hidden="true" />
+                          <span className="min-w-0">
+                            {step}
+                            {source && (
+                              <a
+                                href={source.url}
+                                target="_blank"
+                                rel="noreferrer noopener"
+                                className="ml-2 text-[11px] text-ink-faint hover:text-navy underline underline-offset-2 whitespace-nowrap"
+                              >
+                                出典: {source.organization}
+                              </a>
+                            )}
+                          </span>
+                        </li>
+                      );
+                    })}
                   </ul>
                   <hr className="rule-fade my-4" />
                   <p className="text-xs leading-relaxed text-ink-muted">

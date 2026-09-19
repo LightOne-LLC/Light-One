@@ -95,6 +95,17 @@ describe('ResultPage dashboard panels - 実データでのレンダリング検�
     expect(html).toContain('Suggested Actions');
   });
 
+  test('SuggestedActionsPanel: 確認事項に出典リンクが付く場合がある', () => {
+    // deathカテゴリが確実にchecklist(critical/high)に含まれるよう明示的にスコアを与える。
+    const categoriesWithDeathCritical = result.categories.map((c) =>
+      c.key === 'death' ? { ...c, score: 90, level: 'critical' as const } : c,
+    );
+    const html = renderToStaticMarkup(
+      <SuggestedActionsPanel categories={categoriesWithDeathCritical} productTypes={result.suggestedProductTypes} />,
+    );
+    expect(html).toContain('出典:');
+  });
+
   test('AssumptionsPanel', () => {
     const html = renderToStaticMarkup(<AssumptionsPanel assumptions={result.assumptions} />);
     expect(html).toContain('Assumptions');
