@@ -2,8 +2,10 @@ import type { RawEmail } from '../gmail/types';
 import {
   extractBulletValueNoColonNumeric,
   extractCompanyName,
+  extractGreetingCompanyName,
   extractLabeledValue,
   extractNestedSkillSections,
+  extractSignatureCompanyName,
   findRateInFreeText,
   findRemoteInFreeText,
   parseDateValue,
@@ -15,7 +17,6 @@ import {
   parseRequiredSkillList,
   parseYesNo,
   sanitizeDisplayName,
-  splitAffiliationValue,
   stripNoteSuffix,
   stripTrailingGenderAnnotation,
 } from './extractors';
@@ -29,10 +30,14 @@ const ENGINEER_KEYWORDS = ['要員', 'スキルシート', '希望単価', '稼�
 const PROJECT_NAME_LABELS = ['案件名', 'PJ名', 'プロジェクト名', '案件タイトル'];
 const ENGINEER_NAME_LABELS = ['氏名', 'お名前', '名前'];
 
-// 実メール調査で「所属：」ラベルが要員メールの約9割で確認された。
-// 「会社名：」のような単一ラベルは案件メール側には存在しなかったため、
-// 案件側の会社名はextractCompanyName()(自己紹介文パターン)で取得する。
-const AFFILIATED_COMPANY_LABELS = ['所属', '所属会社', '所属企業'];
+// 実メール調査(500件、要員134件)で「所属：」ラベルが要員メールの約9割で
+// 確認されたが、その98%以上は契約形態(商流)の記述であり会社名ではな
+// かった(下記commercialFlowで使う)。要員本人の所属会社を示す専用ラベル
+// (所属会社/所属先/企業名/法人名/勤務先/会社名等)は1件も確認できな
+// かった。「会社名：」のような単一ラベルは案件メール側にも存在しな
+// かったため、案件側の会社名はextractCompanyName()(自己紹介文パターン)
+// で取得する。
+const AFFILIATION_LABELS = ['所属', '所属会社', '所属企業'];
 // 「商流：」「☆商流：」の2表記が実メールで確認された(値は「貴社まで」
 // 「現場→弊社」のような短い自由文で、根拠なく構造化しない)。
 const COMMERCIAL_FLOW_LABELS = ['商流', '☆商流'];
@@ -167,21 +172,27 @@ function parseEngineerCandidate(subject: string, body: string, id: string): Reco
   const engineerName = sanitizeDisplayName(rawEngineerName ? stripTrailingGenderAnnotation(rawEngineerName) : undefined);
   if (engineerName) candidate.engineerName = engineerName;
 
-  // 所属会社/商流。実メール調査(59件)で「所属：」ラベルの値の98%以上が
-  // 「弊社個人事業主」「弊社フリーランス」のような契約形態(商流)の記述
-  // であり、会社名では無かった(「弊社」は送信元BPエージェント自身を
-  // 指す一人称)。「所属」ラベルだから機械的に会社名として扱うのではなく、
-  // splitAffiliationValue()で値の中身(法人格表記の有無)を見て判定する
-  // (会社名と断定できる根拠が無ければ会社名を推測しない)。案件側の
-  // sourceCompanyとは意味が異なるため別フィールドとする。
-  const rawAffiliation = extractLabeledValue(body, AFFILIATED_COMPANY_LABELS);
-  const affiliation = rawAffiliation ? splitAffiliationValue(rawAffiliation) : undefined;
-  if (affiliation?.company) candidate.affiliatedCompany = affiliation.company;
+  // companyName = その要員情報を送信してきた会社名。「所属」欄とは完全に
+  // 独立して、(1)本文冒頭の名乗り(自己紹介文) > (2)署名ブロック(会社名の
+  // 近傍に連絡先ラベルがある箇所)の優先順位でのみ抽出する。案件側
+  // sourceCompanyの単独会社名フォールバック(本文中で最初に見つかった
+  // 法人格表記)は要員メールには使わない — 実メール調査で、本文中の
+  // 複数の法人格表記の中には返信引用ヘッダ等に混入した無関係な会社名
+  // (受信者自身の会社名)も確認されており、単純な最初の一致では送信元を
+  // 誤認するリスクが実証されたため。どちらのパターンにも一致しなければ、
+  // 要員本人の所属先を推測する機能ではないためcompanyNameは設定しない。
+  const companyName = extractGreetingCompanyName(body) ?? extractSignatureCompanyName(body);
+  if (companyName) candidate.companyName = companyName;
 
-  // 商流。「商流：」「☆商流：」の明示ラベルを最優先する(実メールで確認
-  // された表記)。要員メール側にはこの明示ラベルはほぼ存在しないため、
-  // 無い場合は上記「所属」欄から得られた契約形態の記述を使う。
-  const commercialFlow = sanitizeDisplayName(extractLabeledValue(body, COMMERCIAL_FLOW_LABELS)) ?? affiliation?.flow;
+  // 商流・契約形態。「商流：」「☆商流：」の明示ラベルを最優先する(実
+  // メールで確認された表記)。要員メール側にはこの明示ラベルはほぼ存在
+  // しないため、無い場合は「所属：」欄の値をそのまま契約形態として使う
+  // (実メール調査で98%以上が契約形態の記述だったため。会社名部分を
+  // 抜き出す処理はしない — companyNameは上記の名乗りからのみ取得する
+  // 設計に一本化したため)。
+  const commercialFlow =
+    sanitizeDisplayName(extractLabeledValue(body, COMMERCIAL_FLOW_LABELS)) ??
+    sanitizeDisplayName(extractLabeledValue(body, AFFILIATION_LABELS));
   if (commercialFlow) candidate.commercialFlow = commercialFlow;
 
   const skillsValue = extractLabeledValue(body, ['スキル']);

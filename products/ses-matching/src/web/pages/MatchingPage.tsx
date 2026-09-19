@@ -119,7 +119,7 @@ export function MatchingPage() {
               )}
               {useReal && engineer && (
                 <span style={{ width: '100%', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  所属: {engineer.affiliatedCompany ?? '未記載'} ・ 商流: {engineer.commercialFlow ?? '商流情報なし'}
+                  会社名: {engineer.companyName ?? '未記載'} ・ 商流: {engineer.commercialFlow ?? '商流情報なし'}
                 </span>
               )}
             </div>

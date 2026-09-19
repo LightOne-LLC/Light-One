@@ -42,8 +42,8 @@ export function EngineerDetailPage() {
       {useReal && (
         <div className="card">
           <div className="card-row">
-            <span>所属会社</span>
-            <span>{engineer.affiliatedCompany ?? '未記載'}</span>
+            <span>会社名</span>
+            <span>{engineer.companyName ?? '未記載'}</span>
           </div>
           <div className="card-row">
             <span>商流</span>

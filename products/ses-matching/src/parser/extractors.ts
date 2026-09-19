@@ -454,43 +454,60 @@ export function extractCompanyName(body: string): string | undefined {
   return undefined;
 }
 
-// 実メール(要員メール59件)の調査で、「所属：」の値の98%以上
-// (54/55件)が「弊社個人事業主」「弊社フリーランス」「弊社プロパー」の
+// 実メール(要員メール134件、500件取得規模)の調査で、「所属：」の値の
+// 98%以上が「弊社個人事業主」「弊社フリーランス」「弊社プロパー」の
 // ような契約形態(商流)の記述であり、会社名ではなかった(「弊社」は
-// 送信元BPエージェント自身を指す一人称)。「所属」ラベルだから機械的に
-// 会社名として扱うのではなく、値の中身を見て判定する。
-//   - 法人格表記(株式会社/㈱/有限会社等)を含む場合のみ、その部分を
-//     会社名として抜き出し、残りを契約形態(商流)とする
-//     (例: "サクシード株式会社 社員" → 会社名"サクシード株式会社" +
-//     商流"社員")。
-//   - 法人格表記が無くても、「名称（社員）」のように既知の雇用形態語を
-//     伴う括弧表記がある場合は、括弧の前を会社名、中身を商流とする
-//     (例: "サクシード（社員）" → 会社名"サクシード" + 商流"社員")。
-//   - どちらにも該当しない場合、会社名と断定できる根拠が無いため、
-//     値全体を契約形態(商流)として扱い、会社名は推測しない
-//     (undefinedのまま)。
-const EMPLOYMENT_STATUS_WORDS = ['個人事業主', 'フリーランス', 'プロパー', '正社員', '契約社員', '業務委託', '準委任', '社員'];
-const TRAILING_STATUS_PAREN_RE = new RegExp(`^(.+?)[（(](${EMPLOYMENT_STATUS_WORDS.join('|')})[)）]\\s*$`);
+// 送信元BPエージェント自身を指す一人称であり、要員本人でも要員の所属先
+// でもない)。要員本人の所属先を明示する専用ラベルは1件も確認できな
+// かった。
+//
+// 「その要員情報を送信してきた会社名」(companyName)は、「所属」欄とは
+// 完全に独立して、本文冒頭の名乗り(自己紹介文)からのみ抽出する。
+// extractCompanyName()の単独会社名フォールバック(PLAIN_COMPANY_RE)は
+// 要員メールには使わない — 実メール調査で、本文中に複数の法人格表記が
+// 存在し(返信の引用ヘッダ等に混入した自社(受信者側)の会社名を含む
+// ケースも確認)、単純な最初の一致では送信元を誤認するリスクが実証され
+// たため。自己紹介文が見つからない場合はcompanyNameを推測せずundefined
+// のままにする。
+export function extractGreetingCompanyName(body: string): string | undefined {
+  const greeting = body.match(GREETING_COMPANY_RE);
+  return greeting ? greeting[1] : undefined;
+}
 
-/** 「所属」欄の値を、会社名(あれば)と契約形態(商流)に分離する。
- * 会社名が根拠を持って特定できない場合はcompanyをundefinedのままにし、
- * 値全体をflowとして返す(推測で会社名を生成しない)。 */
-export function splitAffiliationValue(raw: string): { company?: string; flow?: string } {
-  const legalMatch = raw.match(new RegExp(`\\S*${COMPANY_MARK}\\S*`));
-  if (legalMatch) {
-    return {
-      company: sanitizeDisplayName(legalMatch[0]),
-      flow: sanitizeDisplayName(raw.replace(legalMatch[0], '')),
-    };
+// 名乗り(自己紹介文)が見つからない場合の第2の手がかりとして、署名ブロック
+// (会社名の近くにTEL/Mobile/Email/HP等の連絡先ラベルが伴う箇所)を使う。
+// 実メール調査で、返信の引用ヘッダ等に混入した無関係な会社名(受信者
+// 自身の会社名を含む)は、本文中の他の連絡先ラベルから離れた位置(数百〜
+// 2000文字以上)に単独で現れる一方、実際の送信元の署名は近傍(実測で
+// 184文字)に連絡先ラベルを伴うことを確認した。HTML由来で改行が失われ
+// 1行化した本文にも対応するため、行単位ではなく文字数の近さで判定する。
+// この距離の閾値(300文字)を超える場合は、署名として断定できる根拠が
+// 無いため会社名を推測しない(undefinedのまま)。
+const SIGNATURE_CONTACT_LABEL_RE = /(TEL|Tel|tel|Mobile|Email|E-mail|HP|FAX|Fax|URL)[:：]/;
+const SIGNATURE_PROXIMITY_WINDOW = 300;
+
+export function extractSignatureCompanyName(body: string): string | undefined {
+  const companyRe = new RegExp(`\\S*${COMPANY_MARK}\\S*`, 'g');
+  let best: { value: string; distance: number } | undefined;
+  let match: RegExpExecArray | null;
+  while ((match = companyRe.exec(body)) !== null) {
+    const matchEnd = match.index + match[0].length;
+    const before = body.slice(Math.max(0, match.index - SIGNATURE_PROXIMITY_WINDOW), match.index);
+    const after = body.slice(matchEnd, matchEnd + SIGNATURE_PROXIMITY_WINDOW);
+
+    let distance: number | undefined;
+    const afterLabel = SIGNATURE_CONTACT_LABEL_RE.exec(after);
+    if (afterLabel) distance = afterLabel.index;
+    const beforeLabel = SIGNATURE_CONTACT_LABEL_RE.exec(before);
+    if (beforeLabel) {
+      const beforeDistance = before.length - beforeLabel.index - beforeLabel[0].length;
+      if (distance === undefined || beforeDistance < distance) distance = beforeDistance;
+    }
+    if (distance === undefined) continue;
+
+    if (!best || distance < best.distance) {
+      best = { value: match[0], distance };
+    }
   }
-
-  const parenMatch = raw.match(TRAILING_STATUS_PAREN_RE);
-  if (parenMatch) {
-    return {
-      company: sanitizeDisplayName(parenMatch[1]),
-      flow: sanitizeDisplayName(parenMatch[2]),
-    };
-  }
-
-  return { flow: sanitizeDisplayName(raw) };
+  return best ? sanitizeDisplayName(best.value) : undefined;
 }

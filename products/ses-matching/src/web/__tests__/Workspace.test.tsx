@@ -15,12 +15,15 @@ import { matchProjectToEngineers } from '../../matching/matchProjectToEngineers'
 // 実メールのケース(内部IDフォールバック表示)を、既存の各テストの流れの中で
 // 自然にカバーするため。
 //
-// 所属会社/商流のデータモデル(実メール59件の監査結果に基づく):
-// 「所属：」の値は98%以上が「弊社フリーランス」等の契約形態(商流)の記述で
-// あり、会社名では無かった。会社名として安全に取得できるのは、値に法人格
-// 表記(株式会社等)が含まれる稀なケースのみ。realEngineerGoodはその稀な
-// ケース(会社名+雇用形態が分離済み)、realEngineerWeakは典型的なケース
-// (会社名は無く、契約形態のみ)を表す。
+// companyName/commercialFlowのデータモデル(実メール500件・要員134件の
+// 監査結果に基づく):
+// companyName = 「その要員情報を送信してきた会社名」(本文冒頭の名乗り・
+// 署名からのみ抽出。要員本人の所属会社を推測するフィールドではない)。
+// commercialFlow = 「所属：」欄の値をそのまま保持する契約形態の記述
+// (「弊社フリーランス」等。会社名らしき文字列を含んでいても分離しない
+// — companyNameとは完全に独立した別の抽出元を持つため)。
+// realEngineerGoodは両方取得できたケース、realEngineerWeakはcompanyName
+// が取得できなかった典型的なケース(実メールの過半数)を表す。
 const realProject: ProjectRecord = {
   id: 'real-project-1',
   projectName: 'クラウド基盤構築案件',
@@ -37,11 +40,14 @@ const realProject: ProjectRecord = {
 const realEngineerGood: EngineerRecord = {
   id: 'real-engineer-good',
   engineerName: 'エンジニアA',
-  // 「所属：サンプルテック株式会社 社員」のような、法人格表記を含む
-  // 稀なケース。parserが会社名と雇用形態をあらかじめ分離済みの状態
+  // 本文冒頭の名乗り等から取得できた送信元会社名。案件側のsourceCompany
+  // (株式会社サンプルテック)とは別の値にして、案件出し会社と要員の
+  // companyNameが混同されていないことをテストで直接確認できるようにする。
+  companyName: '株式会社キャリアビート',
+  // 「所属：サクシード株式会社 社員」のような、会社名らしき文字列を含む
+  // 値でも、companyNameへ分離せずそのままcommercialFlowとして保持する
   // (このfixtureはparser通過後のEngineerRecordを表す)。
-  affiliatedCompany: 'サンプルテック株式会社',
-  commercialFlow: '社員',
+  commercialFlow: 'サクシード株式会社 社員',
   skills: [{ name: 'Java', years: 5 }],
   desiredRateMin: 65,
   desiredRateMax: 75,
@@ -52,9 +58,8 @@ const realEngineerGood: EngineerRecord = {
 
 const realEngineerWeak: EngineerRecord = {
   id: 'real-engineer-weak',
-  // 「所属：弊社フリーランス」のような、実メールで最多(98%以上)の
-  // ケース。会社名では無いためaffiliatedCompanyは設定せず、契約形態を
-  // そのままcommercialFlowとする。
+  // 送信元会社名が本文から特定できなかった典型的なケース(実メールの
+  // 過半数)。companyNameは設定せず、契約形態のみcommercialFlowとする。
   commercialFlow: '弊社フリーランス',
   skills: [{ name: 'PHP', years: 2 }],
   desiredRateMin: 100,
@@ -156,10 +161,10 @@ describe('Matching Workspace(実データがWorkspace全体を経由してEngine
     // 会社/商流→マッチング候補、を1画面で追えることの一部)。
     expect(screen.getByText('株式会社サンプルテック')).toBeTruthy();
     expect(screen.getByText('貴社まで')).toBeTruthy();
-    // 候補カードでも、人材の所属会社・商流を確認できる(案件出し会社とは
+    // 候補カードでも、人材の会社名・商流を確認できる(案件出し会社とは
     // 別の値であり、混同していないことを直接確認する)。
-    expect(screen.getByText(/サンプルテック株式会社/)).toBeTruthy();
-    expect(screen.getByText(/社員/)).toBeTruthy();
+    expect(screen.getByText(/株式会社キャリアビート/)).toBeTruthy();
+    expect(screen.getByText(/サクシード株式会社 社員/)).toBeTruthy();
 
     // 候補をクリック → Engineer Detailでページタイトルが人材名になり、
     // スコア内訳が既存calcTotalScore()と一致する
@@ -170,10 +175,10 @@ describe('Matching Workspace(実データがWorkspace全体を経由してEngine
     expect(screen.getByRole('heading', { level: 1, name: 'エンジニアA' })).toBeTruthy();
     expect(screen.getByText('ID: real-engineer-good')).toBeTruthy();
     expect(screen.getByText(/クラウド基盤構築案件/)).toBeTruthy();
-    // Engineer Detail上部で所属会社・商流を確認できる(別フィールドとして
-    // 分離済みであることを直接確認する)。
-    expect(screen.getByText('サンプルテック株式会社')).toBeTruthy();
-    expect(screen.getByText('社員')).toBeTruthy();
+    // Engineer Detail上部で会社名・商流を確認できる(companyNameが案件側
+    // sourceCompanyとは別の値であることも含めて直接確認する)。
+    expect(screen.getByText('株式会社キャリアビート')).toBeTruthy();
+    expect(screen.getByText('サクシード株式会社 社員')).toBeTruthy();
 
     const totalScoreEl = document.querySelector('.ranking-score');
     expect(totalScoreEl?.textContent).toBe(String(expectedBreakdown.totalScore));
@@ -267,14 +272,14 @@ describe('Matching Workspace(実データがWorkspace全体を経由してEngine
     expect(screen.getByText('人材ID: real-engineer-weak')).toBeTruthy();
     // 名前が表示されている候補は、内部IDも小さく併記する(デバッグ用途)。
     expect(screen.getByText('ID: real-engineer-good')).toBeTruthy();
-    // 所属会社・商流も表示される。realEngineerGoodは「会社名+雇用形態」の
-    // 稀なケース(分離済み)、realEngineerWeakは典型的な「会社名は無く
-    // 契約形態のみ」のケース(所属会社は未記載、商流に契約形態が入る)。
+    // 会社名・商流も表示される。realEngineerGoodは送信元会社名を取得
+    // できたケース、realEngineerWeakは取得できなかった典型的なケース
+    // (会社名は未記載、商流に契約形態が入る)。
     // getByTextは一致が複数あると例外を投げるため、この1件ずつが通ること
-    // 自体が「所属会社の値が商流欄に重複して表示されていないこと」の確認
-    // になる(所属会社を商流と誤認しない回帰確認)。
-    expect(screen.getByText('サンプルテック株式会社')).toBeTruthy();
-    expect(screen.getByText('社員')).toBeTruthy();
+    // 自体が「商流の値が会社名欄に重複して表示されていないこと」の確認
+    // になる(会社名と商流を混同しない回帰確認)。
+    expect(screen.getByText('株式会社キャリアビート')).toBeTruthy();
+    expect(screen.getByText('サクシード株式会社 社員')).toBeTruthy();
     expect(screen.getByText('弊社フリーランス')).toBeTruthy();
     expect(screen.getAllByText('未記載').length).toBeGreaterThan(0);
   });
