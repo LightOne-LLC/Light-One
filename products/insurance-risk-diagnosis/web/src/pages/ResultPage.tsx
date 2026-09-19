@@ -98,6 +98,12 @@ export function ResultPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-10">
+      {/*
+        ページ内の見出し(ReportSectionのh2)はいずれも「01 優先して確認する領域」のような
+        章題であり、ページ全体を表すh1が無いとスクリーンリーダーの見出し階層が
+        h2から始まってしまう。視覚デザインは変えず、読み上げ専用のh1を先頭に置く。
+      */}
+      <h1 className="sr-only">保険リスク診断結果</h1>
       <div className="flex items-center justify-between gap-3 flex-wrap pb-5 mb-7 border-b border-line print:hidden">
         <Link to="/history" className="inline-flex items-center gap-2 text-[13px] text-ink-muted hover:text-navy transition-colors py-2">
           <span aria-hidden="true">←</span> 履歴一覧

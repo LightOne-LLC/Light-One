@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { RequireAuth } from './components/auth/RequireAuth';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { LoadingState } from './components/ui';
 
 const LoginPage = lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.LoginPage })));
@@ -61,36 +62,38 @@ export default function App() {
   return (
     <div className="min-h-screen page-ground">
       <Header />
-      <Suspense fallback={<LoadingState message="読み込み中" />}>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route
-            path="/diagnosis"
-            element={
-              <RequireAuth>
-                <DiagnosisFormPage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/result/:id"
-            element={
-              <RequireAuth>
-                <ResultPage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/history"
-            element={
-              <RequireAuth>
-                <HistoryPage />
-              </RequireAuth>
-            }
-          />
-          <Route path="*" element={<Navigate to="/diagnosis" replace />} />
-        </Routes>
-      </Suspense>
+      <ErrorBoundary>
+        <Suspense fallback={<LoadingState message="読み込み中" />}>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route
+              path="/diagnosis"
+              element={
+                <RequireAuth>
+                  <DiagnosisFormPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/result/:id"
+              element={
+                <RequireAuth>
+                  <ResultPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/history"
+              element={
+                <RequireAuth>
+                  <HistoryPage />
+                </RequireAuth>
+              }
+            />
+            <Route path="*" element={<Navigate to="/diagnosis" replace />} />
+          </Routes>
+        </Suspense>
+      </ErrorBoundary>
     </div>
   );
 }
