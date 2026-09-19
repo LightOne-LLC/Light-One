@@ -143,7 +143,7 @@ describe('ResultPage dashboard panels - 実データでのレンダリング検�
       ),
     };
     const html = renderToStaticMarkup(<EvidenceSourcesPanel result={resultWithNoAssetEvidence} />);
-    expect(html).toContain('公的制度・モデル前提の出典を参照していません');
+    expect(html).toContain('特定の公的制度を根拠にしておらず');
   });
 
   test('空データ(子供なし・配偶者なし・履歴0件相当)でもクラッシュしない', () => {

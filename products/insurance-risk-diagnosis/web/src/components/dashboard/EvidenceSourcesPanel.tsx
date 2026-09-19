@@ -16,9 +16,12 @@ import { Card, SectionHeader, Eyebrow } from '../ui';
     制度・前提なのか)・一次情報はどこか」を1件ごとに示す。
   - direct evidenceには、それを裏付ける実際の計算根拠(reason)の一節を短く引用する。
     これにより「自分のどの判定に関係するか」を具体的な数字・文言のレベルで追跡できる。
-  - 7領域すべてを表示し、出典が無い領域も「このカテゴリでは公的制度・モデル前提の
-    出典を参照していません」と明示する。単に非表示にすると、バグなのか
-    本当に該当が無いのか区別できず誤解を招くため。
+  - 7領域すべてを表示し、出典が無い領域も「特定の公的制度を根拠にしていない」旨を
+    明示する。単に非表示にすると、バグなのか本当に該当が無いのか区別できず
+    誤解を招くため。
+  - direct/relatedというEvidence Mapping内部の用語はそのままUIに出さず、
+    「この判定の根拠」「関連する制度情報」というユーザー視点の日本語に変換する
+    (Evidence architecture自体・relevanceの値そのものは変更しない)。
   - CoverageBreakdown/SuggestedActionsPanel内の出典表示は組織名だけの小さな
     indicatorとし、実際のリンク付き詳細はここに集約する(重複した長い引用の
     繰り返しを避ける階層構造)。
@@ -28,8 +31,10 @@ function truncate(text: string, max = 70): string {
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
+// direct/relatedというEvidence Mapping内部の用語をそのままUIに出さず、
+// ユーザーが読んで意味の分かる日本語に変換する。
 function relevanceLabel(evidence: Evidence): string {
-  return evidence.relevance === 'direct' ? 'この判定の計算に使用' : '関連する制度・前提';
+  return evidence.relevance === 'direct' ? 'この判定の根拠' : '関連する制度情報';
 }
 
 function EvidenceItem({ evidence }: { evidence: Evidence }) {
@@ -69,7 +74,7 @@ function CategoryEvidenceGroup({ category }: { category: CategoryExplanation }) 
       <Eyebrow className="mb-1.5">{category.label}リスク</Eyebrow>
       {category.evidence.length === 0 ? (
         <p className="text-[11px] leading-relaxed text-ink-faint">
-          このカテゴリでは公的制度・モデル前提の出典を参照していません。
+          この判定は特定の公的制度を根拠にしておらず、入力いただいた情報をもとに算出しています。
         </p>
       ) : (
         <>
