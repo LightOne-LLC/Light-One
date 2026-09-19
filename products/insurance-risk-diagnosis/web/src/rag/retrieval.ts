@@ -98,3 +98,24 @@ export function retrieveForCategory(category: RiskCategoryResult, limit = 3): Re
   const text = [category.label, ...category.reasons].join(' ');
   return search({ text, category: category.key, limit });
 }
+
+/**
+ * KnowledgeSourceをRetrievedSourceへ変換する。evidenceMapping.ts が
+ * (relatedReasonKeysの直接一致など)search()を経由しない独自のスコアリングで
+ * 資料を採用する場合に、出典metadataの組み立てを共通化するためのヘルパー。
+ * search()自体の挙動・戻り値は変更しない。
+ */
+export function toRetrievedSource(source: KnowledgeSource, score: number, highlightTerms: string[] = []): RetrievedSource {
+  return {
+    sourceId: source.sourceId,
+    title: source.title,
+    organization: source.organization,
+    url: source.url,
+    category: source.category,
+    snippet: buildSnippet(source.content, highlightTerms.length > 0 ? highlightTerms : [source.title]),
+    score,
+    effectiveDate: source.effectiveDate,
+    retrievedDate: source.retrievedDate,
+    version: source.version,
+  };
+}

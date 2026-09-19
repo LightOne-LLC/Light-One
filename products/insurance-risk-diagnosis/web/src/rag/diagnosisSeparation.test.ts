@@ -2,6 +2,8 @@ import { describe, test, expect } from 'vitest';
 import { runDiagnosis } from '../calc';
 import type { DiagnosisInput } from '../types/diagnosis';
 import { explainCategories } from './explain';
+import { buildEvidenceForCategories } from './evidenceMapping';
+import { buildDiagnosisExplanation } from './explanation';
 
 /*
   RAGは「診断結果を決めるAI」ではないことをテストで固定する。
@@ -52,8 +54,10 @@ describe('RAG導入による既存診断エンジンへの非干渉', () => {
     const input = sampleInput();
 
     const before = runDiagnosis(input);
-    // RAGの主要APIを実際に呼び出す(explainCategoriesはretrieval+explainを内部で使う)
+    // RAGの主要API(retrieval → evidence mapping → explanation)をすべて実際に呼び出す
     explainCategories(before.categories);
+    buildEvidenceForCategories(before.categories);
+    buildDiagnosisExplanation(before);
     const after = runDiagnosis(input);
 
     expect(after.overallScore).toBe(before.overallScore);
@@ -71,6 +75,22 @@ describe('RAG導入による既存診断エンジンへの非干渉', () => {
     explainCategories(result.categories);
 
     expect(JSON.stringify(result.categories)).toBe(snapshotBefore);
+  });
+
+  test('buildDiagnosisExplanationはDiagnosisResultを変更せず、reasons/score/levelをそのまま保持する', () => {
+    const input = sampleInput();
+    const result = runDiagnosis(input);
+    const snapshotBefore = JSON.stringify(result);
+
+    const explanation = buildDiagnosisExplanation(result);
+
+    expect(JSON.stringify(result)).toBe(snapshotBefore);
+    for (const category of explanation.categories) {
+      const original = result.categories.find((c) => c.key === category.key);
+      expect(category.why).toEqual(original?.reasons);
+      expect(category.score).toBe(original?.score);
+      expect(category.level).toBe(original?.level);
+    }
   });
 
   test('同じ入力に対しrunDiagnosisは常に同じスコアを返す(RAGの検索スコアのような非決定要素を持ち込まない)', () => {

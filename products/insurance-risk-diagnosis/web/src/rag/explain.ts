@@ -1,5 +1,5 @@
 import type { RiskCategoryResult } from '../types/diagnosis';
-import { retrieveForCategory } from './retrieval';
+import { buildEvidenceForCategory } from './evidenceMapping';
 import type { RetrievedSource } from './types';
 
 /*
@@ -36,12 +36,12 @@ export interface Explanation {
 
 /**
  * 診断結果の1カテゴリについて、根拠付きの説明を生成する。
- * LLMを使わず、検索結果(RetrievedSource[])をそのまま添付するだけの決定論的な処理。
+ * LLMを使わず、Evidence Mapping(evidenceMapping.ts)の結果をそのまま添付するだけの決定論的な処理。
  * sourcesが空でも diagnosisReasons(既存の決定論的根拠)は必ず返す — 「出典が無ければ何も説明しない」
  * のではなく、「出典が無い場合はそれを明示した上で、診断ロジック自身の根拠のみを示す」。
  */
 export function explainCategory(category: RiskCategoryResult): Explanation {
-  const sources = retrieveForCategory(category);
+  const sources = buildEvidenceForCategory(category).map((e) => e.source);
   return {
     categoryKey: category.key,
     categoryLabel: category.label,

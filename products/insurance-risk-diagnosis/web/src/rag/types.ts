@@ -39,6 +39,20 @@ export interface KnowledgeSource {
   version: string;
   /** 検索用のキーワード。カテゴリラベルや制度名の別名などを含む */
   tags: string[];
+  /**
+   * この資料が実際に関係する診断カテゴリ(複数可)。'general'資料(前提条件など)は
+   * 該当しうる全カテゴリを列挙する。単純なcategoryフィルタより明示的に管理するための項目。
+   */
+  applicableRiskCategories: RiskCategoryKey[];
+  /**
+   * 決定論的診断エンジン(web/src/calc)のreasons[]文字列に実際に出現する固定フレーズ。
+   * ここに列挙した文字列がRiskCategoryResult.reasonsのいずれかに部分一致した場合、
+   * 「キーワード類似」ではなく「この判定の計算過程で直接使われた根拠」として
+   * 高い確度で紐付けられる(Evidence Mappingのdirect match)。
+   * 診断エンジンのreasons文言が変わった場合はここも追従させる。
+   * 該当する固定フレーズが無い資料は空配列とし、無理に一致させない。
+   */
+  relatedReasonKeys: string[];
   /** その他の補助情報(公開日・更新日が分かる場合のみ設定) */
   metadata?: {
     publishedDate?: string;
@@ -67,4 +81,28 @@ export interface RagQuery {
   text: string;
   category?: KnowledgeCategory;
   limit?: number;
+}
+
+/*
+  Evidence Mapping。
+
+  単純なkeyword検索(RagQuery → RetrievedSource[])の上位に位置する概念で、
+  「診断結果の特定のreasonが、どの資料によって裏付けられるか」を明示する。
+  - relevance 'direct'  : relatedReasonKeysが実際のreasons文字列に一致した高確度の対応
+  - relevance 'related' : 直接一致は無いが、カテゴリ・キーワードから関連すると判断した資料
+  matchedReasonは常に「診断エンジンが実際に生成した文字列」であり、Evidence Mapping側が
+  新しい主張を作ることはない。
+*/
+export interface Evidence {
+  source: RetrievedSource;
+  /** この根拠が紐づいた、診断エンジンの実際のreasons[]文字列(またはカテゴリラベル) */
+  matchedReason: string;
+  relevance: 'direct' | 'related';
+  score: number;
+}
+
+/** 1つの推奨アクション(NEXT_STEPS)に、どの資料が関連するかを保持する。 */
+export interface ActionEvidence {
+  action: string;
+  sources: RetrievedSource[];
 }

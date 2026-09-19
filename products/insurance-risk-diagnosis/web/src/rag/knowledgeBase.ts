@@ -7,16 +7,21 @@ import type { KnowledgeSource } from './types';
   Tier 2: 既存の決定論的診断ロジック(web/src/calc)が前提としている計算方法の説明。
 
   重要な制約:
-  - ここに書く内容は、既存の web/src/calc/publicSystemParams.ts および各 *Risk.ts の
-    reasons文字列としてすでにコードに存在する記述の範囲に留める。診断ロジックが
-    参照していない新しい数値・制度を勝手に追加しない。
+  - ここに書く内容は、既存の web/src/calc/publicSystemParams.ts・params.ts・education.ts・
+    livingCost.ts および各 *Risk.ts の reasons文字列としてすでにコードに存在する記述の範囲に留める。
+    診断ロジックが参照していない新しい数値・制度を勝手に追加しない。
+  - relatedReasonKeys は、実際にcalc engineが生成するreasons[]文字列に verbatim で
+    出現するフレーズのみを登録する(Evidence Mappingのdirect match用)。一致するフレーズが
+    無い場合は空配列のままにし、無理に対応付けない。
   - 金額・条件は publicSystemParams.ts の PUBLIC_SYSTEM_ASOF と同じ効力発生時点
     (2024年度・令和6年度時点)を明記する。将来の制度改定時は、まず
     web/src/calc/publicSystemParams.ts を更新し、その変更に合わせてこのファイルの
-    該当エントリの version / effectiveDate / content を更新する運用とする。
+    該当エントリの version / effectiveDate / content / relatedReasonKeys を更新する運用とする。
   - url は一次情報の発行機関の公式サイト(トップページ)。個別ページへの深いリンクは
     リンク切れ・改定によるずれのリスクがあるため、本MVPでは組織の公式サイトを
-    確実な参照先として採用する。
+    確実な参照先として採用する。'LIGHT ONE'を発行元とするTier2エントリも、
+    その計算方法が最も強く関係する公的機関の公式サイトを url として付す
+    (存在確認できないURLを新規に作らない)。
 */
 
 const RETRIEVED_DATE = '2026-09-19';
@@ -39,6 +44,8 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
     retrievedDate: RETRIEVED_DATE,
     version: '1.0',
     tags: ['遺族年金', '遺族基礎年金', '遺族厚生年金', '死亡', '国民年金', '厚生年金'],
+    applicableRiskCategories: ['death'],
+    relatedReasonKeys: ['遺族基礎年金', '遺族厚生年金', '自営業(国民年金のみ)のため遺族厚生年金'],
   },
   {
     sourceId: 'public-sick-leave-benefit',
@@ -55,6 +62,8 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
     retrievedDate: RETRIEVED_DATE,
     version: '1.0',
     tags: ['傷病手当金', '就業不能', '健康保険', '自営業', '国民健康保険'],
+    applicableRiskCategories: ['disability'],
+    relatedReasonKeys: ['傷病手当金', '国民健康保険)のため傷病手当金の対象外'],
   },
   {
     sourceId: 'public-high-cost-medical',
@@ -72,6 +81,8 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
     retrievedDate: RETRIEVED_DATE,
     version: '1.0',
     tags: ['高額療養費', '医療', '自己負担限度額', '健康保険'],
+    applicableRiskCategories: ['medical'],
+    relatedReasonKeys: ['高額療養費制度'],
   },
   {
     sourceId: 'public-disability-pension',
@@ -88,6 +99,10 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
     retrievedDate: RETRIEVED_DATE,
     version: '1.0',
     tags: ['障害年金', '障害基礎年金', '障害厚生年金', '就業不能'],
+    applicableRiskCategories: ['disability'],
+    // 現在のdisabilityRisk.tsのreasons[]は傷病手当金のみを説明しており、障害年金の金額は
+    // 計算に使用していない(制度としての一般知識として保持)。存在しない直接一致を作らない。
+    relatedReasonKeys: [],
   },
   {
     sourceId: 'public-long-term-care-insurance',
@@ -103,6 +118,8 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
     retrievedDate: RETRIEVED_DATE,
     version: '1.0',
     tags: ['介護保険', '要介護', '要支援', '自己負担割合'],
+    applicableRiskCategories: ['care'],
+    relatedReasonKeys: ['介護保険制度により自己負担は原則'],
   },
   {
     sourceId: 'public-old-age-pension',
@@ -119,6 +136,8 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
     retrievedDate: RETRIEVED_DATE,
     version: '1.0',
     tags: ['老齢年金', '老齢基礎年金', '老齢厚生年金', 'ねんきん定期便', '老後'],
+    applicableRiskCategories: ['retirement'],
+    relatedReasonKeys: ['公的年金(自営業・国民年金のみ)', '公的年金(会社員/公務員)'],
   },
   {
     sourceId: 'public-inheritance-tax-deduction',
@@ -136,9 +155,11 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
     retrievedDate: RETRIEVED_DATE,
     version: '1.0',
     tags: ['相続税', '基礎控除', '法定相続人', '相続'],
+    applicableRiskCategories: ['inheritance'],
+    relatedReasonKeys: ['相続税の基礎控除'],
   },
 
-  // --- Tier 2: 診断ロジックの計算根拠 ---
+  // --- Tier 2: 診断ロジックの計算根拠(モデルの前提・簡略化そのものの説明) ---
   {
     sourceId: 'diagnosis-assumptions-general',
     title: '本診断の計算前提',
@@ -154,12 +175,14 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
     retrievedDate: RETRIEVED_DATE,
     version: '1.0',
     tags: ['前提条件', 'assumptions', '概算', '制度改定'],
+    applicableRiskCategories: ['death', 'medical', 'disability', 'retirement', 'care', 'asset', 'inheritance'],
+    relatedReasonKeys: [],
   },
   {
     sourceId: 'diagnosis-death-coverage-methodology',
     title: '死亡保障必要額の計算方法',
     organization: 'LIGHT ONE',
-    url: 'https://www.mhlw.go.jp/',
+    url: 'https://www.nenkin.go.jp/',
     category: 'death',
     content:
       '必要死亡保障額は「遺族の生活費(末子が独立するまでの期間と、その後の配偶者のみの期間の2段階)+教育費の残り総額' +
@@ -170,12 +193,50 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
     retrievedDate: RETRIEVED_DATE,
     version: '1.0',
     tags: ['死亡保障', '必要保障額', '教育費', '生活費', '葬儀費用'],
+    applicableRiskCategories: ['death'],
+    relatedReasonKeys: ['葬儀費用等の一時費用', '負債の上乗せ'],
+  },
+  {
+    sourceId: 'diagnosis-survivor-pension-simplification',
+    title: '遺族年金額モデルの簡略化について',
+    organization: 'LIGHT ONE',
+    url: 'https://www.nenkin.go.jp/',
+    category: 'death',
+    content:
+      '実際の遺族年金額の計算式は加入期間・報酬比例部分等により複雑なため、本診断では大幅に単純化した概算値を用いている。' +
+      '遺族基礎年金は基本額(年額目安)に子の加算(2人目まで)を加えた額を、末子が18歳に達するまでの年数分だけ計上する。' +
+      '遺族厚生年金(会社員・公務員のみ)は、年収に簡易係数(年率目安)を乗じた額を、必要な年数分だけ計上する。' +
+      '自営業者(国民年金のみ)には遺族厚生年金を計上しない。実際の受給見込み額は「ねんきん定期便」等で確認できる。',
+    effectiveDate: EFFECTIVE_DATE,
+    retrievedDate: RETRIEVED_DATE,
+    version: '1.0',
+    tags: ['遺族年金', '簡易概算', 'モデル簡略化'],
+    applicableRiskCategories: ['death'],
+    relatedReasonKeys: ['遺族基礎年金(簡易概算)', '遺族厚生年金(簡易概算'],
+  },
+  {
+    sourceId: 'diagnosis-living-cost-education-assumptions',
+    title: '生活費・教育費モデルの前提',
+    organization: 'LIGHT ONE',
+    url: 'https://www.stat.go.jp/',
+    category: 'general',
+    content:
+      '本診断における年間生活費の目安(未入力時)は年収に対する一定割合として概算し、教育費の残り総額は' +
+      '幼稚園から大学までの各ステージの在籍全期間総額(公立/私立)を子の現在年齢から按分して算出する。' +
+      'これらの係数は、総務省「家計調査」・文部科学省「子供の学習費調査」等の公的統計を参考値として設計した' +
+      '簡易モデルであり、個別の統計値をそのまま転記したものではなく、実額とは異なる目安にとどまる。',
+    effectiveDate: EFFECTIVE_DATE,
+    retrievedDate: RETRIEVED_DATE,
+    version: '1.0',
+    tags: ['生活費', '教育費', '家計調査', '子供の学習費調査', 'モデル前提'],
+    applicableRiskCategories: ['death', 'disability', 'retirement', 'asset'],
+    relatedReasonKeys: ['年間生活費目安', '年間生活費(入力値)', '年分:'],
   },
   {
     sourceId: 'diagnosis-disability-risk-methodology',
     title: '就業不能リスクの評価方法',
     organization: 'LIGHT ONE',
-    url: 'https://www.mhlw.go.jp/',
+    url: 'https://www.kyoukaikenpo.or.jp/',
     category: 'disability',
     content:
       '就業不能リスクは、会社員・公務員は傷病手当金の支給上限期間である1年6か月、自営業者は公的な所得保障がないことを踏まえ' +
@@ -185,6 +246,8 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
     retrievedDate: RETRIEVED_DATE,
     version: '1.0',
     tags: ['就業不能', '傷病手当金', '生活防衛資金'],
+    applicableRiskCategories: ['disability'],
+    relatedReasonKeys: ['生活防衛資金'],
   },
   {
     sourceId: 'diagnosis-retirement-risk-methodology',
@@ -200,6 +263,8 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
     retrievedDate: RETRIEVED_DATE,
     version: '1.0',
     tags: ['老後資金', '退職金', '老後生活費'],
+    applicableRiskCategories: ['retirement'],
+    relatedReasonKeys: [],
   },
   {
     sourceId: 'diagnosis-care-risk-methodology',
@@ -215,6 +280,8 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
     retrievedDate: RETRIEVED_DATE,
     version: '1.0',
     tags: ['介護資金', '介護期間', '住宅改修'],
+    applicableRiskCategories: ['care'],
+    relatedReasonKeys: [],
   },
   {
     sourceId: 'diagnosis-inheritance-risk-methodology',
@@ -231,5 +298,7 @@ export const KNOWLEDGE_BASE: KnowledgeSource[] = [
     retrievedDate: RETRIEVED_DATE,
     version: '1.0',
     tags: ['相続税評価', '法定相続人数', '簡易モデル'],
+    applicableRiskCategories: ['inheritance'],
+    relatedReasonKeys: ['法定相続人数'],
   },
 ];
