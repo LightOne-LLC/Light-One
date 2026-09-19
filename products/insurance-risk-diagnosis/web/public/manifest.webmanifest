@@ -1,0 +1,19 @@
+{
+  "name": "LIGHT ONE — Financial Risk Intelligence",
+  "short_name": "LIGHT ONE",
+  "description": "死亡・医療・就業不能・老後・介護・資産・相続の7領域から、あなたの家計と保障の不足を診断します。",
+  "start_url": "/diagnosis",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#eceef2",
+  "theme_color": "#101a30",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -15,6 +15,17 @@ export function parseNumberFieldInput(raw: string): number | null {
   return Number.isNaN(n) ? null : n;
 }
 
+// min/maxはネイティブのinput属性としてはブラウザの視覚的ヒントにしかならず、
+// onChangeで渡ってくる値そのものは範囲外でも素通りしてしまう(例: 年齢に99999999を
+// 入力できてしまう)。診断エンジン(web/src/calc)は変更せず、入力層でのみ範囲外の
+// 極端な数値を確定時(blur)にクランプすることで、あり得ない数値が計算に渡るのを防ぐ。
+export function clampNumber(value: number, min?: number, max?: number): number {
+  let v = value;
+  if (min !== undefined && v < min) v = min;
+  if (max !== undefined && v > max) v = max;
+  return v;
+}
+
 interface NumberFieldProps {
   value: number;
   onChange: (value: number) => void;
@@ -51,6 +62,19 @@ export function NumberField({ value, onChange, className, min, max, step, placeh
     onChange(n);
   };
 
+  // 入力中はクランプしない(例: max=120に対して"1"→"12"の途中で弾かれるのを防ぐ)。
+  // 入力確定(blur)時にのみ範囲外の値を丸める。
+  const handleBlur = () => {
+    const n = parseNumberFieldInput(text);
+    if (n === null) return;
+    const clamped = clampNumber(n, min, max);
+    if (clamped !== n) {
+      setText(formatForDisplay(clamped));
+      lastEmitted.current = clamped;
+      onChange(clamped);
+    }
+  };
+
   return (
     <input
       type="number"
@@ -58,6 +82,7 @@ export function NumberField({ value, onChange, className, min, max, step, placeh
       className={className}
       value={text}
       onChange={(e) => handleChange(e.target.value)}
+      onBlur={handleBlur}
       min={min}
       max={max}
       step={step}
