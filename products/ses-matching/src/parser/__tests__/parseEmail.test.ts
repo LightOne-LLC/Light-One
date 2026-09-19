@@ -411,6 +411,8 @@ describe('parseEmail (案件出し会社/所属会社/商流の抽出)', () => {
     ['弊社個人事業主'],
     ['弊社フリーランス'],
     ['弊社プロパー'],
+    // 500件監査(Engineer 134件全数)で新たに確認した表記ゆれ。
+    ['直フリーランス'],
   ])('「所属: %s」は会社名ではなく契約形態(商流)として扱い、affiliatedCompanyは設定しない', (value) => {
     const email: RawEmail = {
       id: `email-engineer-flow-${value}`,

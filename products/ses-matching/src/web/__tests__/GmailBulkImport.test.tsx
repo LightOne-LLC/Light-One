@@ -42,11 +42,11 @@ describe('GmailBulkImport', () => {
     await waitFor(() => expect(fetch).toHaveBeenCalled());
   });
 
-  it('マウント時に自動で/api/gmail/fetchをlimit=200付きで呼ぶ(手動クリック不要)', async () => {
+  it('マウント時に自動で/api/gmail/fetchをlimit=500付きで呼ぶ(手動クリック不要)', async () => {
     mockFetchOnce({ success: true, fetched: 0 });
     renderComponent();
 
-    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/gmail/fetch?limit=200'));
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/gmail/fetch?limit=500'));
   });
 
   it('「最新データを取得」ボタンをクリックすると再度同じAPIを呼ぶ', async () => {
@@ -61,7 +61,7 @@ describe('GmailBulkImport', () => {
   it('集計結果(件数・分類・Validation PASS/FAIL・マッチング可能数)を表示する', async () => {
     mockFetchOnce({
       success: true,
-      limit: 200,
+      limit: 500,
       fetched: 50,
       project: { total: 10, valid: 3, invalid: 7 },
       engineer: { total: 31, valid: 5, invalid: 26 },

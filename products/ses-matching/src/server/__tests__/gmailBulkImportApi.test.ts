@@ -112,7 +112,7 @@ const unrelatedEmail: RawEmail = {
 };
 
 describe('clampLimit', () => {
-  it('デフォルト値(200)を返す(未指定)', () => {
+  it('デフォルト値(500)を返す(未指定)', () => {
     expect(clampLimit(undefined)).toBe(DEFAULT_LIMIT);
   });
 
@@ -126,7 +126,7 @@ describe('clampLimit', () => {
     expect(clampLimit(null)).toBe(DEFAULT_LIMIT);
   });
 
-  it('MAX_LIMIT(200)を超える値は上限に丸める(ユーザー入力をそのままGmail APIへ渡さない)', () => {
+  it('MAX_LIMIT(500)を超える値は上限に丸める(ユーザー入力をそのままGmail APIへ渡さない)', () => {
     expect(clampLimit(9999)).toBe(MAX_LIMIT);
   });
 
