@@ -15,6 +15,7 @@ import { SuggestedActionsPanel } from '../components/dashboard/SuggestedActionsP
 import { AssumptionsPanel } from '../components/dashboard/AssumptionsPanel';
 import { CoverageBreakdown } from '../components/dashboard/CoverageBreakdown';
 import { RadarChartPanel } from '../components/dashboard/RadarChartPanel';
+import { EvidenceSourcesPanel } from '../components/dashboard/EvidenceSourcesPanel';
 import { BasicInfoStep } from '../components/steps/BasicInfoStep';
 import { AssetStep } from '../components/steps/AssetStep';
 import { InsuranceStep } from '../components/steps/InsuranceStep';
@@ -104,12 +105,18 @@ describe('ResultPage dashboard panels - 実データでのレンダリング検�
     expect(html).toContain('死亡リスク');
   });
 
+  test('EvidenceSourcesPanel', () => {
+    const html = renderToStaticMarkup(<EvidenceSourcesPanel categories={result.categories} />);
+    expect(html).toContain('Sources');
+  });
+
   test('空データ(子供なし・配偶者なし・履歴0件相当)でもクラッシュしない', () => {
     const emptyResult = runDiagnosis(emptyDiagnosisInput());
     expect(() => renderToStaticMarkup(<RiskMapPanel categories={emptyResult.categories} />)).not.toThrow();
     expect(() => renderToStaticMarkup(<FinancialGapPanel categories={emptyResult.categories} />)).not.toThrow();
     expect(() => renderToStaticMarkup(<WhyPanel categories={emptyResult.categories} />)).not.toThrow();
     expect(() => renderToStaticMarkup(<TopRiskAreasPanel categories={emptyResult.categories} />)).not.toThrow();
+    expect(() => renderToStaticMarkup(<EvidenceSourcesPanel categories={emptyResult.categories} />)).not.toThrow();
   });
 });
 
