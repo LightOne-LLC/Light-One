@@ -42,8 +42,13 @@ function addDatePrecision(counts: DatePrecisionCounts, candidate: Record<string,
   }
 }
 
-export const DEFAULT_LIMIT = 50;
-export const MAX_LIMIT = 100;
+// PWA起動時の自動取得・手動再取得ともに500件を標準の取得件数とする
+// (営業デモでの案件・要員の母数を増やすための拡張。500はGmail API
+// messages.listの1ページあたりmaxResults上限でもあるため、追加の
+// ページネーション実装無しに安全に対応できる。既存のbulk fetch/
+// Parser/Validation/Matchingロジック自体は一切変更しない)。
+export const DEFAULT_LIMIT = 500;
+export const MAX_LIMIT = 500;
 
 /** ユーザー入力値をそのままGmail APIへ渡さないための境界。数値でない/0以下は
  * デフォルト値へ、上限を超える値はMAX_LIMITへ丸める(推測して補完しない —
@@ -89,9 +94,19 @@ function buildWorkspaceProject(
       ? (candidate.startDate as MatchingWorkspaceProject['startDate'])
       : undefined;
 
+  // 表示名はProjectRecordと同じ優先順位(案件名ラベル > 件名)を使う。
+  // candidate.projectNameはParser側(parseEmail.ts)で既にこの優先順位・
+  // サニタイズ済みの値として設定されているため、ここでは値の有無だけ見る
+  // (ロジックを重複実装しない)。
+  const projectName = typeof candidate.projectName === 'string' ? candidate.projectName : undefined;
+  const sourceCompany = typeof candidate.sourceCompany === 'string' ? candidate.sourceCompany : undefined;
+  const commercialFlow = typeof candidate.commercialFlow === 'string' ? candidate.commercialFlow : undefined;
+
   return {
     id: typeof candidate.id === 'string' ? candidate.id : '',
-    title: subject,
+    title: projectName ?? subject,
+    sourceCompany,
+    commercialFlow,
     skills,
     rateMin,
     rateMax,

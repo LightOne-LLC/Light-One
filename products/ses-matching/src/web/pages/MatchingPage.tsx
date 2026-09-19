@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { matchProjectToEngineers } from '../../matching/matchProjectToEngineers';
+import { resolveDisplayName } from '../displayName';
 import { scoreColorClass } from '../scoreColor';
 import { useMatchingPools } from '../useMatchingPools';
 
@@ -47,10 +48,24 @@ export function MatchingPage() {
         >
           {projectList.map((project) => (
             <option key={project.id} value={project.id}>
-              {project.id}
+              {resolveDisplayName('project', project.id, project.projectName, useReal)}
             </option>
           ))}
         </select>
+      )}
+
+      {useReal && selectedProject && (
+        <div className="card">
+          <div className="card-title">{resolveDisplayName('project', selectedProject.id, selectedProject.projectName, useReal)}</div>
+          <div className="card-row">
+            <span>案件出し会社</span>
+            <span>{selectedProject.sourceCompany ?? '未記載'}</span>
+          </div>
+          <div className="card-row">
+            <span>商流</span>
+            <span>{selectedProject.commercialFlow ?? '商流情報なし'}</span>
+          </div>
+        </div>
       )}
 
       {results.length > 0 && (
@@ -91,13 +106,20 @@ export function MatchingPage() {
               onClick={() => selectedProject && navigate(`/matching/${selectedProject.id}/engineer/${result.engineerId}`)}
             >
               <span className="ranking-rank">{index + 1}</span>
-              <span className="ranking-id">{result.engineerId}</span>
+              <span className="ranking-id">
+                {resolveDisplayName('engineer', result.engineerId, engineer?.engineerName, useReal)}
+              </span>
               <span className={`ranking-score ${scoreColorClass(result.score)}`}>{result.score}</span>
               {engineer && (
                 <span style={{ width: '100%', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   {engineer.skills.map((s) => s.name).join(' / ')}
                   {engineer.desiredLocations.length > 0 ? ` ・ ${engineer.desiredLocations.join('/')}` : ''}
                   {` ・ ${engineer.desiredRateMin}〜${engineer.desiredRateMax}万円`}
+                </span>
+              )}
+              {useReal && engineer && (
+                <span style={{ width: '100%', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  会社名: {engineer.companyName ?? '未記載'} ・ 商流: {engineer.commercialFlow ?? '商流情報なし'}
                 </span>
               )}
             </div>

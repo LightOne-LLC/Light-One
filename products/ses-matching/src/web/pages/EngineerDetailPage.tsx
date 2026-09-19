@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom';
 import { toEngineerInput } from '../../intake/engineer';
 import { toProjectInput } from '../../intake/project';
 import { calcTotalScore } from '../../scoring/totalScore';
+import { resolveDisplayName } from '../displayName';
 import { formatDateValue } from '../formatDateValue';
 import { scoreColorClass } from '../scoreColor';
 import { useMatchingPools } from '../useMatchingPools';
@@ -13,7 +14,7 @@ import { useMatchingPools } from '../useMatchingPools';
  */
 export function EngineerDetailPage() {
   const { projectId, engineerId } = useParams();
-  const { projectList, engineerPool } = useMatchingPools();
+  const { projectList, engineerPool, useReal } = useMatchingPools();
 
   const project = projectList.find((p) => p.id === projectId);
   const engineer = engineerPool.find((e) => e.id === engineerId);
@@ -32,8 +33,27 @@ export function EngineerDetailPage() {
 
   return (
     <>
-      <h1>{engineer.id}</h1>
-      <p className="empty-note">案件 {project.id} に対する候補者詳細です。</p>
+      <h1>{resolveDisplayName('engineer', engineer.id, engineer.engineerName, useReal)}</h1>
+      {useReal && engineer.engineerName && (
+        <p className="empty-note" style={{ fontSize: '0.75rem' }}>
+          ID: {engineer.id}
+        </p>
+      )}
+      {useReal && (
+        <div className="card">
+          <div className="card-row">
+            <span>会社名</span>
+            <span>{engineer.companyName ?? '未記載'}</span>
+          </div>
+          <div className="card-row">
+            <span>商流</span>
+            <span>{engineer.commercialFlow ?? '商流情報なし'}</span>
+          </div>
+        </div>
+      )}
+      <p className="empty-note">
+        案件 {resolveDisplayName('project', project.id, project.projectName, useReal)} に対する候補者詳細です。
+      </p>
       <div className="card-row">
         <Link to={`/matching/${project.id}`}>← ランキングに戻る</Link>
       </div>

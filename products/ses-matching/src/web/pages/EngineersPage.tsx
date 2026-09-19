@@ -1,4 +1,5 @@
 import { dummyEngineers } from '../../demo/dummyData';
+import { resolveDisplayName } from '../displayName';
 import { formatDateValue } from '../formatDateValue';
 import { useWorkspace } from '../workspaceContext';
 
@@ -24,7 +25,24 @@ export function EngineersPage() {
       ) : (
         engineers.map((engineer) => (
           <div key={engineer.id} className="card">
-            <div className="card-title">{engineer.id}</div>
+            <div className="card-title">{resolveDisplayName('engineer', engineer.id, engineer.engineerName, usingReal)}</div>
+            {usingReal && engineer.engineerName && (
+              <div className="empty-note" style={{ fontSize: '0.75rem' }}>
+                ID: {engineer.id}
+              </div>
+            )}
+            {usingReal && (
+              <>
+                <div className="card-row">
+                  <span>会社名</span>
+                  <span>{engineer.companyName ?? '未記載'}</span>
+                </div>
+                <div className="card-row">
+                  <span>商流</span>
+                  <span>{engineer.commercialFlow ?? '商流情報なし'}</span>
+                </div>
+              </>
+            )}
             <div>
               {engineer.skills.map((skill) => (
                 <span key={skill.name} className="skill-tag">

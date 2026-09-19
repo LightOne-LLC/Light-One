@@ -72,6 +72,12 @@ export interface GmailBulkMatchingSample {
 export interface MatchingWorkspaceProject {
   id: string;
   title?: string;
+  // 案件を出している会社。ProjectRecord.sourceCompanyと同じ値(意味は
+  // 「人材の所属会社」と別、混同しない)。取得できなければ未設定。
+  sourceCompany?: string;
+  // 商流。実メールの表現をそのまま保持する自由テキスト。取得できなければ
+  // 未設定(構造化・推測はしない)。
+  commercialFlow?: string;
   skills: string[];
   rateMin?: number;
   rateMax?: number;
