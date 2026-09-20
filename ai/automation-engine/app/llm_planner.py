@@ -45,6 +45,26 @@ _PROMPT_TEMPLATE = """あなたはタスクプランナーです。ユーザー�
 ユーザーの指示: {instruction}
 """
 
+_REPAIR_PROMPT_TEMPLATE = """あなたはタスクプランナーです。前回、以下のツール呼び出しを
+生成しましたが、Tool契約に違反したため実行できませんでした。
+
+利用可能なツール:
+{tool_specs}
+
+ユーザーの指示: {instruction}
+
+前回生成した tool_name: {previous_tool}
+前回生成した arguments: {previous_arguments}
+Validation Error: {validation_error}
+
+上記のエラーを修正し、同じユーザーの指示を満たすvalidな tool_name と
+arguments を1つだけJSON形式で返してください。説明文やコードブロックは
+不要です。JSON以外は出力しないこと。契約に存在しない引数名を作らないこと。
+
+出力形式（このJSON形式のみを出力すること）:
+{{"tool_name": "<ツール名>", "arguments": {{}}}}
+"""
+
 
 class LLMPlanner:
     """Prompts an LLMProvider for {tool_name, arguments}, then validates
@@ -83,6 +103,33 @@ class LLMPlanner:
             tool=tool_name,
             parameters=arguments,
         )
+
+    def replan_with_error(
+        self,
+        user_input: str,
+        previous_tool: str,
+        previous_arguments: dict,
+        validation_error: str,
+    ) -> tuple[str, dict]:
+        """Validation-aware Repair, called at most once by
+        app.main._run_planned_task() when Tool Contract validation rejects
+        this Planner's own output: shows the LLM the exact contract
+        violation from the failed attempt and asks it to regenerate.
+
+        Reuses the same Tool Contract prompt data and the same
+        _parse()/tool-name-validation logic as plan() — no separate
+        response format, no separate schema."""
+        contracts = build_tool_contracts(self.registry)
+        prompt = _REPAIR_PROMPT_TEMPLATE.format(
+            tool_specs=describe_tools_for_prompt(contracts),
+            instruction=user_input,
+            previous_tool=previous_tool,
+            previous_arguments=json.dumps(previous_arguments, ensure_ascii=False),
+            validation_error=validation_error,
+        )
+
+        raw_response = self.llm.generate(prompt)
+        return self._parse(raw_response, sorted(contracts))
 
     @staticmethod
     def _parse(raw_response: str, valid_tool_names: list[str]) -> tuple[str, dict]:

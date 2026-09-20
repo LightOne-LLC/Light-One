@@ -31,39 +31,66 @@ def run_llm_task(user_input: str) -> tuple[Task, str]:
     a Tool + arguments) instead of the rule-based Planner — proves the
     pipeline is planner-agnostic without duplicating the loop.
 
+    The same LLMPlanner instance is passed into _run_planned_task() so a
+    Tool Contract validation failure can be repaired by asking it to
+    regenerate (see llm_planner.replan_with_error()) rather than only the
+    existing tool-name fallback repair.
+
     Imported lazily so the default rule-based CLI path never imports
     `ollama` (app.llm_planner -> app.llm -> ollama)."""
     from app.llm_planner import LLMPlanner
 
-    task = LLMPlanner().plan(user_input)
-    return _run_planned_task(task)
+    planner = LLMPlanner()
+    task = planner.plan(user_input)
+    return _run_planned_task(task, llm_planner=planner)
 
 
-def _execute_validated(routed_tool: str, task: Task, contracts: dict) -> str:
+def _execute_validated(routed_tool: str, task: Task, contracts: dict) -> tuple[str, str | None]:
     """Tool Contract validation, then (only if valid) the actual Executor
     call — arguments that don't satisfy the routed Tool's contract never
     reach ToolExecutor.execute()/`tool(**parameters)` at all.
 
-    Returns a result string in exactly the same two failure shapes
-    ToolExecutor itself already produces ("Unknown tool", or a JSON string
-    with an "error" key), so Evaluator needs no changes to recognize a
-    validation failure as a failure."""
+    Returns (result, validation_error). `result` is in exactly the same
+    two failure shapes ToolExecutor itself already produces ("Unknown
+    tool", or a JSON string with an "error" key), so Evaluator needs no
+    changes to recognize a validation failure as a failure.
+    `validation_error` is the raw contract-violation message (None unless
+    this specific call failed Tool Contract validation, as opposed to
+    "unknown_tool" or a business-logic failure) — the one piece of extra
+    information _run_planned_task() needs to decide whether a
+    Validation-aware Repair applies."""
     contract = contracts.get(routed_tool)
     if contract is None:
-        return "Unknown tool"
+        return "Unknown tool", None
 
     validation = validate_arguments(contract, task.parameters)
     if not validation.valid:
-        return json.dumps({"error": f"Invalid arguments: {validation.error}"}, ensure_ascii=False)
+        result = json.dumps({"error": f"Invalid arguments: {validation.error}"}, ensure_ascii=False)
+        return result, validation.error
 
     executor = ToolExecutor()
-    return executor.execute(routed_tool, task.instruction, task.parameters)
+    return executor.execute(routed_tool, task.instruction, task.parameters), None
 
 
-def _run_planned_task(task: Task) -> tuple[Task, str]:
+def _run_planned_task(task: Task, llm_planner=None) -> tuple[Task, str]:
     """The Router -> Tool Contract validation -> Executor -> Evaluator ->
     Repair/Retry(max 1) portion of the pipeline, shared by every Planner
-    (rule-based or LLM) so it's implemented exactly once."""
+    (rule-based or LLM) so it's implemented exactly once.
+
+    Repair strategy per failure (still capped at the same MAX_RETRY=1 the
+    loop already enforced before this change — one retry total, not one
+    of each kind):
+      - Tool Contract validation failed AND an llm_planner was given
+        (i.e. this Task came from LLMPlanner): Validation-aware Repair —
+        hand the LLM its own previous tool/arguments and the exact
+        validation error, and let it regenerate once.
+      - Anything else (unknown_tool, or a known tool that ran and failed
+        on its own merits, e.g. "Job not found") or no llm_planner
+        (rule-based Planner Task): unchanged — existing AIRepair
+        tool-name fallback.
+    Repaired tool+arguments are re-validated against the same Tool
+    Contract before Executor runs, exactly like the first attempt — a
+    repaired response is never trusted any more than the original one."""
     router = ToolRouter()
     evaluator = Evaluator()
     repair = AIRepair()
@@ -72,13 +99,21 @@ def _run_planned_task(task: Task) -> tuple[Task, str]:
     task.status = "running"
 
     routed_tool = router.route(task.tool)
-    result = _execute_validated(routed_tool, task, contracts)
+    result, validation_error = _execute_validated(routed_tool, task, contracts)
     evaluation = evaluator.evaluate(result)
 
     while not evaluation.success and task.retry_count < MAX_RETRY:
         task.retry_count += 1
-        routed_tool = repair.repair(routed_tool)
-        result = _execute_validated(routed_tool, task, contracts)
+
+        if validation_error is not None and llm_planner is not None:
+            task.tool, task.parameters = llm_planner.replan_with_error(
+                task.instruction, task.tool, task.parameters, validation_error
+            )
+            routed_tool = router.route(task.tool)
+        else:
+            routed_tool = repair.repair(routed_tool)
+
+        result, validation_error = _execute_validated(routed_tool, task, contracts)
         evaluation = evaluator.evaluate(result)
 
     if evaluation.success:
