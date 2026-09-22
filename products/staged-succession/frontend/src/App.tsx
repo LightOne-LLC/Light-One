@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { Nav } from './components/Nav';
+import { PwaUpdatePrompt } from './components/PwaUpdatePrompt';
 import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
 import { SearchPage } from './pages/SearchPage';
@@ -24,6 +25,7 @@ export default function App() {
   return (
     <>
       <Nav />
+      <PwaUpdatePrompt />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route
