@@ -35,10 +35,16 @@ function positionLabel(score: number): string {
   レポートの章立て。番号 + 章題 + 端に向かって消える罫線で紙面のリズムを作る。
   これがあることで、下に続くパネル群が「並べられたカード」ではなく
   「章の中身」として読まれる。
+
+  各章はマウント時に短いdelayを挟んでopacity/translateYで立ち上がる
+  (indexから章番号を読み取り、01→02→03...の順に少しずつ遅く出す)。
+  Heroの後を追う形で全体が「一気に表示」ではなく「読み進む順に立ち上がる」
+  印象を作る。reduced motionでは既存のグローバル指定により即時表示になる。
 */
 function ReportSection({ index, title, children }: { index: string; title: string; children: ReactNode }) {
+  const order = Math.max(0, parseInt(index, 10) - 1);
   return (
-    <section>
+    <section className="animate-rise" style={{ animationDelay: `${260 + order * 85}ms` }}>
       <div className="flex items-center gap-4 mb-4 sm:mb-5">
         <span className="font-display-num text-xs font-bold tabular-nums text-platinum shrink-0">{index}</span>
         <h2 className="text-[13px] sm:text-sm font-semibold tracking-[0.04em] text-ink shrink-0">{title}</h2>
