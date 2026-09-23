@@ -200,6 +200,32 @@ body {
   transform: translateX(120%);
 }
 
+/*
+  ページ表示時に1回だけ流れる、ごく薄い光のsweep。
+  .surface-sheen(hover専用、::afterを使用)とは別のレイヤー(::before)に
+  実装することで、hover挙動と干渉しない。animation-iteration-countは
+  既定の1回のみ、fill-modeのbothで最終状態(画面外)のまま静止する。
+  「光っている」のではなく「一瞬だけ光が表面を通り過ぎた」程度に留めるため、
+  不透明度は.surface-sheenのhoverより更に低く抑える。
+*/
+@keyframes sheen-once {
+  from { transform: translateX(-120%); }
+  to { transform: translateX(220%); }
+}
+.surface-sheen-load {
+  position: relative;
+  overflow: hidden;
+}
+.surface-sheen-load::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 42%, rgba(255, 255, 255, 0.08) 50%, transparent 58%);
+  transform: translateX(-120%);
+  animation: sheen-once 1.3s cubic-bezier(0.16, 1, 0.3, 1) 480ms 1 both;
+  pointer-events: none;
+}
+
 .hairline-light {
   border-top: 1px solid rgba(255, 255, 255, 0.14);
 }
@@ -303,5 +329,19 @@ body {
   .material-platinum,
   .material-brushed {
     background: #ffffff !important;
+  }
+  /*
+    印刷/PDF出力は、その時点までの画面上のanimation経過時間に関わらず、
+    常に「完成した状態」のレポートとして出す。動きは一切不要。
+  */
+  .animate-rise,
+  .animate-fade-in {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .surface-sheen::after,
+  .surface-sheen-load::before {
+    display: none !important;
   }
 }

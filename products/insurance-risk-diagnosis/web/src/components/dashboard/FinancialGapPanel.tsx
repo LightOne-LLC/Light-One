@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { RiskCategoryResult, RiskGap } from '../../types/diagnosis';
 import { formatManYen, splitManYen } from '../../lib/riskLevelStyle';
+import { usePrefersReducedMotion } from '../../lib/usePrefersReducedMotion';
 import { Card, SectionHeader, Metric, Eyebrow } from '../ui';
 
 const SEGMENTS = [
@@ -9,18 +10,28 @@ const SEGMENTS = [
   { key: 'existingInsurance', label: '既存の保険', bar: 'bg-platinum', dot: 'bg-platinum' },
 ] as const;
 
+// バーが実際に伸び始めるまでの間合い。トラック・ラベルが先に見えてから
+// 区分が伸び始める「第二拍」を作るための遅延(container appears → bar extends)。
+const GROW_DELAY_MS = 260;
+
 // 必要額を100%とした積み上げバー: 公的保障・自己資産・既存保険で埋まった分と、残る不足額を視覚化する。
-// マウント直後は幅0から始め、次のフレームで実際の幅に遷移させることで、
-// 「背景トラック → 各区分が静かに伸びる」という順序を1本のバーの中で表現する。
-// reduced motionでは transition-duration がCSS側で即時化されるため、瞬時に最終状態になる。
+// マウント直後は幅0から始め、GROW_DELAY_MS後に実際の幅へ遷移させることで、
+// 「背景トラック(+ラベル) → 各区分が静かに伸びる」という順序を1本のバーの中で表現する。
+// reduced motionでは遅延を挟まず即座に最終幅にする(transition-durationも
+// グローバルなreduced motion指定によりCSS側で即時化される)。
 function GapBar({ gap }: { gap: RiskGap }) {
   const { requiredAmount, publicCoverage, ownAssets, existingInsurance, shortfall } = gap;
   const [grown, setGrown] = useState(false);
+  const reducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
-    const id = requestAnimationFrame(() => setGrown(true));
-    return () => cancelAnimationFrame(id);
-  }, []);
+    if (reducedMotion) {
+      setGrown(true);
+      return;
+    }
+    const id = setTimeout(() => setGrown(true), GROW_DELAY_MS);
+    return () => clearTimeout(id);
+  }, [reducedMotion]);
 
   if (requiredAmount <= 0) return null;
   const pct = (v: number) => (grown ? Math.max(0, Math.min(100, (v / requiredAmount) * 100)) : 0);
