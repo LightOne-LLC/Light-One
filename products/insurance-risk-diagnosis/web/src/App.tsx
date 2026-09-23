@@ -9,6 +9,7 @@ const LoginPage = lazy(() => import('./pages/LoginPage').then((m) => ({ default:
 const DiagnosisFormPage = lazy(() => import('./pages/DiagnosisFormPage').then((m) => ({ default: m.DiagnosisFormPage })));
 const ResultPage = lazy(() => import('./pages/ResultPage').then((m) => ({ default: m.ResultPage })));
 const HistoryPage = lazy(() => import('./pages/HistoryPage').then((m) => ({ default: m.HistoryPage })));
+const FinancialProfilePage = lazy(() => import('./pages/FinancialProfilePage').then((m) => ({ default: m.FinancialProfilePage })));
 
 const PAGE_LABEL: Record<string, string> = {
   '/diagnosis': '診断',
@@ -24,7 +25,10 @@ function Header() {
   const { user, signOut } = useAuth();
   const location = useLocation();
   if (!user) return null;
-  const pageLabel = PAGE_LABEL[location.pathname] ?? (location.pathname.startsWith('/result') ? '診断結果' : undefined);
+  const pageLabel = PAGE_LABEL[location.pathname]
+    ?? (location.pathname.startsWith('/result') ? '診断結果'
+      : location.pathname.startsWith('/financial-profile') ? 'Financial Profile'
+        : undefined);
 
   return (
     <header className="print:hidden sticky top-0 z-30 border-b border-line bg-canvas/85 backdrop-blur-md supports-[backdrop-filter]:bg-canvas/70">
@@ -89,6 +93,14 @@ export default function App() {
               element={
                 <RequireAuth>
                   <HistoryPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/financial-profile/:id"
+              element={
+                <RequireAuth>
+                  <FinancialProfilePage />
                 </RequireAuth>
               }
             />
