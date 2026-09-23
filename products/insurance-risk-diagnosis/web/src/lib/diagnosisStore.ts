@@ -91,6 +91,16 @@ export async function getDiagnosisDetail(id: string): Promise<{ id: string; inpu
   return { ...record, result: normalizeResult(record.result) };
 }
 
+// listDiagnosisHistory()は一覧表示用の要約(HistoryItem)のみを返すため、
+// Financial Snapshot/Profileの構築に必要なinputを含む全件の詳細をここで公開する。
+// 保存フォーマット(StoredDiagnosis)自体は変更しない、読み取り専用の追加API。
+export async function listDiagnosisRecords(): Promise<{ id: string; input: DiagnosisInput; result: DiagnosisResult; createdAt: string }[]> {
+  return loadAll()
+    .slice()
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .map((r) => ({ id: r.id, input: r.input, result: normalizeResult(r.result), createdAt: r.createdAt }));
+}
+
 export async function deleteDiagnosisHistory(id: string): Promise<void> {
   const records = loadAll().filter((r) => r.id !== id);
   saveAll(records);

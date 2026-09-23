@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { HistoryItem } from '../types/diagnosis';
-import { listDiagnosisHistory, deleteDiagnosisHistory } from '../lib/diagnosisStore';
+import { listDiagnosisHistory, listDiagnosisRecords, deleteDiagnosisHistory } from '../lib/diagnosisStore';
 import { riskLevelStyle, formatManYen, splitManYen } from '../lib/riskLevelStyle';
+import { buildFinancialSnapshot, compareSnapshots } from '../financial';
+import type { FinancialChange } from '../financial';
+import { ChangeOverTimeSection } from '../components/financial/ChangeOverTimeSection';
 import { Card, Button, Metric, EmptyState, LoadingState, StatusChip, Eyebrow, SectionHeader } from '../components/ui';
 
 function formatDate(iso: string): string {
@@ -30,11 +33,22 @@ function ScoreDelta({ current, previous }: { current: number; previous: number |
 export function HistoryPage() {
   const [items, setItems] = useState<HistoryItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [changes, setChanges] = useState<FinancialChange[] | null>(null);
 
   useEffect(() => {
     listDiagnosisHistory()
       .then(setItems)
       .catch((e) => setError(e?.message ?? '履歴の取得に失敗しました。'));
+
+    // Change Over Time は履歴が2件以上ある場合のみ意味を持つ、あくまで付加的な表示のため、
+    // 取得に失敗しても(壊れた保存データ等)ページ全体のエラーにはしない。
+    listDiagnosisRecords()
+      .then((records) => {
+        if (records.length < 2) return;
+        const [current, previous] = records.map(buildFinancialSnapshot);
+        setChanges(compareSnapshots(previous, current));
+      })
+      .catch(() => {});
   }, []);
 
   const handleDelete = async (id: string) => {
@@ -142,6 +156,8 @@ export function HistoryPage() {
           </div>
         </Card>
       )}
+
+      {changes && <ChangeOverTimeSection changes={changes} />}
 
       {past.length > 0 && (
         <section>
