@@ -57,9 +57,13 @@ _REPAIR_PROMPT_TEMPLATE = """あなたはタスクプランナーです。前回
 前回生成した arguments: {previous_arguments}
 Validation Error: {validation_error}
 
-上記のエラーを修正し、同じユーザーの指示を満たすvalidな tool_name と
-arguments を1つだけJSON形式で返してください。説明文やコードブロックは
-不要です。JSON以外は出力しないこと。契約に存在しない引数名を作らないこと。
+上記のValidation Errorの原因を理解し、修正すること。前回のargumentsを
+そのまま繰り返さないこと。「optional」のようなメタデータ用のキー名を
+argumentsに追加しないこと（任意引数がある場合は、その引数名自体を
+argumentsのキーとして直接使うこと）。利用可能なツールの仕様に記載された
+引数名だけを使い、required（必須）の引数は必ず含めること。同じユーザーの
+指示を満たすvalidな tool_name と arguments を1つだけJSON形式で返して
+ください。説明文やコードブロックは不要です。JSON以外は出力しないこと。
 
 出力形式（このJSON形式のみを出力すること）:
 {{"tool_name": "<ツール名>", "arguments": {{}}}}

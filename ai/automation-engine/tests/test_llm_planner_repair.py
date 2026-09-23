@@ -9,6 +9,7 @@ model is exercised separately as an E2E check."""
 from unittest.mock import patch
 
 from app.llm import LLMProvider
+from app.llm_planner import LLMPlanner
 from app.main import run_llm_task
 from app.tools import search_jobs as real_search_jobs
 
@@ -25,6 +26,29 @@ class ScriptedLLM(LLMProvider):
     def generate(self, prompt: str) -> str:
         self.prompts.append(prompt)
         return self.responses.pop(0)
+
+
+# --- Repair prompt content: warns against the specific mistake observed in
+# real LLM output (a hallucinated "optional" meta-key) and against just
+# repeating the previous invalid arguments (spec section 6/7) -------------
+
+
+def test_repair_prompt_warns_against_a_literal_optional_key_and_repeating_arguments():
+    scripted_llm = ScriptedLLM(
+        ['{"tool_name": "job_search_tool", "arguments": {"keyword": "Python"}}']
+    )
+
+    LLMPlanner(llm=scripted_llm).replan_with_error(
+        user_input="Python案件を探して",
+        previous_tool="job_search_tool",
+        previous_arguments={"keyword": "Python", "optional": ["location"]},
+        validation_error="unknown argument(s): optional",
+    )
+
+    (prompt,) = scripted_llm.prompts
+    assert "optional" in prompt  # names the actual offending key
+    assert "そのまま繰り返さない" in prompt
+    assert "required" in prompt or "必須" in prompt
 
 
 # --- invalid -> Repair -> valid -> Executor -> success --------------------
