@@ -15,12 +15,6 @@ interface WorkspaceContextValue {
 
 const WorkspaceContext = createContext<WorkspaceContextValue | undefined>(undefined);
 
-// PWA起動時の自動読み込み・手動再取得のどちらもこの件数で統一する
-// (既存のbulk API・仕様は一切変更しない、単にここで呼ぶ際の件数)。
-// サーバー側のMAX_LIMIT(gmailBulkImportApi.ts)も500に合わせてあるため、
-// ここで500を指定してもクランプされない。
-const AUTO_LOAD_LIMIT = 500;
-
 /**
  * 実Gmail取り込み結果(既存 /api/gmail/fetch)を、ページ遷移をまたいで
  * Matching Workspace全体(Dashboard/Projects/Engineers/Matching/Engineer
@@ -44,7 +38,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     inFlight.current = true;
     setStatus('loading');
     try {
-      const res = await fetch(`/api/gmail/fetch?limit=${AUTO_LOAD_LIMIT}`);
+      const res = await fetch('/api/gmail/fetch');
       const data: GmailBulkImportResult = await res.json();
       setResult(data);
       // HTTP自体は成功していてもdata.successがfalseの場合(Gmail取得失敗等)

@@ -114,17 +114,17 @@ function ResultView({ result }: { result: GmailBulkImportResult }) {
  * Dashboardの取り込み状況表示 + 手動再取得UI。実データの取得自体は
  * WorkspaceProviderがPWA起動時(マウント時)に自動実行するため、ここでは
  * 共有state(workspaceContext)をそのまま表示するだけで、fetchロジックは
- * 一切重複実装しない。「最新データを取得」ボタンも同じrefresh()を呼ぶ
- * (初回の自動取得と手動再取得で、データフローを完全に統一する)。
+ * 一切重複実装しない。「直近3日間のメールを取得」ボタンも同じrefresh()を
+ * 呼ぶ(初回の自動取得と手動再取得で、データフローを完全に統一する)。
  */
 export function GmailBulkImport() {
   const { result, status, refresh } = useWorkspace();
 
   return (
     <div className="card">
-      <div className="card-title">Gmail Import (最新データ)</div>
+      <div className="card-title">Gmail Import (直近3日間)</div>
       <button type="button" onClick={() => void refresh()} disabled={status === 'loading'}>
-        最新データを取得
+        直近3日間のメールを取得
       </button>
       <div className="card-row">
         <span>Status</span>

@@ -136,6 +136,48 @@ export async function getMessage(
   return res.data as GmailApiMessage;
 }
 
+/** Gmailのafter:検索演算子はアカウントのローカル日(day)単位の比較であり、
+ * 正確な時刻の比較ではない。JST(UTC+9、DSTなし)前提でその暦日を求める。 */
+function toJstDateQuery(ms: number): string {
+  const jst = new Date(ms + 9 * 60 * 60 * 1000);
+  const y = jst.getUTCFullYear();
+  const m = String(jst.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(jst.getUTCDate()).padStart(2, '0');
+  return `${y}/${m}/${d}`;
+}
+
+/**
+ * `sinceMs`以降の全メッセージのid/threadIdを、ページネーションを正しく
+ * 処理して(500件で打ち切らず)取得する。after:は暦日単位の比較のため、
+ * 取りこぼしを避けて1日分手前から問い合わせる — 正確な`sinceMs`との
+ * 突き合わせ(未来日時・対象期間外の除外含む)は呼び出し側がinternalDate
+ * で行う(このリストAPI自体はid/threadIdしか返さないため)。
+ *
+ * listMessages()とは別関数として追加しており、その既存の挙動
+ * (getLatestEmail()向けの単一ページ取得)には一切影響しない。
+ */
+export async function listMessageIdsSince(
+  service: ReturnType<typeof getGmailService>,
+  sinceMs: number,
+): Promise<{ id?: string | null; threadId?: string | null }[]> {
+  const q = `after:${toJstDateQuery(sinceMs - 24 * 60 * 60 * 1000)}`;
+
+  const results: { id?: string | null; threadId?: string | null }[] = [];
+  let pageToken: string | undefined;
+  do {
+    const res = await service.users.messages.list({
+      userId: GMAIL_USER_ID,
+      q,
+      maxResults: 500,
+      pageToken,
+    });
+    results.push(...(res.data.messages ?? []));
+    pageToken = res.data.nextPageToken ?? undefined;
+  } while (pageToken);
+
+  return results;
+}
+
 /**
  * Fetches exactly the single most recent message in the mailbox.
  * No search query/filtering, no pagination — "give me the newest

@@ -1,5 +1,6 @@
 import type { RawEmail } from '../../gmail/types';
-import { clampLimit, DEFAULT_LIMIT, MAX_LIMIT, performGmailBulkImport } from '../gmailBulkImportApi';
+import type { GmailApiMessage } from '../../gmail/parseMessage';
+import { RECENT_DAYS, isWithinWindow, performGmailBulkImport } from '../gmailBulkImportApi';
 
 // すべて匿名の合成(synthetic)メール。実Gmail/OAuthには一切アクセスしない
 // (fetchRawEmailsを差し替えて注入する)。
@@ -111,35 +112,42 @@ const unrelatedEmail: RawEmail = {
   bodyText: `${SECRET_BODY_MARKER}\n来週の定例会議の件です。`,
 };
 
-describe('clampLimit', () => {
-  it('デフォルト値(500)を返す(未指定)', () => {
-    expect(clampLimit(undefined)).toBe(DEFAULT_LIMIT);
+describe('RECENT_DAYS', () => {
+  it('過去3日間を対象とする(件数上限ではない)', () => {
+    expect(RECENT_DAYS).toBe(3);
+  });
+});
+
+describe('isWithinWindow', () => {
+  const sinceMs = 1_000_000;
+  const untilMs = 2_000_000;
+
+  function messageAt(internalDate: number): GmailApiMessage {
+    return { internalDate: String(internalDate) };
+  }
+
+  it('対象期間内(境界値含む)のメールはtrue', () => {
+    expect(isWithinWindow(messageAt(sinceMs), sinceMs, untilMs)).toBe(true);
+    expect(isWithinWindow(messageAt(untilMs), sinceMs, untilMs)).toBe(true);
+    expect(isWithinWindow(messageAt(1_500_000), sinceMs, untilMs)).toBe(true);
   });
 
-  it('0以下の値はデフォルト値へ丸める', () => {
-    expect(clampLimit(0)).toBe(DEFAULT_LIMIT);
-    expect(clampLimit(-5)).toBe(DEFAULT_LIMIT);
+  it('対象期間より前のメールはfalse(after:の暦日境界で取得されてしまった分を除外)', () => {
+    expect(isWithinWindow(messageAt(sinceMs - 1), sinceMs, untilMs)).toBe(false);
   });
 
-  it('数値でない値はデフォルト値へ丸める', () => {
-    expect(clampLimit('abc')).toBe(DEFAULT_LIMIT);
-    expect(clampLimit(null)).toBe(DEFAULT_LIMIT);
+  it('未来日時(現在時刻より後)のメールはfalse', () => {
+    expect(isWithinWindow(messageAt(untilMs + 1), sinceMs, untilMs)).toBe(false);
   });
 
-  it('MAX_LIMIT(500)を超える値は上限に丸める(ユーザー入力をそのままGmail APIへ渡さない)', () => {
-    expect(clampLimit(9999)).toBe(MAX_LIMIT);
-  });
-
-  it('範囲内の値はそのまま(整数化して)使う', () => {
-    expect(clampLimit(30)).toBe(30);
-    expect(clampLimit('30')).toBe(30);
-    expect(clampLimit(30.9)).toBe(30);
+  it('internalDateが取得できない場合は安全側に倒して含める', () => {
+    expect(isWithinWindow({}, sinceMs, untilMs)).toBe(true);
   });
 });
 
 describe('performGmailBulkImport', () => {
   it('複数メールを分類・集計する(project/engineer/unparsed)', async () => {
-    const result = await performGmailBulkImport(50, async () => [
+    const result = await performGmailBulkImport(async () => [
       validProjectEmail,
       incompleteProjectEmail,
       validEngineerEmail,
@@ -163,16 +171,16 @@ describe('performGmailBulkImport', () => {
     expect(result.unparsed).toBe(1);
   });
 
-  it('limitをclampしてから使う(ユーザー入力をそのままGmail APIへ渡さない)', async () => {
+  it('件数上限を渡さずfetchRawEmailsを呼び、結果にRECENT_DAYSをそのまま返す(「3日分だから件数を絞る」ことはしない)', async () => {
     const fetchRawEmails = vi.fn().mockResolvedValue([]);
-    const result = await performGmailBulkImport(9999, fetchRawEmails);
+    const result = await performGmailBulkImport(fetchRawEmails);
 
-    expect(fetchRawEmails).toHaveBeenCalledWith(MAX_LIMIT);
-    expect(result.limit).toBe(MAX_LIMIT);
+    expect(fetchRawEmails).toHaveBeenCalledWith();
+    expect(result.days).toBe(RECENT_DAYS);
   });
 
   it('空の結果でもクラッシュせずゼロ集計を返す', async () => {
-    const result = await performGmailBulkImport(50, async () => []);
+    const result = await performGmailBulkImport(async () => []);
 
     const emptyDatePrecision = { day: 0, month: 0, immediate: 0, unknown: 0, missing: 0 };
     expect(result.success).toBe(true);
@@ -185,7 +193,7 @@ describe('performGmailBulkImport', () => {
   });
 
   it('Gmail取得失敗時はsuccess:falseとreasonを返す(集計フィールドは含めない)', async () => {
-    const result = await performGmailBulkImport(50, async () => {
+    const result = await performGmailBulkImport(async () => {
       throw new Error('network unreachable');
     });
 
@@ -196,14 +204,14 @@ describe('performGmailBulkImport', () => {
 
   it('想定外の形式(malformed)のメールでも例外を投げず、unparsedとして扱う', async () => {
     const malformedEmail = { id: 'malformed' } as RawEmail; // bodyText/subjectが無い
-    const result = await performGmailBulkImport(50, async () => [malformedEmail]);
+    const result = await performGmailBulkImport(async () => [malformedEmail]);
 
     expect(result.success).toBe(true);
     expect(result.unparsed).toBe(1);
   });
 
   it('validationのFAIL理由をフィールド名別に集計する(個別メールの内容は含めない)', async () => {
-    const result = await performGmailBulkImport(50, async () => [incompleteProjectEmail, incompleteBpEngineerEmail]);
+    const result = await performGmailBulkImport(async () => [incompleteProjectEmail, incompleteBpEngineerEmail]);
 
     expect(result.success).toBe(true);
     // incompleteProjectEmailは必須スキルのみ記載 -> rateMin/rateMax/location/remoteAllowed/startDateが不足
@@ -216,7 +224,7 @@ describe('performGmailBulkImport', () => {
   });
 
   it('validな案件・要員が揃えばmatchProjectToEngineers()でランキングまで返す', async () => {
-    const result = await performGmailBulkImport(50, async () => [
+    const result = await performGmailBulkImport(async () => [
       validProjectEmail,
       validEngineerEmail,
       anotherValidEngineerEmail,
@@ -234,7 +242,7 @@ describe('performGmailBulkImport', () => {
   });
 
   it('validな要員が0件の場合、案件がvalidでもmatchableProjectsは0、sampleも無い', async () => {
-    const result = await performGmailBulkImport(50, async () => [validProjectEmail, incompleteBpEngineerEmail]);
+    const result = await performGmailBulkImport(async () => [validProjectEmail, incompleteBpEngineerEmail]);
 
     expect(result.success).toBe(true);
     expect(result.matching?.validProjects).toBe(1);
@@ -244,7 +252,7 @@ describe('performGmailBulkImport', () => {
   });
 
   it('レスポンスに本文(bodyText)・from・subjectを一切含めない', async () => {
-    const result = await performGmailBulkImport(50, async () => [
+    const result = await performGmailBulkImport(async () => [
       validProjectEmail,
       validEngineerEmail,
       incompleteBpEngineerEmail,
@@ -258,7 +266,7 @@ describe('performGmailBulkImport', () => {
   });
 
   it('日付精度(day/month/immediate/unknown/missing)をフィールド別に正しく集計する', async () => {
-    const result = await performGmailBulkImport(50, async () => [
+    const result = await performGmailBulkImport(async () => [
       validProjectEmail, // startDate: day
       monthPrecisionProjectEmail, // startDate: month
       immediateProjectEmail, // startDate: immediate
@@ -288,7 +296,7 @@ describe('performGmailBulkImport', () => {
 
 describe('performGmailBulkImport (Matching Workspace用のview model)', () => {
   it('validな案件・要員はvalidProjects/validEngineersとしてそのまま返す(既存matchProjectToEngineers()にそのまま渡せる型)', async () => {
-    const result = await performGmailBulkImport(50, async () => [validProjectEmail, validEngineerEmail]);
+    const result = await performGmailBulkImport(async () => [validProjectEmail, validEngineerEmail]);
 
     expect(result.validProjects).toHaveLength(1);
     expect(result.validProjects?.[0].id).toBe('email-project-valid');
@@ -297,7 +305,7 @@ describe('performGmailBulkImport (Matching Workspace用のview model)', () => {
   });
 
   it('projectsには件名をtitleとして含み、valid/invalidを問わず全件を返す', async () => {
-    const result = await performGmailBulkImport(50, async () => [validProjectEmail, incompleteProjectEmail]);
+    const result = await performGmailBulkImport(async () => [validProjectEmail, incompleteProjectEmail]);
 
     expect(result.projects).toHaveLength(2);
     const valid = result.projects?.find((p) => p.id === 'email-project-valid');
@@ -330,13 +338,13 @@ describe('performGmailBulkImport (Matching Workspace用のview model)', () => {
         '稼働開始: 2026-04-01',
       ].join('\n'),
     };
-    const result = await performGmailBulkImport(50, async () => [projectWithNameLabel]);
+    const result = await performGmailBulkImport(async () => [projectWithNameLabel]);
     const project = result.projects?.find((p) => p.id === 'email-project-named');
     expect(project?.title).toBe('大手金融系システム開発');
   });
 
   it('projects/validProjects/validEngineersにも本文(bodyText)・from・件名以外の個人情報を含めない', async () => {
-    const result = await performGmailBulkImport(50, async () => [
+    const result = await performGmailBulkImport(async () => [
       validProjectEmail,
       validEngineerEmail,
       incompleteProjectEmail,
