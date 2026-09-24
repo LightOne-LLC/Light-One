@@ -15,7 +15,6 @@ import { performGmailBulkImport } from './gmailBulkImportApi';
 
 interface MinimalRequest {
   method?: string;
-  query?: Record<string, string | string[] | undefined>;
 }
 
 interface MinimalResponse {
@@ -28,9 +27,6 @@ export default async function handler(req: MinimalRequest, res: MinimalResponse)
     return;
   }
 
-  const limitParam = req.query?.limit;
-  const limit = Array.isArray(limitParam) ? limitParam[0] : limitParam;
-
-  const result = await performGmailBulkImport(limit);
+  const result = await performGmailBulkImport();
   res.status(result.success ? 200 : 502).json(result);
 }

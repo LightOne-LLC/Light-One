@@ -35,6 +35,12 @@ describe('SES Matching PWA', () => {
     expect(screen.getByRole('heading', { name: 'SES Matching' })).toBeTruthy();
   });
 
+  it('Dashboardに「1件取得」UIは表示されない(直近3日間の一括取得のみ)', async () => {
+    await renderAt('/');
+    expect(screen.queryByText(/Gmail Import \(1件\)/)).toBeNull();
+    expect(screen.getByText(/Gmail Import \(直近3日間\)/)).toBeTruthy();
+  });
+
   it('Projects一覧が表示される', async () => {
     await renderAt('/projects');
     for (const project of dummyProjects) {

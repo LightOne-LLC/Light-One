@@ -36,32 +36,32 @@ describe('GmailBulkImport', () => {
   it('取得ボタンが表示される', async () => {
     mockFetchOnce({ success: true, fetched: 0 });
     renderComponent();
-    expect(screen.getByRole('button', { name: '最新データを取得' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '直近3日間のメールを取得' })).toBeTruthy();
     // マウント時の自動fetchが完了するのを待ってからテストを終える
     // (act()警告を避けるため)。
     await waitFor(() => expect(fetch).toHaveBeenCalled());
   });
 
-  it('マウント時に自動で/api/gmail/fetchをlimit=500付きで呼ぶ(手動クリック不要)', async () => {
+  it('マウント時に自動で/api/gmail/fetchを呼ぶ(件数指定なし、手動クリック不要)', async () => {
     mockFetchOnce({ success: true, fetched: 0 });
     renderComponent();
 
-    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/gmail/fetch?limit=500'));
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/gmail/fetch'));
   });
 
-  it('「最新データを取得」ボタンをクリックすると再度同じAPIを呼ぶ', async () => {
+  it('「直近3日間のメールを取得」ボタンをクリックすると再度同じAPIを呼ぶ', async () => {
     mockFetchOnce({ success: true, fetched: 0 });
     renderComponent();
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
 
-    fireEvent.click(screen.getByRole('button', { name: '最新データを取得' }));
+    fireEvent.click(screen.getByRole('button', { name: '直近3日間のメールを取得' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
   });
 
   it('集計結果(件数・分類・Validation PASS/FAIL・マッチング可能数)を表示する', async () => {
     mockFetchOnce({
       success: true,
-      limit: 500,
+      days: 3,
       fetched: 50,
       project: { total: 10, valid: 3, invalid: 7 },
       engineer: { total: 31, valid: 5, invalid: 26 },

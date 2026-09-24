@@ -10,8 +10,8 @@ import { validateEngineerRecord } from '../intake/engineer';
 import { validateProjectRecord } from '../intake/project';
 import type { EngineerRecord, ProjectRecord } from '../intake/types';
 import { matchProjectToEngineers } from '../matching/matchProjectToEngineers';
-import { authenticate, getGmailService, getMessage, listMessages } from '../gmail/client';
-import { toRawEmail } from '../gmail/parseMessage';
+import { authenticate, getGmailService, getMessage, listMessageIdsSince } from '../gmail/client';
+import { toRawEmail, type GmailApiMessage } from '../gmail/parseMessage';
 import type { RawEmail } from '../gmail/types';
 import { parseEmail } from '../parser/parseEmail';
 import type {
@@ -42,22 +42,11 @@ function addDatePrecision(counts: DatePrecisionCounts, candidate: Record<string,
   }
 }
 
-// PWA起動時の自動取得・手動再取得ともに500件を標準の取得件数とする
-// (営業デモでの案件・要員の母数を増やすための拡張。500はGmail API
-// messages.listの1ページあたりmaxResults上限でもあるため、追加の
-// ページネーション実装無しに安全に対応できる。既存のbulk fetch/
-// Parser/Validation/Matchingロジック自体は一切変更しない)。
-export const DEFAULT_LIMIT = 500;
-export const MAX_LIMIT = 500;
-
-/** ユーザー入力値をそのままGmail APIへ渡さないための境界。数値でない/0以下は
- * デフォルト値へ、上限を超える値はMAX_LIMITへ丸める(推測して補完しない —
- * 単に安全な範囲へ収めるだけ)。 */
-export function clampLimit(rawLimit: unknown): number {
-  const n = typeof rawLimit === 'number' ? rawLimit : Number(rawLimit);
-  if (!Number.isFinite(n) || n <= 0) return DEFAULT_LIMIT;
-  return Math.min(Math.floor(n), MAX_LIMIT);
-}
+// PWA起動時の自動取得・手動再取得ともに「現在時刻から過去N日間」を対象と
+// する(件数上限は設けない — 取得件数はその期間に実際に届いたメール数
+// そのまま)。既存のbulk fetch/Parser/Validation/Matchingロジック自体は
+// 一切変更しない。
+export const RECENT_DAYS = 3;
 
 /** "field: message" 形式のvalidationエラーから、集計用のフィールド名だけを
  * 取り出す("requiredSkills[0]: ..." は "requiredSkills" へまとめる)。 */
@@ -122,53 +111,66 @@ function buildWorkspaceProject(
 
 const CONCURRENCY = 10;
 
+/** メール自身のDateヘッダーではなくGmail自身が記録したinternalDateで
+ * 判定する(なりすまし・記載ミスの影響を受けない)。after:検索は暦日単位
+ * のため1日分手前まで取得しているが、ここで[sinceMs, untilMs]の範囲に
+ * 正確に絞り込む — 未来日時のメールや対象期間より前のメールはここで除外
+ * される。internalDateが取得できない(実運用では起こらない)場合のみ
+ * 安全側に倒して含める。 */
+export function isWithinWindow(message: GmailApiMessage, sinceMs: number, untilMs: number): boolean {
+  const internalDate = message.internalDate !== undefined ? Number(message.internalDate) : NaN;
+  if (Number.isNaN(internalDate)) return true;
+  return internalDate >= sinceMs && internalDate <= untilMs;
+}
+
 /** listで得たmessage idを固定の並列数でバッチ取得する(Gmail APIへの
  * 過度な同時リクエストを避けるための最小限の配慮。リトライ/バックオフ等は
  * 今回のスコープ外)。 */
 async function fetchMessagesInBatches(
   service: ReturnType<typeof getGmailService>,
   ids: string[],
+  sinceMs: number,
+  untilMs: number,
 ): Promise<RawEmail[]> {
   const results: RawEmail[] = [];
   for (let i = 0; i < ids.length; i += CONCURRENCY) {
     const batch = ids.slice(i, i + CONCURRENCY);
     const messages = await Promise.all(batch.map((id) => getMessage(service, id)));
-    results.push(...messages.map(toRawEmail));
+    results.push(...messages.filter((m) => isWithinWindow(m, sinceMs, untilMs)).map(toRawEmail));
   }
   return results;
 }
 
-async function fetchRecentRawEmails(limit: number): Promise<RawEmail[]> {
+async function fetchRecentRawEmails(): Promise<RawEmail[]> {
   const auth = await authenticate();
   const service = getGmailService(auth);
 
-  const messages = await listMessages(service, limit);
+  const untilMs = Date.now();
+  const sinceMs = untilMs - RECENT_DAYS * 24 * 60 * 60 * 1000;
+  const messages = await listMessageIdsSince(service, sinceMs);
   const ids = messages.map((m) => m.id).filter((id): id is string => Boolean(id));
-  return fetchMessagesInBatches(service, ids);
+  return fetchMessagesInBatches(service, ids, sinceMs, untilMs);
 }
 
 /**
- * Gmailの直近`limit`件(clamp後)を取得し、既存のParser/Validation/Matchingへ
- * 流して集計結果を返す。RawEmailの本文/fromはこの結果に一切含めない
- * (集計値、validation失敗のフィールド名別件数、Matching Workspace用の
- * 案件一覧(projects)とvalidation済みレコード(validProjects/validEngineers)
- * のみ)。案件のsubjectは案件名相当の表示用途として例外的にtitleへ含める
- * (PIIではないため)。
+ * Gmailの直近RECENT_DAYS日分(件数上限なし、ページネーション済み)を取得し、
+ * 既存のParser/Validation/Matchingへ流して集計結果を返す。RawEmailの
+ * 本文/fromはこの結果に一切含めない(集計値、validation失敗のフィールド
+ * 名別件数、Matching Workspace用の案件一覧(projects)とvalidation済み
+ * レコード(validProjects/validEngineers)のみ)。案件のsubjectは案件名相当
+ * の表示用途として例外的にtitleへ含める(PIIではないため)。
  *
  * `fetchRawEmails`は差し替え可能(テストではsyntheticなRawEmail[]を返す
  * 関数を注入し、実Gmail/OAuthに触れずに動作を検証する)。
  */
 export async function performGmailBulkImport(
-  rawLimit: unknown = DEFAULT_LIMIT,
-  fetchRawEmails: (limit: number) => Promise<RawEmail[]> = fetchRecentRawEmails,
+  fetchRawEmails: () => Promise<RawEmail[]> = fetchRecentRawEmails,
 ): Promise<GmailBulkImportResult> {
-  const limit = clampLimit(rawLimit);
-
   let emails: RawEmail[];
   try {
-    emails = await fetchRawEmails(limit);
+    emails = await fetchRawEmails();
   } catch (err) {
-    return { success: false, limit, reason: err instanceof Error ? err.message : 'Gmail fetch failed' };
+    return { success: false, days: RECENT_DAYS, reason: err instanceof Error ? err.message : 'Gmail fetch failed' };
   }
 
   let projectTotal = 0;
@@ -236,7 +238,7 @@ export async function performGmailBulkImport(
 
   return {
     success: true,
-    limit,
+    days: RECENT_DAYS,
     fetched: emails.length,
     project: { total: projectTotal, valid: projectValid, invalid: projectInvalid, datePrecision: projectDatePrecision },
     engineer: {

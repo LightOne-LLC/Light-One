@@ -1,4 +1,4 @@
-import { authenticate } from '../client';
+import { authenticate, getGmailService, listMessageIdsSince } from '../client';
 
 // authenticate()の"env var優先"分岐と"サーバーレスではfail fast"分岐のみを検証する。
 // 実Gmail/OAuthネットワークには一切アクセスしない(env var経路はファイル/ネットワーク
@@ -49,5 +49,48 @@ describe('authenticate', () => {
     process.env.VERCEL = '1';
 
     await expect(authenticate()).rejects.toThrow(/Gmail credentials are not configured/);
+  });
+});
+
+// listMessageIdsSince()の"ページネーションを最後まで処理する(500件で
+// 打ち切らない)"分岐と"after:クエリの日付組み立て"分岐のみを検証する。
+// 実Gmail/OAuthネットワークには一切アクセスしない
+// (service.users.messages.listをモックで差し替える)。
+describe('listMessageIdsSince', () => {
+  function fakeService(list: (...args: unknown[]) => unknown) {
+    return { users: { messages: { list } } } as unknown as ReturnType<typeof getGmailService>;
+  }
+
+  it('nextPageTokenが無くなるまでページネーションし、1ページ目(500件)超も取りこぼさず全件返す', async () => {
+    const page1 = Array.from({ length: 500 }, (_, i) => ({ id: `p1-${i}` }));
+    const page2 = [{ id: 'p2-0' }, { id: 'p2-1' }];
+    const list = vi
+      .fn()
+      .mockResolvedValueOnce({ data: { messages: page1, nextPageToken: 'TOKEN_2' } })
+      .mockResolvedValueOnce({ data: { messages: page2 } });
+
+    const result = await listMessageIdsSince(fakeService(list), Date.now());
+
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(result).toHaveLength(502);
+    expect(result[500]).toEqual({ id: 'p2-0' });
+    // 2回目の呼び出しでは1回目のnextPageTokenをそのまま渡す。
+    expect(list.mock.calls[1][0]).toMatchObject({ pageToken: 'TOKEN_2' });
+  });
+
+  it('after:クエリには暦日境界の取りこぼしを避けるため1日前倒しした日付を使う', async () => {
+    const list = vi.fn().mockResolvedValue({ data: { messages: [] } });
+    // 2026-01-10T00:00:00Z (JSTでは2026-01-10 09:00) の3日前を想定。
+    const sinceMs = Date.UTC(2026, 0, 10, 0, 0, 0);
+
+    await listMessageIdsSince(fakeService(list), sinceMs);
+
+    expect(list.mock.calls[0][0]).toMatchObject({ q: 'after:2026/01/09' });
+  });
+
+  it('該当メールが無ければ空配列を返す', async () => {
+    const list = vi.fn().mockResolvedValue({ data: {} });
+    const result = await listMessageIdsSince(fakeService(list), Date.now());
+    expect(result).toEqual([]);
   });
 });

@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { matchProjectToEngineers } from '../../matching/matchProjectToEngineers';
 import { GmailBulkImport } from '../components/GmailBulkImport';
-import { GmailImport } from '../components/GmailImport';
+import { QuickMatch } from '../components/QuickMatch';
 import { resolveDisplayName } from '../displayName';
 import { scoreColorClass } from '../scoreColor';
 import { useMatchingPools } from '../useMatchingPools';
@@ -20,6 +20,8 @@ export function DashboardPage() {
           ? '実Gmail取り込み結果に基づく案件と要員のマッチング状況です。'
           : '案件と要員のマッチング状況の概要です(現在はダミーデータ)。'}
       </p>
+
+      <QuickMatch />
 
       <div className="stat-row">
         <div className="stat-box">
@@ -51,9 +53,6 @@ export function DashboardPage() {
       ) : (
         <p className="empty-note">案件がありません。</p>
       )}
-
-      <h2>Gmail Import (1件)</h2>
-      <GmailImport />
 
       <h2>Gmail Import (一括)</h2>
       <GmailBulkImport />
