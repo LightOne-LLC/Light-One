@@ -52,6 +52,18 @@ describe('analyzeQuickMatchText', () => {
     expect(result.record.startDate).toEqual({ precision: 'month', value: '2026-10' });
   });
 
+  it('override指定なし(auto)でも実案件サンプルをProjectとして正しく判定する(detectEmailType強化の回帰確認)', () => {
+    // 以前は「要員数」(ENGINEER_KEYWORDSの「要員」に部分一致)と「案件」が
+    // 汎用キーワードスコアで同点になり、「■スキル」でのタイブレークにより
+    // Engineerと誤判定されていた(実データで確認済みの既知のバグ)。
+    // 案件固有の構造シグナル(■概要/■作業内容/■期間/■作業場所/■要員数/■面談)
+    // を追加したことで、タイブレークに達する前にProjectが明確に優勢になる。
+    const result = analyzeQuickMatchText(REAL_PROJECT_SAMPLE, 'auto');
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+    expect(result.recordType).toBe('project');
+  });
+
   it('日付の誤記("2026月12月")を勝手に別の日付へ補正しない', () => {
     const result = analyzeQuickMatchText(REAL_PROJECT_SAMPLE, 'project');
     expect(result.status).toBe('ok');

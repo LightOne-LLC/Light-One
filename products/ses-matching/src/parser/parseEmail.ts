@@ -24,8 +24,76 @@ import {
 } from './extractors';
 import type { ParsedEmailResult } from './types';
 
-const PROJECT_KEYWORDS = ['案件', '募集', '必須スキル', '商流'];
+const PROJECT_KEYWORDS = ['案件', '募集', '必須スキル'];
 const ENGINEER_KEYWORDS = ['要員', 'スキルシート', '希望単価', '稼働可能日', '経歴'];
+
+// 「商流」は案件・要員どちらのメールにも現れるSES業界共通語(契約形態の
+// 話であり案件固有ではない)であることをQuick Match実案件監査(30日間・
+// 16,768件の実測)で確認したため、PROJECT_KEYWORDSから外した
+// (Project/Engineerを決める強い根拠にしない)。
+
+// Quick Match実案件("■概要"見出し形式の案件メール)が、汎用キーワードだけ
+// では「要員数」(ENGINEER_KEYWORDSの「要員」に部分一致)と「案件」が同点
+// になり、後述のタイブレークで誤ってengineer判定されることが分かった。
+// 実データ(500件監査)で、以下は案件メール側にのみ高頻度で現れ、要員
+// メール側にはほぼ現れないことを確認した固有の構造的見出し語のため、
+// 案件側の強いシグナルとして追加する。見出し記号は「■」だけでなく
+// 「●」を使う実テンプレート(例:「●案件 ：顧客管理システム新規構築」
+// 「●期間 ：10月～中長期」)も500件回帰確認で見つかったため、両方の記号
+// で用意する(extractors.tsのLIST_MARKER_PREFIX_SRCが従来から□■◆★▼●を
+// 同種の見出し記号として扱っているのと同じ考え方)。
+const PROJECT_STRUCTURAL_MARKERS = [
+  '■概要',
+  '案件概要',
+  '■作業内容',
+  '●内容',
+  '■就業時間',
+  '■期間',
+  '●期間',
+  '■作業場所',
+  '●場所',
+  '■要員数',
+  '募集人数',
+  '■面談',
+  '●面談',
+  '●単金',
+  '案件名',
+];
+
+// 同じ実データ監査で、要員1名分のプロフィールを【】見出しで列挙する形式
+// (FREE BRAIN等)が、これらのフィールドを複数まとめて持つことを確認した。
+// 個々の語(例:「氏名」「最寄駅」)は案件メールの署名・連絡先欄にも高頻度で
+// 現れ単独では判別力が無いため含めない(実データで「other」に多く出現し、
+// 判別力が無いことを確認済み)。ここに含めるのは、要員プロフィール特有の
+// 語彙で、案件メール側にはほぼ現れないことを確認できたものだけ。
+//
+// 「並行」は当初この一覧に含めていたが、Quick Match修正後の500件回帰
+// 確認で、案件メール側にも「※並行状況のご記載をお願い申し上げます」と
+// いう提案時の定型的な確認事項(他社への並行提案有無の確認)として高頻度で
+// 使われており、案件/要員どちらにも現れる共通語であることが分かったため
+// 除外した(このリストに残す語は、この回帰確認で実際に案件メール側への
+// 誤判定を起こさなかったものだけ)。
+const ENGINEER_PROFILE_MARKERS = ['要員番号', '所属種類', '契約形態', '週稼働', '面談可能日', '希望条件'];
+
+function countProjectStructuralSignals(body: string): number {
+  return countMatches(body, PROJECT_STRUCTURAL_MARKERS);
+}
+
+function countEngineerProfileSignals(body: string): number {
+  return countMatches(body, ENGINEER_PROFILE_MARKERS);
+}
+
+// 「氏名：」「■スキル」「【単価】」のような見出し・ラベル記号は、
+// 案件・要員メールのほぼ全てに(ごく短いテストフィクスチャや、コロンを
+// 使わない単独■見出し形式も含め)最低1つは存在する。逆に「チョータツ
+// ブーストの新着案件・人材情報」のような、実データを一切含まない外部
+// ポータルへの通知メール(実データで確認済み)には、これらの見出し記号が
+// 一切現れない(「・」は通常の文中の区切りとしても頻出するため、この
+// 判定には使わない)。この違いを使って、案件/要員固有の構造的シグナルも
+// 無く、かつ判定の根拠が汎用キーワード1個だけ(スコア差が最小の1点)の
+// 場合に、見出し構造の有無で実データを含む短いメールと空の通知メールを
+// 区別する(本文の文字数という不安定な閾値には頼らない)。
+const LABEL_MARKER_PATTERN = /[：:■【]/;
 
 // 実メール(100〜200件規模)の調査で「案件名：」ラベルが最も高頻度・高信頼で
 // 観測された(明示ラベル優先)。「氏名：」は要員メールのほぼ全件で観測された。
@@ -55,6 +123,16 @@ function countMatches(text: string, keywords: string[]): number {
 // メール本文に偶然出現することは考えにくいため、単独の一致でも
 // 「BP要員メールらしい構造的シグナル」として扱う(単純な1単語一致による
 // 粗い判定とは異なる)。
+//
+// 「■スキル」は案件メール側でも(「■スキル：開発～結合テストフェーズ」の
+// ように)ごく普通に使われる見出しであることをQuick Match実案件監査で
+// 確認したため、単独では判定に使わない方が良いのでは、と一度この一覧から
+// 外したが、その場合でも他のBP固有見出し(■希望条件等)が無い実データの
+// 要員メール(単独■見出し・コロン無し形式)まで判定できなくなる回帰が
+// 見つかった。実際には、下記のPROJECT_STRUCTURAL_MARKERS追加により、案件
+// メール側は「■スキル」に頼らずとも(■概要/■作業内容等の複数の案件固有
+// 見出しで)このタイブレークに到達する前にスコア差で決着するようになった
+// ため、「■スキル」はこのリストに残したままで問題ない。
 const BP_ENGINEER_STRUCTURAL_MARKERS = [
   '■基本情報',
   '■希望条件',
@@ -78,14 +156,38 @@ function hasBpEngineerStructuralSignal(body: string): boolean {
 // (parseEmail()自体はこれまで通りこの関数をそのまま呼ぶ)。
 export function detectEmailType(subject: string, body: string): 'project' | 'engineer' | null {
   const text = `${subject}\n${body}`;
-  const projectScore = countMatches(text, PROJECT_KEYWORDS);
-  const engineerScore = countMatches(text, ENGINEER_KEYWORDS);
+  const projectStructuralScore = countProjectStructuralSignals(body);
+  const engineerStructuralScore = countEngineerProfileSignals(body);
+  const hasBpSignal = hasBpEngineerStructuralSignal(body);
+
+  // 汎用キーワード(「案件」「要員」等、案件・要員どちらのメールにも現れ
+  // うる単語)に、案件/要員固有の構造的シグナルの件数を加算する。単語1個
+  // だけでは弱い判定材料でも、複数の固有フィールドが揃えば強い根拠になる
+  // という考え方(実データ監査で確認済み)。
+  const projectScore = countMatches(text, PROJECT_KEYWORDS) + projectStructuralScore;
+  const engineerScore = countMatches(text, ENGINEER_KEYWORDS) + engineerStructuralScore;
+
   if (projectScore === 0 && engineerScore === 0) return null;
+
+  // 案件/要員固有の構造的シグナルが双方とも一切無く、かつ判定の根拠が
+  // 汎用キーワード1個だけ(スコア差が最小の1点)で、本文にラベル区切りの
+  // 「：」「:」が一切無い場合は、その1語の偶然の一致だけでは種別を確定
+  // させない(外部ポータルへの誘導のみのdigest通知メール等への対処、
+  // 実データで確認済み)。複数のキーワードが一致している場合(経歴+
+  // 稼働可能日+希望単価等、それ自体で十分な根拠になる)や、ラベル構造が
+  // 1つでもある場合は対象外とする — ラベル付きの短い実メールまで
+  // 巻き込まないため。
+  const hasAnyStructuralSignal = projectStructuralScore > 0 || engineerStructuralScore > 0 || hasBpSignal;
+  const decisiveScore = Math.max(projectScore, engineerScore);
+  if (!hasAnyStructuralSignal && decisiveScore <= 1 && !LABEL_MARKER_PATTERN.test(body)) {
+    return null;
+  }
+
   if (projectScore === engineerScore) {
     // 通常のキーワード判定が同点で決着しない場合のみ、BP要員メール特有の
     // 構造的シグナルでタイブレークする。既存の非同点判定(明確にproject/
     // engineerと判別できるメール)には一切影響しない。
-    return hasBpEngineerStructuralSignal(body) ? 'engineer' : null;
+    return hasBpSignal ? 'engineer' : null;
   }
   return projectScore > engineerScore ? 'project' : 'engineer';
 }

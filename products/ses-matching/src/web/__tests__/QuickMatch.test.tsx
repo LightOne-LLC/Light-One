@@ -104,24 +104,21 @@ describe('QuickMatch', () => {
     mockFetchReject();
     await renderQuickMatch();
     fireEvent.change(getTextarea(), { target: { value: REAL_PROJECT_SAMPLE } });
-    // このサンプルは「要員数」「■スキル」等の語も含むため、自動判定
-    // (detectEmailTypeの既存ロジック)だけでは要員と判定されうる
-    // (下記の別テストで自動判定の既知の限界として検証済み)。ここでは
-    // loading状態の表示だけを見たいため、判定方法を明示的に固定する。
-    fireEvent.change(screen.getByLabelText('判定方法'), { target: { value: 'project' } });
     fireEvent.click(getAnalyzeButton());
     expect(screen.getByRole('button', { name: '解析中…' })).toBeTruthy();
     await waitFor(() => expect(screen.getAllByText('案件として解析しました').length).toBeGreaterThan(0));
   });
 
-  it('(既知の限界)自動判定はこの実案件サンプルをEngineerと誤判定する — detectEmailTypeの既存ロジックによるもので今回は変更しない', async () => {
+  it('自動判定だけで実案件サンプルをProjectとして正しく解析できる(detectEmailType強化後の回帰確認)', async () => {
     mockFetchReject();
     await renderQuickMatch();
+    // 判定方法を明示的に切り替えず、デフォルトの「自動判定」のまま解析する。
+    // 以前はこのサンプルが「要員数」「■スキル」等の語に引きずられてEngineer
+    // に誤判定されていたが、detectEmailTypeの構造シグナル強化により
+    // 自動判定だけで正しくProjectと判定されるようになったことを確認する。
     await paste(REAL_PROJECT_SAMPLE, 'auto');
-    // 誤判定の結果、要員として必要な項目(勤務地/リモート/稼働開始日)が
-    // 揃わずvalidation-failedになる。手動で「案件」に切り替えれば正しく
-    // 解析できることは別テストで確認済み。
-    expect(screen.getByText(/情報が不足しています/)).toBeTruthy();
+    expect(screen.getByText('案件として解析しました')).toBeTruthy();
+    expect(screen.getByText('55〜55万円/月')).toBeTruthy();
   });
 
   it('実案件サンプルを判定方法「案件」で解析すると、構造化結果とダミー要員とのマッチング候補を表示する(dummy data fallback)', async () => {
