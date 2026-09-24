@@ -73,7 +73,10 @@ function hasBpEngineerStructuralSignal(body: string): boolean {
   return BP_ENGINEER_STRUCTURAL_MARKERS.some((marker) => body.includes(marker));
 }
 
-function detectEmailType(subject: string, body: string): 'project' | 'engineer' | null {
+// Quick Match(貼り付けテキストの手動種別切り替え)がparseEmail()を経由せず
+// 直接この判定・変換を呼べるよう公開する。ロジック・挙動は一切変更しない
+// (parseEmail()自体はこれまで通りこの関数をそのまま呼ぶ)。
+export function detectEmailType(subject: string, body: string): 'project' | 'engineer' | null {
   const text = `${subject}\n${body}`;
   const projectScore = countMatches(text, PROJECT_KEYWORDS);
   const engineerScore = countMatches(text, ENGINEER_KEYWORDS);
@@ -87,7 +90,7 @@ function detectEmailType(subject: string, body: string): 'project' | 'engineer' 
   return projectScore > engineerScore ? 'project' : 'engineer';
 }
 
-function parseProjectCandidate(subject: string, body: string, id: string): Record<string, unknown> {
+export function parseProjectCandidate(subject: string, body: string, id: string): Record<string, unknown> {
   const candidate: Record<string, unknown> = { id };
 
   // 表示用の案件名。「案件名：」等の明示ラベルを最優先、無ければ件名を
@@ -176,7 +179,12 @@ function parseProjectCandidate(subject: string, body: string, id: string): Recor
   ];
   if (requiredSkills.length > 0) candidate.requiredSkills = requiredSkills;
 
-  const rateValue = extractLabeledValue(body, ['単価', '金額', '契約金額', '単金']);
+  // 「■単価：55万円\n　※140H～190H 時間精算 中間割り」のように、単価ラベルの
+  // 値の直後に精算時間等の※注記が(改行を挟んでも)続く実データで、注記内の
+  // 数値(140/190)がparseRateRangeの数値カウントを狂わせ、本来1つだけの
+  // 単価(55)を検出できなくなる不具合が見つかった。他のラベル値抽出と同様、
+  // ※注記はstripNoteSuffixで切り落としてから数値解析する。
+  const rateValue = stripNoteSuffix(extractLabeledValue(body, ['単価', '金額', '契約金額', '単金']) ?? '') || undefined;
   const rateRange = rateValue ? parseRateRange(rateValue) : findRateInFreeText(subject);
   if (rateRange) {
     candidate.rateMin = rateRange.min;
@@ -204,7 +212,7 @@ function parseProjectCandidate(subject: string, body: string, id: string): Recor
   return candidate;
 }
 
-function parseEngineerCandidate(subject: string, body: string, id: string): Record<string, unknown> {
+export function parseEngineerCandidate(subject: string, body: string, id: string): Record<string, unknown> {
   const candidate: Record<string, unknown> = { id };
 
   // 表示用の人材名。「氏名：」ラベルが要員メールのほぼ全件で観測された
@@ -248,7 +256,9 @@ function parseEngineerCandidate(subject: string, body: string, id: string): Reco
   // 一部の実メールではコロンが省略される("・単金（税抜）85万円")ため、
   // その場合は数字直前フォールバックで補う。
   const rateLabels = ['希望単価', '単価', '単金（税抜）', '単金(税抜)', '単金'];
-  const rateValue = extractLabeledValue(body, rateLabels) ?? extractBulletValueNoColonNumeric(body, rateLabels);
+  const rateValue = stripNoteSuffix(
+    extractLabeledValue(body, rateLabels) ?? extractBulletValueNoColonNumeric(body, rateLabels) ?? '',
+  ) || undefined;
   const rateRange = rateValue ? parseRateRange(rateValue) : findRateInFreeText(subject);
   if (rateRange) {
     candidate.desiredRateMin = rateRange.min;
