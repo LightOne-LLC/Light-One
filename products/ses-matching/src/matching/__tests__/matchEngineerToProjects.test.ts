@@ -98,3 +98,31 @@ describe('matchEngineerToProjects', () => {
     expect(results[results.length - 1].projectId).toBe('project-b');
   });
 });
+
+describe('matchEngineerToProjects(同一会社の除外)', () => {
+  it('要員のcompanyNameと案件のsourceCompanyが同一の場合、その案件は候補から除外される', () => {
+    const sameCompanyEngineer: EngineerRecord = { ...engineer, companyName: '株式会社ABC' };
+    const sameCompanyProject: ProjectRecord = { ...projectA, sourceCompany: '株式会社ABC' };
+    const results = matchEngineerToProjects(sameCompanyEngineer, [sameCompanyProject, projectB]);
+    expect(results.map((r) => r.projectId)).toEqual(['project-b']);
+  });
+
+  it('会社名が異なる場合は通常どおり候補に残る', () => {
+    const engineerAbc: EngineerRecord = { ...engineer, companyName: '株式会社ABC' };
+    const projectXyz: ProjectRecord = { ...projectA, sourceCompany: '株式会社XYZ' };
+    const results = matchEngineerToProjects(engineerAbc, [projectXyz]);
+    expect(results.map((r) => r.projectId)).toEqual(['project-a']);
+  });
+
+  it('案件側にsourceCompanyが無ければ除外しない', () => {
+    const engineerAbc: EngineerRecord = { ...engineer, companyName: '株式会社ABC' };
+    const results = matchEngineerToProjects(engineerAbc, [projectA]);
+    expect(results.map((r) => r.projectId)).toEqual(['project-a']);
+  });
+
+  it('要員側にcompanyNameが無ければ除外しない', () => {
+    const projectAbc: ProjectRecord = { ...projectA, sourceCompany: '株式会社ABC' };
+    const results = matchEngineerToProjects(engineer, [projectAbc]);
+    expect(results.map((r) => r.projectId)).toEqual(['project-a']);
+  });
+});

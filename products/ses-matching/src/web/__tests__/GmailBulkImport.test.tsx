@@ -36,7 +36,7 @@ describe('GmailBulkImport', () => {
   it('取得ボタンが表示される', async () => {
     mockFetchOnce({ success: true, fetched: 0 });
     renderComponent();
-    expect(screen.getByRole('button', { name: '直近3日間のメールを取得' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '直近7日間のメールを取得' })).toBeTruthy();
     // マウント時の自動fetchが完了するのを待ってからテストを終える
     // (act()警告を避けるため)。
     await waitFor(() => expect(fetch).toHaveBeenCalled());
@@ -49,12 +49,12 @@ describe('GmailBulkImport', () => {
     await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/gmail/fetch'));
   });
 
-  it('「直近3日間のメールを取得」ボタンをクリックすると再度同じAPIを呼ぶ', async () => {
+  it('「直近7日間のメールを取得」ボタンをクリックすると再度同じAPIを呼ぶ', async () => {
     mockFetchOnce({ success: true, fetched: 0 });
     renderComponent();
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
 
-    fireEvent.click(screen.getByRole('button', { name: '直近3日間のメールを取得' }));
+    fireEvent.click(screen.getByRole('button', { name: '直近7日間のメールを取得' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
   });
 

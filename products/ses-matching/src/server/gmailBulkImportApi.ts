@@ -46,7 +46,7 @@ function addDatePrecision(counts: DatePrecisionCounts, candidate: Record<string,
 // する(件数上限は設けない — 取得件数はその期間に実際に届いたメール数
 // そのまま)。既存のbulk fetch/Parser/Validation/Matchingロジック自体は
 // 一切変更しない。
-export const RECENT_DAYS = 3;
+export const RECENT_DAYS = 7;
 
 /** "field: message" 形式のvalidationエラーから、集計用のフィールド名だけを
  * 取り出す("requiredSkills[0]: ..." は "requiredSkills" へまとめる)。 */

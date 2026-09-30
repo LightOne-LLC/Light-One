@@ -113,8 +113,8 @@ const unrelatedEmail: RawEmail = {
 };
 
 describe('RECENT_DAYS', () => {
-  it('過去3日間を対象とする(件数上限ではない)', () => {
-    expect(RECENT_DAYS).toBe(3);
+  it('過去7日間を対象とする(件数上限ではない)', () => {
+    expect(RECENT_DAYS).toBe(7);
   });
 });
 
@@ -171,7 +171,7 @@ describe('performGmailBulkImport', () => {
     expect(result.unparsed).toBe(1);
   });
 
-  it('件数上限を渡さずfetchRawEmailsを呼び、結果にRECENT_DAYSをそのまま返す(「3日分だから件数を絞る」ことはしない)', async () => {
+  it('件数上限を渡さずfetchRawEmailsを呼び、結果にRECENT_DAYSをそのまま返す(「N日分だから件数を絞る」ことはしない)', async () => {
     const fetchRawEmails = vi.fn().mockResolvedValue([]);
     const result = await performGmailBulkImport(fetchRawEmails);
 
