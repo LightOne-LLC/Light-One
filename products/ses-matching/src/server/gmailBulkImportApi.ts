@@ -10,7 +10,7 @@ import { validateEngineerRecord } from '../intake/engineer';
 import { validateProjectRecord } from '../intake/project';
 import type { EngineerRecord, ProjectRecord } from '../intake/types';
 import { matchProjectToEngineers } from '../matching/matchProjectToEngineers';
-import { authenticate, getGmailService, getMessage, listMessageIdsSince } from '../gmail/client';
+import { authenticate, getGmailService, getMessagesBatch, listMessageIdsSince } from '../gmail/client';
 import { toRawEmail, type GmailApiMessage } from '../gmail/parseMessage';
 import type { RawEmail } from '../gmail/types';
 import { parseEmail } from '../parser/parseEmail';
@@ -109,8 +109,6 @@ function buildWorkspaceProject(
   };
 }
 
-const CONCURRENCY = 10;
-
 /** メール自身のDateヘッダーではなくGmail自身が記録したinternalDateで
  * 判定する(なりすまし・記載ミスの影響を受けない)。after:検索は暦日単位
  * のため1日分手前まで取得しているが、ここで[sinceMs, untilMs]の範囲に
@@ -123,24 +121,6 @@ export function isWithinWindow(message: GmailApiMessage, sinceMs: number, untilM
   return internalDate >= sinceMs && internalDate <= untilMs;
 }
 
-/** listで得たmessage idを固定の並列数でバッチ取得する(Gmail APIへの
- * 過度な同時リクエストを避けるための最小限の配慮。リトライ/バックオフ等は
- * 今回のスコープ外)。 */
-async function fetchMessagesInBatches(
-  service: ReturnType<typeof getGmailService>,
-  ids: string[],
-  sinceMs: number,
-  untilMs: number,
-): Promise<RawEmail[]> {
-  const results: RawEmail[] = [];
-  for (let i = 0; i < ids.length; i += CONCURRENCY) {
-    const batch = ids.slice(i, i + CONCURRENCY);
-    const messages = await Promise.all(batch.map((id) => getMessage(service, id)));
-    results.push(...messages.filter((m) => isWithinWindow(m, sinceMs, untilMs)).map(toRawEmail));
-  }
-  return results;
-}
-
 async function fetchRecentRawEmails(): Promise<RawEmail[]> {
   const auth = await authenticate();
   const service = getGmailService(auth);
@@ -149,7 +129,12 @@ async function fetchRecentRawEmails(): Promise<RawEmail[]> {
   const sinceMs = untilMs - RECENT_DAYS * 24 * 60 * 60 * 1000;
   const messages = await listMessageIdsSince(service, sinceMs);
   const ids = messages.map((m) => m.id).filter((id): id is string => Boolean(id));
-  return fetchMessagesInBatches(service, ids, sinceMs, untilMs);
+
+  // Gmail APIのバッチHTTPエンドポイント経由でまとめて取得する(1件ずつ
+  // getMessage()をHTTP往復していた既存方式より往復回数を削減するための
+  // 変更。返り値の内容・internalDateによる絞り込みは従来と同一)。
+  const fullMessages = await getMessagesBatch(auth, ids);
+  return fullMessages.filter((m) => isWithinWindow(m, sinceMs, untilMs)).map(toRawEmail);
 }
 
 /**

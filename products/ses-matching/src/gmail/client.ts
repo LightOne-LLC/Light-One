@@ -178,6 +178,124 @@ export async function listMessageIdsSince(
   return results;
 }
 
+// Gmail API専用のバッチHTTPエンドポイント(汎用の www.googleapis.com/batch
+// とは別物で、こちらはGmail向けに現在も提供されている)。1件ずつ
+// messages.get()をHTTP往復していた既存方式に対し、複数件を1回のHTTP
+// リクエストにまとめることで往復回数(レイテンシの支配的要因)を削減する。
+const GMAIL_BATCH_URL = 'https://www.googleapis.com/batch/gmail/v1';
+// 1バッチに含めるmessages.get呼び出し数。Gmail APIの公式ガイドは1バッチ
+// 最大50件までを許容するが、実測の結果、バッチ内の各呼び出しも
+// 「ユーザーあたりの同時リクエスト数」制限(429 rateLimitExceeded)の対象に
+// なることを確認した — 50件バッチ×複数バッチ並行では大部分が429/403で
+// 失敗した。既存の単発取得方式で実績のある同時実行数(10)と同じ実効
+// 同時実行数に収まるよう、バッチサイズを10、バッチ同時実行数を1(完全に
+// 逐次)にしている。これにより、往復回数はCONCURRENCY=10のバッチ単位分
+// (10件ずつ)削減しつつ、Gmail側の同時実行数制限は従来と同じ水準に保つ。
+const BATCH_SIZE = 10;
+const BATCH_CONCURRENCY = 1;
+
+interface BatchResponsePart {
+  status: number;
+  body: string;
+}
+
+function buildBatchRequestBody(ids: string[], boundary: string): string {
+  let body = '';
+  for (const id of ids) {
+    body += `--${boundary}\r\n`;
+    body += `Content-Type: application/http\r\n`;
+    body += `Content-ID: <item-${id}>\r\n\r\n`;
+    body += `GET /gmail/v1/users/me/messages/${id}?format=full\r\n\r\n`;
+  }
+  body += `--${boundary}--`;
+  return body;
+}
+
+/** multipart/mixedのバッチレスポンスを、パートごとのHTTPステータスと
+ * 本文(JSON文字列)へ分解する。Content-IDでの突き合わせは行わない
+ * (各パートのJSON自体にmessageのidが含まれるため不要)。 */
+function parseBatchResponse(responseText: string, boundary: string): BatchResponsePart[] {
+  const rawParts = responseText.split(`--${boundary}`);
+  const parts: BatchResponsePart[] = [];
+  for (const raw of rawParts) {
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed === '--') continue;
+    const statusMatch = trimmed.match(/HTTP\/1\.1 (\d+)/);
+    const jsonStart = trimmed.indexOf('{');
+    const jsonEnd = trimmed.lastIndexOf('}');
+    if (!statusMatch || jsonStart === -1 || jsonEnd === -1 || jsonEnd < jsonStart) continue;
+    parts.push({ status: Number(statusMatch[1]), body: trimmed.slice(jsonStart, jsonEnd + 1) });
+  }
+  return parts;
+}
+
+/** 最大BATCH_SIZE件のmessageを1回のバッチHTTPリクエストで取得する。
+ * 個別messageの取得が失敗した場合(削除済み・一時的エラー等、HTTP
+ * ステータスが200以外、またはJSONとして解釈できない場合)はそのmessageだけ
+ * を黙ってスキップし、バッチ全体や他のmessageの取得は失敗させない。 */
+async function fetchMessageBatch(auth: OAuth2Client, ids: string[]): Promise<GmailApiMessage[]> {
+  const accessToken = (await auth.getAccessToken()).token;
+  if (!accessToken) throw new Error('failed to obtain access token for Gmail batch request');
+
+  const boundary = `batch_${Math.random().toString(36).slice(2)}`;
+  const res = await fetch(GMAIL_BATCH_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': `multipart/mixed; boundary=${boundary}`,
+    },
+    body: buildBatchRequestBody(ids, boundary),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Gmail batch request failed: ${res.status} ${res.statusText}`);
+  }
+
+  const contentType = res.headers.get('content-type') ?? '';
+  const responseBoundary = contentType.match(/boundary=([^;]+)/)?.[1]?.trim();
+  if (!responseBoundary) {
+    throw new Error('Gmail batch response is missing a multipart boundary');
+  }
+
+  const parts = parseBatchResponse(await res.text(), responseBoundary);
+  const messages: GmailApiMessage[] = [];
+  for (const part of parts) {
+    if (part.status !== 200) continue;
+    try {
+      messages.push(JSON.parse(part.body) as GmailApiMessage);
+    } catch {
+      continue;
+    }
+  }
+  return messages;
+}
+
+/**
+ * 複数messageをGmail APIのバッチHTTPエンドポイント経由でまとめて取得する。
+ * getMessage()を件数分個別に呼ぶ既存方式と返り値の内容(internalDate含む)
+ * は同一で、HTTP往復の回数だけを削減する。
+ *
+ * BATCH_SIZE件ごとに分割し、BATCH_CONCURRENCY件のバッチリクエストを
+ * 並行実行する。個別messageの取得失敗は該当messageだけをスキップし、
+ * 全体やその他のmessage取得を巻き込まない(fetchMessageBatch参照)。
+ */
+export async function getMessagesBatch(auth: OAuth2Client, ids: string[]): Promise<GmailApiMessage[]> {
+  if (ids.length === 0) return [];
+
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+    chunks.push(ids.slice(i, i + BATCH_SIZE));
+  }
+
+  const results: GmailApiMessage[] = [];
+  for (let i = 0; i < chunks.length; i += BATCH_CONCURRENCY) {
+    const group = chunks.slice(i, i + BATCH_CONCURRENCY);
+    const groupResults = await Promise.all(group.map((chunk) => fetchMessageBatch(auth, chunk)));
+    for (const r of groupResults) results.push(...r);
+  }
+  return results;
+}
+
 /**
  * Fetches exactly the single most recent message in the mailbox.
  * No search query/filtering, no pagination — "give me the newest
