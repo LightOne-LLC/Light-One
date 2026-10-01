@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from unittest.mock import patch
 
 from app.gmail_intake import run_gmail_project_intake
@@ -19,7 +20,14 @@ def test_a_project_posting_email_flows_all_the_way_to_project_registration():
         "Python/AWS案件です。リモート可。単価70〜80万円。9月開始。Python経験3年以上希望。"
     )
 
-    with patch("app.gmail_client.get_latest_email", return_value=fake_email):
+    # _extract_start_date() (app/planner.py) resolves "9月開始" relative to
+    # "today": fix it to a date safely before September, same as
+    # test_project_register_execution.py, so the expected year below
+    # doesn't depend on the real month this test happens to run in.
+    with patch("app.gmail_client.get_latest_email", return_value=fake_email), patch(
+        "app.planner.datetime"
+    ) as mock_datetime:
+        mock_datetime.now.return_value = datetime(2026, 1, 1)
         email_task, email_routed_tool, project_task, project_routed_tool = run_gmail_project_intake()
 
     assert email_task.status == "success"

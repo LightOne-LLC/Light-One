@@ -1,3 +1,6 @@
+from datetime import datetime
+from unittest.mock import patch
+
 from app.planner import Planner
 
 
@@ -7,7 +10,14 @@ def test_full_project_email_is_parsed_into_all_fields():
         "9月開始。Python経験3年以上希望。"
     )
 
-    task = Planner().plan(email)
+    # _extract_start_date() (app/planner.py) resolves "9月開始" relative to
+    # "today": this year if 9月 hasn't passed yet, otherwise next year.
+    # Fix "today" to a date safely before September so the expected year
+    # below reflects that fixed point in time, not whatever month this
+    # test happens to actually run in.
+    with patch("app.planner.datetime") as mock_datetime:
+        mock_datetime.now.return_value = datetime(2026, 1, 1)
+        task = Planner().plan(email)
 
     assert task.tool == "案件登録"
     assert task.parameters == {
@@ -41,7 +51,13 @@ def test_different_skill_set_is_not_hardcoded_to_python_aws():
         "10月開始。経験5年以上希望。"
     )
 
-    task = Planner().plan(email)
+    # Same fixed-"today" reasoning as test_full_project_email_is_parsed_
+    # into_all_fields above — this test passed only by coincidence when
+    # the real current month happened to be <= 10; fixing "today" makes
+    # it stable regardless of when it actually runs.
+    with patch("app.planner.datetime") as mock_datetime:
+        mock_datetime.now.return_value = datetime(2026, 1, 1)
+        task = Planner().plan(email)
 
     assert task.tool == "案件登録"
     assert task.parameters["skills"] == ["Java", "Spring"]
