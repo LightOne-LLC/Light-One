@@ -2,6 +2,7 @@ import { toEngineerInput } from '../../intake/engineer';
 import { toProjectInput } from '../../intake/project';
 import type { EngineerRecord, ProjectRecord } from '../../intake/types';
 import { calcTotalScore } from '../../scoring/totalScore';
+import { parseProjectCandidate } from '../../parser/parseEmail';
 import { matchProjectToEngineers } from '../matchProjectToEngineers';
 
 // 匿名化したダミーデータ（実在の案件・要員ではない）
@@ -164,6 +165,45 @@ describe('matchProjectToEngineers(商流が「貴社」止まりの案件の除�
 
   it('商流が未設定の案件は除外しない', () => {
     const results = matchProjectToEngineers(project, [engineerA]);
+    expect(results.map((r) => r.engineerId)).toEqual(['engineer-a']);
+  });
+
+  it('実データに見られる「貴社社員まで」「貴社プロパーまで」も除外される', () => {
+    const syainMade: ProjectRecord = { ...project, commercialFlow: '貴社社員まで' };
+    const properMade: ProjectRecord = { ...project, commercialFlow: '貴社プロパーまで' };
+    expect(matchProjectToEngineers(syainMade, [engineerA])).toEqual([]);
+    expect(matchProjectToEngineers(properMade, [engineerA])).toEqual([]);
+  });
+
+  it('商流の前後や内部に空白・改行があっても「貴社」を検出して除外する(表記揺れの正規化)', () => {
+    const withSpaces: ProjectRecord = { ...project, commercialFlow: ' 貴社 まで ' };
+    const withNewline: ProjectRecord = { ...project, commercialFlow: '貴社\nまで' };
+    const withFullWidthSpace: ProjectRecord = { ...project, commercialFlow: '貴社　社員まで' };
+    expect(matchProjectToEngineers(withSpaces, [engineerA])).toEqual([]);
+    expect(matchProjectToEngineers(withNewline, [engineerA])).toEqual([]);
+    expect(matchProjectToEngineers(withFullWidthSpace, [engineerA])).toEqual([]);
+  });
+
+  it('本文の挨拶文に「貴社」があるだけで、商流ラベルの値自体は通常の内容なら除外しない(本文全体を検索しているわけではないことの確認)', () => {
+    // 実メールでよくある「貴社ますますご清栄の…」のような挨拶文を本文冒頭に
+    // 持つが、「商流：」ラベルの値そのものには「貴社」が含まれないケース。
+    const body = [
+      '貴社ますますご清栄のこととお慶び申し上げます。',
+      '下記案件のご紹介です。',
+      '■必須スキル■',
+      'Java',
+      '■単価■',
+      '60万円',
+      '■場所■',
+      '東京都',
+      '■商流■',
+      '現場→弊社',
+    ].join('\n');
+    const candidate = parseProjectCandidate('案件のご紹介', body, 'greeting-test');
+    expect(candidate.commercialFlow).toBe('現場→弊社');
+
+    const projectFromEmail: ProjectRecord = { ...project, commercialFlow: candidate.commercialFlow as string };
+    const results = matchProjectToEngineers(projectFromEmail, [engineerA]);
     expect(results.map((r) => r.engineerId)).toEqual(['engineer-a']);
   });
 });

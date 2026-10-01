@@ -310,4 +310,43 @@ describe('Matching Workspace(実データがWorkspace全体を経由してEngine
     await waitFor(() => expect(fetch).toHaveBeenCalled());
     expect(screen.getByText('案件または候補者が見つかりません。')).toBeTruthy();
   });
+
+  it('Engineer Detailに現在の案件情報(案件出し会社・商流・必須スキル・単価・勤務地)も表示される', async () => {
+    mockBulkFetch();
+    render(
+      <MemoryRouter initialEntries={[`/matching/${realProject.id}/engineer/${realEngineerGood.id}`]}>
+        <App />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+
+    await waitFor(() => expect(screen.getByText(/クラウド基盤構築案件/)).toBeTruthy());
+    expect(screen.getByText('株式会社サンプルテック')).toBeTruthy();
+    expect(screen.getByText('現場→弊社')).toBeTruthy();
+    expect(screen.getByText(/Java\(必須\)/)).toBeTruthy();
+    expect(screen.getByText('60〜80万円/月')).toBeTruthy();
+    // 案件側の勤務地(東京都/リモート可)と候補者側の希望勤務地(東京都)の
+    // 両方に「東京都」が出るため、件数のみ確認する(厳密な一意性はここでは問わない)。
+    expect(screen.getAllByText(/東京都/).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('同一会社または商流が「貴社」止まりの組み合わせへ直接遷移した場合、スコアの代わりに「マッチング対象外」を表示する', async () => {
+    const excludedResult: GmailBulkImportResult = {
+      ...bulkResult,
+      validProjects: [{ ...realProject, id: 'excluded-project', commercialFlow: '貴社まで' }],
+      validEngineers: [realEngineerGood],
+    };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: () => Promise.resolve(excludedResult) }));
+
+    render(
+      <MemoryRouter initialEntries={[`/matching/excluded-project/engineer/${realEngineerGood.id}`]}>
+        <App />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+
+    await waitFor(() => expect(screen.getByText(/マッチング対象外/)).toBeTruthy());
+    expect(screen.queryByText('総合スコア')).toBeTruthy(); // カード自体は表示される
+    expect(document.querySelector('.ranking-score')).toBeNull(); // スコア数値は表示しない
+  });
 });
