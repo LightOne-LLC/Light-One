@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getDiagnosisDetail, listDiagnosisRecords } from '../lib/diagnosisStore';
+import { listDiagnosisRecords } from '../lib/diagnosisStore';
 import {
-  buildFinancialProfile, buildFinancialSnapshot, buildFinancialIntelligence,
+  buildFinancialProfile, buildFinancialSnapshot, buildFinancialIntelligence, orderRecordsFromCurrent,
 } from '../financial';
 import type { FinancialIntelligence } from '../financial';
 import { buildDiagnosisExplanation } from '../rag';
@@ -25,20 +25,19 @@ export function FinancialProfilePage() {
     if (!id) return;
     (async () => {
       try {
-        const detail = await getDiagnosisDetail(id);
+        // listDiagnosisRecords()は作成日時降順(新しい順)で返る。buildFinancialIntelligenceは
+        // 「history[0]=表示中の診断・history[1]=その直前の診断」を前提とするため、
+        // orderRecordsFromCurrent()で表示対象のidを基準に並べ直す(最新以外の記録を
+        // 開いた場合でも「直前」が実際にその診断の直前に行われたものになるようにする)。
         const records = await listDiagnosisRecords();
-        // 現在表示している診断を先頭に、それ以外を作成日時降順で並べる(compareSnapshotsが
-        // 「先頭=現在・2番目=直前」を前提としているため)。
-        const others = records.filter((r) => r.id !== id);
-        const orderedRecords = [
-          { id: detail.id, input: detail.input, result: detail.result, createdAt: detail.createdAt },
-          ...others,
-        ];
+        const orderedRecords = orderRecordsFromCurrent(records, id);
+        if (!orderedRecords) throw new Error('診断結果が見つかりません。');
+        const current = orderedRecords[0];
         const snapshots = orderedRecords.map(buildFinancialSnapshot);
 
-        const profile = buildFinancialProfile(detail.input, detail.result);
-        const evidence = buildDiagnosisExplanation(detail.result);
-        setIntelligence(buildFinancialIntelligence(profile, detail.result, snapshots, evidence));
+        const profile = buildFinancialProfile(current.input, current.result);
+        const evidence = buildDiagnosisExplanation(current.result);
+        setIntelligence(buildFinancialIntelligence(profile, current.result, snapshots, evidence));
       } catch (e: any) {
         setError(e?.message ?? 'Financial Profileの取得に失敗しました。');
       }

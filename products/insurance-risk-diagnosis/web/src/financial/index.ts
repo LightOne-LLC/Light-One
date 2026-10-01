@@ -5,3 +5,4 @@ export * from './compareSnapshots';
 export * from './missingInformation';
 export * from './buildFinancialProfileSummary';
 export * from './buildFinancialIntelligence';
+export * from './orderRecordsFromCurrent';

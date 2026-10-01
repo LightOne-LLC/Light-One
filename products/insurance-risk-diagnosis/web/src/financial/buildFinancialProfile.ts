@@ -37,8 +37,12 @@ export function buildFinancialProfile(input: DiagnosisInput, result: DiagnosisRe
     },
     living: {
       monthlyLivingExpense: basic.monthlyLivingExpense,
-      // 診断エンジン(deathCoverage.breakdown)が既に算出した値をそのまま転記する(再計算しない)
-      educationCostRemaining: result.deathCoverage.breakdown.educationTotal,
+      // 診断エンジン(deathCoverage.breakdown)が既に算出した値をそのまま転記する(再計算しない)。
+      // normalizeResult()(diagnosisStore.ts)はcategories/overallScore/assumptionsのみを
+      // 補完しdeathCoverage自体は補完しないため、将来的にごく古いスキーマのレコードで
+      // breakdownの形が異なっていても例外を投げないよう、存在しない場合は0として扱う
+      // (捏造ではなく、算出不能であることを示す安全なフォールバック)。
+      educationCostRemaining: result.deathCoverage?.breakdown?.educationTotal ?? 0,
     },
     assets: {
       savings: asset.savings,

@@ -43,6 +43,35 @@ describe('buildFinancialIntelligence', () => {
     expect(JSON.stringify(evidence)).toBe(beforeEvidence);
   });
 
+  test('historyが完全に空配列(0件)でも例外を投げず、keyChangesは空配列になる', () => {
+    const { input, result } = snapshotFor(() => {}, 'a', '2026-02-01');
+    const profile = buildFinancialProfile(input, result);
+    const evidence = buildDiagnosisExplanation(result);
+
+    const intelligence = buildFinancialIntelligence(profile, result, [], evidence);
+    expect(intelligence.keyChanges).toEqual([]);
+    expect(intelligence.currentState).toBeDefined();
+  });
+
+  test('すべて0円(emptyDiagnosisInputの既定値に近い状態)でも例外を投げない', () => {
+    const input = emptyDiagnosisInput();
+    input.asset.savings = 0;
+    input.asset.otherAssets = 0;
+    input.asset.realEstateValue = 0;
+    input.asset.mortgageBalance = 0;
+    input.asset.otherLoanBalance = 0;
+    input.existingInsurance.deathCoverage = 0;
+    input.existingInsurance.monthlyPremiumTotal = 0;
+    input.retirement.expectedSeverancePay = 0;
+    const result = runDiagnosis(input);
+    const profile = buildFinancialProfile(input, result);
+    const evidence = buildDiagnosisExplanation(result);
+
+    expect(() => buildFinancialIntelligence(profile, result, [], evidence)).not.toThrow();
+    const intelligence = buildFinancialIntelligence(profile, result, [], evidence);
+    expect(intelligence.currentState.balanceSheet.netPosition).toBe(0);
+  });
+
   test('historyが1件のみの場合、keyChangesは空配列になる(比較対象が無いため)', () => {
     const { input, result, snapshot } = snapshotFor(() => {}, 'a', '2026-02-01');
     const profile = buildFinancialProfile(input, result);
