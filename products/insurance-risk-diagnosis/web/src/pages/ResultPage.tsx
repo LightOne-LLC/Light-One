@@ -115,6 +115,9 @@ export function ResultPage() {
           <span aria-hidden="true">←</span> 履歴一覧
         </Link>
         <div className="flex gap-2 flex-wrap">
+          <Link to={`/financial-profile/${id}`}>
+            <Button variant="secondary" size="sm">Financial Profile</Button>
+          </Link>
           <Button variant="secondary" size="sm" onClick={handlePrint}>印刷する</Button>
           <Button variant="primary" size="sm" onClick={handleExportPdf} disabled={exporting}>
             {exporting ? '出力中...' : 'PDFレポート出力'}
