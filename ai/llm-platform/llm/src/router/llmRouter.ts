@@ -3,7 +3,7 @@ import { ModelRegistry } from '../registry/modelRegistry.js';
 import { ModelDescriptor, capabilityForTaskType, privacySatisfies } from '../registry/modelDescriptor.js';
 import { TaskMetadata } from '../schemas/taskMetadata.js';
 import { LLMTask } from '../schemas/llmTask.js';
-import { ClassifyResult, EvaluatedResult, ProviderKind } from '../schemas/results.js';
+import { ClassifyResult, EvaluatedResult, ExecutionTrace, GenerateResult, ProviderKind } from '../schemas/results.js';
 import { tryDeterministicClassify } from '../deterministic/deterministicGate.js';
 import { Evaluator } from '../evaluator/evaluator.js';
 
@@ -105,7 +105,10 @@ export class LLMRouter {
    * This is the path SES classification (and any future classify-type
    * domain model) runs through.
    */
-  async executeClassify(task: LLMTask, options: { systemPrompt?: string } = {}): Promise<EvaluatedResult<ClassifyResult>> {
+  async executeClassify(
+    task: LLMTask,
+    options: { systemPrompt?: string; timeoutMs?: number } = {},
+  ): Promise<EvaluatedResult<ClassifyResult>> {
     const startedAt = Date.now();
     const input = typeof task.input === 'string' ? task.input : JSON.stringify(task.input ?? '');
 
@@ -120,11 +123,41 @@ export class LLMRouter {
 
     const decision = this.route(task.metadata);
     const provider = this.providerFactory(decision.descriptor);
-    const result = await provider.classify({ input, systemPrompt: options.systemPrompt });
+    const result = await provider.classify({ input, systemPrompt: options.systemPrompt, timeoutMs: options.timeoutMs });
 
     const evaluated = Evaluator.evaluateClassification(result);
     return {
       ...evaluated,
+      trace: {
+        providerKind: decision.descriptor.provider as ProviderKind,
+        modelId: decision.descriptor.id,
+        routedReason: decision.reason,
+        durationMs: Date.now() - startedAt,
+      },
+    };
+  }
+
+  /**
+   * Free-form generation pipeline: Task -> Router -> Provider.generate ->
+   * Result. Unlike `executeClassify`, there is no fixed output shape to
+   * validate (a classify task's `{category, confidence, reason}` shape
+   * doesn't apply to arbitrary text), so there's no deterministic gate and
+   * no Evaluator here — the caller owns interpreting `output.text` itself,
+   * the same way `LLMProvider.generate()` already works one level down.
+   */
+  async executeGenerate(
+    task: LLMTask,
+    options: { systemPrompt?: string; timeoutMs?: number } = {},
+  ): Promise<{ output: GenerateResult; trace: ExecutionTrace }> {
+    const startedAt = Date.now();
+    const input = typeof task.input === 'string' ? task.input : JSON.stringify(task.input ?? '');
+
+    const decision = this.route(task.metadata);
+    const provider = this.providerFactory(decision.descriptor);
+    const output = await provider.generate({ input, systemPrompt: options.systemPrompt, timeoutMs: options.timeoutMs });
+
+    return {
+      output,
       trace: {
         providerKind: decision.descriptor.provider as ProviderKind,
         modelId: decision.descriptor.id,

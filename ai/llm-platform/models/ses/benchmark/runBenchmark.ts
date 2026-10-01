@@ -69,7 +69,8 @@ async function main() {
 
   const modelId = process.env.SES_CLASSIFIER_MODEL ?? descriptor.runtime.model;
   const endpoint = descriptor.runtime.endpoint ?? process.env.OLLAMA_HOST ?? 'http://localhost:11434';
-  const provider = new OllamaProvider({ modelId, name: descriptor.id, endpoint });
+  const defaultTimeoutMs = process.env.SES_CLASSIFIER_TIMEOUT_MS ? Number(process.env.SES_CLASSIFIER_TIMEOUT_MS) : undefined;
+  const provider = new OllamaProvider({ modelId, name: descriptor.id, endpoint, defaultTimeoutMs });
 
   const available = await provider.isAvailable();
   if (!available) {

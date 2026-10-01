@@ -9,7 +9,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "build": "tsc -b",
-    "benchmark:ses": "tsx models/ses/benchmark/runBenchmark.ts"
+    "benchmark:ses": "tsx models/ses/benchmark/runBenchmark.ts",
+    "execute-task": "tsx llm/src/cli.ts"
   },
   "devDependencies": {
     "@types/node": "^20.14.9",
