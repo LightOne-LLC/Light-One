@@ -28,7 +28,7 @@ const realProject: ProjectRecord = {
   id: 'real-project-1',
   projectName: 'クラウド基盤構築案件',
   sourceCompany: '株式会社サンプルテック',
-  commercialFlow: '貴社まで',
+  commercialFlow: '現場→弊社',
   requiredSkills: [{ name: 'Java', minYears: 3, required: true }],
   rateMin: 60,
   rateMax: 80,
@@ -93,7 +93,7 @@ const bulkResult: GmailBulkImportResult = {
       id: 'real-project-1',
       title: 'AWSインフラ案件',
       sourceCompany: '株式会社サンプルテック',
-      commercialFlow: '貴社まで',
+      commercialFlow: '現場→弊社',
       skills: ['Java'],
       rateMin: 60,
       rateMax: 80,
@@ -140,7 +140,7 @@ describe('Matching Workspace(実データがWorkspace全体を経由してEngine
     expect(screen.getByText('✓ Matching可能')).toBeTruthy();
     // 案件出し会社・商流も案件カードに表示される
     expect(screen.getByText('株式会社サンプルテック')).toBeTruthy();
-    expect(screen.getByText('貴社まで')).toBeTruthy();
+    expect(screen.getByText('現場→弊社')).toBeTruthy();
 
     // 候補を見る → Matchingページで実Engineerのランキングが既存Matching
     // Engineeと一致する。名前が取得できたエンジニアは名前で、できなかった
@@ -160,7 +160,7 @@ describe('Matching Workspace(実データがWorkspace全体を経由してEngine
     // Matching画面上部で、案件出し会社・商流を確認できる(案件名/案件出し
     // 会社/商流→マッチング候補、を1画面で追えることの一部)。
     expect(screen.getByText('株式会社サンプルテック')).toBeTruthy();
-    expect(screen.getByText('貴社まで')).toBeTruthy();
+    expect(screen.getByText('現場→弊社')).toBeTruthy();
     // 候補カードでも、人材の会社名・商流を確認できる(案件出し会社とは
     // 別の値であり、混同していないことを直接確認する)。
     expect(screen.getByText(/株式会社キャリアビート/)).toBeTruthy();

@@ -142,3 +142,28 @@ describe('matchProjectToEngineers(同一会社の除外)', () => {
     expect(results.map((r) => r.engineerId)).toEqual(['engineer-a']);
   });
 });
+
+describe('matchProjectToEngineers(商流が「貴社」止まりの案件の除外)', () => {
+  it('商流に「貴社まで」が含まれる案件は、どの要員に対しても空のランキングを返す', () => {
+    const clientOnlyProject: ProjectRecord = { ...project, commercialFlow: '貴社まで' };
+    const results = matchProjectToEngineers(clientOnlyProject, [engineerA, engineerB]);
+    expect(results).toEqual([]);
+  });
+
+  it('商流に「貴社」が含まれる案件は除外される(「貴社まで」という厳密な一致でなくてもよい)', () => {
+    const clientOnlyProject: ProjectRecord = { ...project, commercialFlow: '弊社→貴社' };
+    const results = matchProjectToEngineers(clientOnlyProject, [engineerA]);
+    expect(results).toEqual([]);
+  });
+
+  it('商流が「貴社」を含まなければ通常どおりマッチングする', () => {
+    const normalFlowProject: ProjectRecord = { ...project, commercialFlow: '現場→弊社' };
+    const results = matchProjectToEngineers(normalFlowProject, [engineerA]);
+    expect(results.map((r) => r.engineerId)).toEqual(['engineer-a']);
+  });
+
+  it('商流が未設定の案件は除外しない', () => {
+    const results = matchProjectToEngineers(project, [engineerA]);
+    expect(results.map((r) => r.engineerId)).toEqual(['engineer-a']);
+  });
+});
