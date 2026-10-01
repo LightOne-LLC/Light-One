@@ -35,7 +35,8 @@ export interface GmailImportResult {
 // アドレス等のPIIではない。
 export interface GmailBulkImportResult {
   success: boolean;
-  limit?: number;
+  // 取得対象とした日数(現在時刻から過去N日間)。件数の上限ではない。
+  days?: number;
   fetched?: number;
   project?: { total: number; valid: number; invalid: number; datePrecision: DatePrecisionCounts };
   engineer?: { total: number; valid: number; invalid: number; datePrecision: DatePrecisionCounts };

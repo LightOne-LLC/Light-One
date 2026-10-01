@@ -11,6 +11,11 @@ export interface GmailApiPart {
 export interface GmailApiMessage {
   id?: string;
   threadId?: string;
+  // メール自身のDateヘッダー(なりすまし・記載ミスがあり得る)とは別の、
+  // Gmailがメッセージ受信時に記録するepoch ms(文字列)。期間指定の
+  // 取得で「対象期間外/未来日時のメールを取得対象にしない」ための
+  // 正確な判定にはこちらを使う。
+  internalDate?: string;
   payload?: GmailApiPart & { headers?: { name?: string; value?: string }[] };
 }
 

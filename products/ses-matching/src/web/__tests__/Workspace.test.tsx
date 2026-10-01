@@ -28,7 +28,7 @@ const realProject: ProjectRecord = {
   id: 'real-project-1',
   projectName: 'クラウド基盤構築案件',
   sourceCompany: '株式会社サンプルテック',
-  commercialFlow: '貴社まで',
+  commercialFlow: '現場→弊社',
   requiredSkills: [{ name: 'Java', minYears: 3, required: true }],
   rateMin: 60,
   rateMax: 80,
@@ -93,7 +93,7 @@ const bulkResult: GmailBulkImportResult = {
       id: 'real-project-1',
       title: 'AWSインフラ案件',
       sourceCompany: '株式会社サンプルテック',
-      commercialFlow: '貴社まで',
+      commercialFlow: '現場→弊社',
       skills: ['Java'],
       rateMin: 60,
       rateMax: 80,
@@ -118,6 +118,9 @@ function mockBulkFetch() {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  // refresh()が成功時にlocalStorageへキャッシュを書くため、
+  // テスト間でキャッシュが漏れて自動fetchがスキップされないようにする。
+  localStorage.clear();
 });
 
 describe('Matching Workspace(実データがWorkspace全体を経由してEngineer Detailまで到達する)', () => {
@@ -140,7 +143,7 @@ describe('Matching Workspace(実データがWorkspace全体を経由してEngine
     expect(screen.getByText('✓ Matching可能')).toBeTruthy();
     // 案件出し会社・商流も案件カードに表示される
     expect(screen.getByText('株式会社サンプルテック')).toBeTruthy();
-    expect(screen.getByText('貴社まで')).toBeTruthy();
+    expect(screen.getByText('現場→弊社')).toBeTruthy();
 
     // 候補を見る → Matchingページで実Engineerのランキングが既存Matching
     // Engineeと一致する。名前が取得できたエンジニアは名前で、できなかった
@@ -160,7 +163,7 @@ describe('Matching Workspace(実データがWorkspace全体を経由してEngine
     // Matching画面上部で、案件出し会社・商流を確認できる(案件名/案件出し
     // 会社/商流→マッチング候補、を1画面で追えることの一部)。
     expect(screen.getByText('株式会社サンプルテック')).toBeTruthy();
-    expect(screen.getByText('貴社まで')).toBeTruthy();
+    expect(screen.getByText('現場→弊社')).toBeTruthy();
     // 候補カードでも、人材の会社名・商流を確認できる(案件出し会社とは
     // 別の値であり、混同していないことを直接確認する)。
     expect(screen.getByText(/株式会社キャリアビート/)).toBeTruthy();
@@ -225,6 +228,41 @@ describe('Matching Workspace(実データがWorkspace全体を経由してEngine
 
     expect(screen.getByText('エンジニアA')).toBeTruthy();
     expect(screen.queryByText('人材ID: real-engineer-weak')).toBeNull();
+  });
+
+  it('マッチング候補の件数表示が、実際にランキングへ表示されている候補数(フィルタ適用後)と一致する', async () => {
+    await renderWorkspaceAtRealMatching();
+    // フィルタ無しの初期状態では2件(realEngineerGood/Weakとも候補に残る)。
+    expect(screen.getByText('マッチング候補 2件')).toBeTruthy();
+
+    const expectedRanking = matchProjectToEngineers(realProject, [realEngineerGood, realEngineerWeak]);
+    const weakScore = expectedRanking.find((r) => r.engineerId === 'real-engineer-weak')?.score ?? 0;
+    fireEvent.change(screen.getByLabelText('最低スコア'), { target: { value: String(weakScore + 1) } });
+
+    // フィルタで1人除外された後は、表示件数も1件に追従する。
+    expect(screen.getByText('マッチング候補 1件')).toBeTruthy();
+    expect(screen.queryByText('マッチング候補 2件')).toBeNull();
+  });
+
+  it('商流が「貴社」止まりの案件は案件選択プルダウンに表示されない(通常の案件は表示される)', async () => {
+    const clientOnlyResult: GmailBulkImportResult = {
+      ...bulkResult,
+      validProjects: [realProject, { ...realProject, id: 'client-only-project', projectName: '貴社止まり案件', commercialFlow: '貴社まで' }],
+    };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: () => Promise.resolve(clientOnlyResult) }));
+
+    render(
+      <MemoryRouter initialEntries={['/matching']}>
+        <App />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Matching' })).toBeTruthy());
+    await waitFor(() => expect(screen.getByLabelText('案件を選択')).toBeTruthy());
+
+    const select = screen.getByLabelText('案件を選択') as HTMLSelectElement;
+    const optionLabels = Array.from(select.options).map((o) => o.textContent);
+    expect(optionLabels).toContain('クラウド基盤構築案件');
+    expect(optionLabels).not.toContain('貴社止まり案件');
   });
 
   it('validationに失敗した案件は「⚠ 情報不足」と不足フィールドを表示し、候補は見られない', async () => {
@@ -309,5 +347,44 @@ describe('Matching Workspace(実データがWorkspace全体を経由してEngine
     );
     await waitFor(() => expect(fetch).toHaveBeenCalled());
     expect(screen.getByText('案件または候補者が見つかりません。')).toBeTruthy();
+  });
+
+  it('Engineer Detailに現在の案件情報(案件出し会社・商流・必須スキル・単価・勤務地)も表示される', async () => {
+    mockBulkFetch();
+    render(
+      <MemoryRouter initialEntries={[`/matching/${realProject.id}/engineer/${realEngineerGood.id}`]}>
+        <App />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+
+    await waitFor(() => expect(screen.getByText(/クラウド基盤構築案件/)).toBeTruthy());
+    expect(screen.getByText('株式会社サンプルテック')).toBeTruthy();
+    expect(screen.getByText('現場→弊社')).toBeTruthy();
+    expect(screen.getByText(/Java\(必須\)/)).toBeTruthy();
+    expect(screen.getByText('60〜80万円/月')).toBeTruthy();
+    // 案件側の勤務地(東京都/リモート可)と候補者側の希望勤務地(東京都)の
+    // 両方に「東京都」が出るため、件数のみ確認する(厳密な一意性はここでは問わない)。
+    expect(screen.getAllByText(/東京都/).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('同一会社または商流が「貴社」止まりの組み合わせへ直接遷移した場合、スコアの代わりに「マッチング対象外」を表示する', async () => {
+    const excludedResult: GmailBulkImportResult = {
+      ...bulkResult,
+      validProjects: [{ ...realProject, id: 'excluded-project', commercialFlow: '貴社まで' }],
+      validEngineers: [realEngineerGood],
+    };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: () => Promise.resolve(excludedResult) }));
+
+    render(
+      <MemoryRouter initialEntries={[`/matching/excluded-project/engineer/${realEngineerGood.id}`]}>
+        <App />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+
+    await waitFor(() => expect(screen.getByText(/マッチング対象外/)).toBeTruthy());
+    expect(screen.queryByText('総合スコア')).toBeTruthy(); // カード自体は表示される
+    expect(document.querySelector('.ranking-score')).toBeNull(); // スコア数値は表示しない
   });
 });

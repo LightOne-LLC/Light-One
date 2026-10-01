@@ -3,7 +3,7 @@ import { toProjectInput, validateProjectRecord } from '../../intake/project';
 import { dummyEngineers } from '../../demo/dummyData';
 import { matchProjectToEngineers } from '../../matching/matchProjectToEngineers';
 import type { RawEmail } from '../../gmail/types';
-import { parseEmail } from '../parseEmail';
+import { detectEmailType, parseEmail } from '../parseEmail';
 
 // すべて匿名の合成(synthetic)メール本文。実メール・実在企業・実在人物ではない。
 
@@ -1519,5 +1519,77 @@ describe('parseEmail (単価の"70～max90万"のような装飾語入り範囲�
 
     expect(result.candidate.rateMin).toBe(70);
     expect(result.candidate.rateMax).toBe(90);
+  });
+});
+
+// Quick Match(貼り付けテキストの自動判定)の実案件監査で見つかった
+// detectEmailTypeの誤判定を修正した際の回帰テスト群。「案件」「要員」の
+// ような案件・要員どちらにも現れうる汎用語だけでなく、案件/要員固有の
+// 構造的シグナル(複数フィールドの組み合わせ)を評価に加えたことを検証する。
+describe('parseEmail (Quick Match実案件監査によるdetectEmailType強化)', () => {
+  const realProjectSample = [
+    'お世話になっております。',
+    'こちら急ぎの案件となります。',
+    'よろしくお願いいたします。',
+    '＝＝＝＝＝＝＝＝＝＝＝',
+    '■概要　　：駐車場管理システム新規構築(AS400)',
+    '■就業時間：9:30～18:30　休憩60分',
+    '■スキル　：開発～結合テストフェーズ',
+    '　　　　　　ILE-RPGの開発経験',
+    '■作業内容：製造，結合テスト等',
+    '■期間　　：2026年10月～2026月12月(延長の可能性大)',
+    '■作業場所：(最寄駅：大門，芝公園，浜松町)  or  在宅(週２～3日)',
+    '■要員数　：1名',
+    '■単価　　：55万円',
+    '■面談　　：1回（上位との面談）',
+    '＝＝＝＝＝＝＝＝＝＝＝',
+  ].join('\n');
+
+  it('「要員数」「■スキル」等のSES共通語彙があっても、■概要/■作業内容等の案件固有見出しが複数あればProjectと判定する(実案件回帰)', () => {
+    expect(detectEmailType('', realProjectSample)).toBe('project');
+    const result = parseEmail({ id: 'quick-match-regression-001', subject: '', bodyText: realProjectSample });
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed') return;
+    expect(result.recordType).toBe('project');
+  });
+
+  const freeBrainStyleEngineerProfile = [
+    '合同会社サンプルの担当者　様',
+    'いつもお世話になっております。',
+    '現在営業中の技術者情報をお送りいたします。',
+    '案件のご紹介お願い致します。',
+    '【要員番号】12345',
+    '【氏名】T.Y',
+    '【所属種類】弊社直個人事業主',
+    '【契約形態】準委任契約',
+    '【最寄駅】東京駅',
+    '【稼働開始日】即日',
+    '【週稼働】週5日',
+    '【単価】80万円',
+    '【面談可能日】柔軟にご調整させて頂きます。',
+    '【並行】あり',
+    '【希望案件】バックエンド開発案件希望',
+  ].join('\n');
+
+  it('要員番号/所属種類/契約形態等の要員プロフィール固有フィールドが複数あればEngineerと判定する(FREE BRAIN形式の実データ回帰)', () => {
+    expect(detectEmailType('', freeBrainStyleEngineerProfile)).toBe('engineer');
+    const result = parseEmail({ id: 'quick-match-regression-002', subject: '', bodyText: freeBrainStyleEngineerProfile });
+    expect(result.status).toBe('parsed');
+    if (result.status !== 'parsed') return;
+    expect(result.recordType).toBe('engineer');
+  });
+
+  it('実データを含まない外部ポータルへの通知メール(digest)は、案件/要員として無理にparseしない', () => {
+    const digestText = 'チョータツブーストの新着案件・人材情報';
+    expect(detectEmailType('', digestText)).toBeNull();
+    const result = parseEmail({ id: 'quick-match-regression-003', subject: '【チョータツブースト】 新着案件・人材', bodyText: digestText });
+    expect(result.status).toBe('unparsed');
+  });
+
+  it('「商流」は案件・要員どちらにも現れる語のため、単独ではProject判定の根拠にしない', () => {
+    // 案件/要員固有の構造シグナルも汎用キーワードも一切無く、「商流」の
+    // 一語だけが本文にある場合、Projectと決めつけない(実データ監査で
+    // 商流が両方の類型に高頻度で現れることを確認済み)。
+    expect(detectEmailType('', '商流についてご確認をお願いいたします。')).toBeNull();
   });
 });

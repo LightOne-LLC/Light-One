@@ -38,8 +38,7 @@ function createHandler() {
     }
 
     if (url.pathname === FETCH_ROUTE) {
-      const limitParam = url.searchParams.get('limit') ?? undefined;
-      performGmailBulkImport(limitParam)
+      performGmailBulkImport()
         .then((result) => writeJson(res, result.success ? 200 : 502, result))
         .catch(() => writeJson(res, 500, { success: false, reason: 'internal error' }));
       return;

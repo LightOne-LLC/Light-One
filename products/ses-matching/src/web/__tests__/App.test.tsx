@@ -14,6 +14,9 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  // refresh()が成功時にlocalStorageへキャッシュを書くため、
+  // テスト間でキャッシュが漏れて自動fetchがスキップされないようにする。
+  localStorage.clear();
 });
 
 async function renderAt(path: string) {
@@ -33,6 +36,12 @@ describe('SES Matching PWA', () => {
   it('appが起動しDashboardが表示される', async () => {
     await renderAt('/');
     expect(screen.getByRole('heading', { name: 'SES Matching' })).toBeTruthy();
+  });
+
+  it('Dashboardに「1件取得」UIは表示されない(直近7日間の一括取得のみ)', async () => {
+    await renderAt('/');
+    expect(screen.queryByText(/Gmail Import \(1件\)/)).toBeNull();
+    expect(screen.getByText(/Gmail Import \(直近7日間\)/)).toBeTruthy();
   });
 
   it('Projects一覧が表示される', async () => {
