@@ -118,6 +118,9 @@ function mockBulkFetch() {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  // refresh()が成功時にlocalStorageへキャッシュを書くため、
+  // テスト間でキャッシュが漏れて自動fetchがスキップされないようにする。
+  localStorage.clear();
 });
 
 describe('Matching Workspace(実データがWorkspace全体を経由してEngineer Detailまで到達する)', () => {
@@ -225,6 +228,41 @@ describe('Matching Workspace(実データがWorkspace全体を経由してEngine
 
     expect(screen.getByText('エンジニアA')).toBeTruthy();
     expect(screen.queryByText('人材ID: real-engineer-weak')).toBeNull();
+  });
+
+  it('マッチング候補の件数表示が、実際にランキングへ表示されている候補数(フィルタ適用後)と一致する', async () => {
+    await renderWorkspaceAtRealMatching();
+    // フィルタ無しの初期状態では2件(realEngineerGood/Weakとも候補に残る)。
+    expect(screen.getByText('マッチング候補 2件')).toBeTruthy();
+
+    const expectedRanking = matchProjectToEngineers(realProject, [realEngineerGood, realEngineerWeak]);
+    const weakScore = expectedRanking.find((r) => r.engineerId === 'real-engineer-weak')?.score ?? 0;
+    fireEvent.change(screen.getByLabelText('最低スコア'), { target: { value: String(weakScore + 1) } });
+
+    // フィルタで1人除外された後は、表示件数も1件に追従する。
+    expect(screen.getByText('マッチング候補 1件')).toBeTruthy();
+    expect(screen.queryByText('マッチング候補 2件')).toBeNull();
+  });
+
+  it('商流が「貴社」止まりの案件は案件選択プルダウンに表示されない(通常の案件は表示される)', async () => {
+    const clientOnlyResult: GmailBulkImportResult = {
+      ...bulkResult,
+      validProjects: [realProject, { ...realProject, id: 'client-only-project', projectName: '貴社止まり案件', commercialFlow: '貴社まで' }],
+    };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: () => Promise.resolve(clientOnlyResult) }));
+
+    render(
+      <MemoryRouter initialEntries={['/matching']}>
+        <App />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Matching' })).toBeTruthy());
+    await waitFor(() => expect(screen.getByLabelText('案件を選択')).toBeTruthy());
+
+    const select = screen.getByLabelText('案件を選択') as HTMLSelectElement;
+    const optionLabels = Array.from(select.options).map((o) => o.textContent);
+    expect(optionLabels).toContain('クラウド基盤構築案件');
+    expect(optionLabels).not.toContain('貴社止まり案件');
   });
 
   it('validationに失敗した案件は「⚠ 情報不足」と不足フィールドを表示し、候補は見られない', async () => {

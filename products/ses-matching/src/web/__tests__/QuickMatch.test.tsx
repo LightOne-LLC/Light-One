@@ -82,6 +82,9 @@ async function paste(text: string, override?: 'auto' | 'project' | 'engineer') {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  // refresh()が成功時にlocalStorageへキャッシュを書くため、
+  // テスト間でキャッシュが漏れて自動fetchがスキップされないようにする。
+  localStorage.clear();
 });
 
 describe('QuickMatch', () => {

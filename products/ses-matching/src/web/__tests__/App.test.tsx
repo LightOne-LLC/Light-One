@@ -14,6 +14,9 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  // refresh()が成功時にlocalStorageへキャッシュを書くため、
+  // テスト間でキャッシュが漏れて自動fetchがスキップされないようにする。
+  localStorage.clear();
 });
 
 async function renderAt(path: string) {

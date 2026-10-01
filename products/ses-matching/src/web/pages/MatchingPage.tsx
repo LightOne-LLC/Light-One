@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { isClientOnlyCommercialFlow } from '../../matching/commercialFlowExclusion';
 import { matchProjectToEngineers } from '../../matching/matchProjectToEngineers';
 import { resolveDisplayName } from '../displayName';
 import { scoreColorClass } from '../scoreColor';
@@ -10,7 +11,16 @@ export function MatchingPage() {
   const navigate = useNavigate();
   const { projectList, engineerPool, useReal } = useMatchingPools();
 
-  const selectedProject = projectList.find((p) => p.id === projectId) ?? projectList[0];
+  // 商流が「貴社」止まり(isClientOnlyCommercialFlow)の案件はmatchProject
+  // ToEngineers()で常に候補0件になるため、選んでも何も出ない選択肢を
+  // プルダウンに出さない。既存の判定関数をそのまま再利用し、新しい判定
+  // ロジックは作らない(同一会社除外は候補者単位の別の判定のため無関係)。
+  const selectableProjects = useMemo(
+    () => projectList.filter((p) => !isClientOnlyCommercialFlow(p.commercialFlow)),
+    [projectList],
+  );
+
+  const selectedProject = projectList.find((p) => p.id === projectId) ?? selectableProjects[0];
 
   const results = useMemo(
     () => (selectedProject ? matchProjectToEngineers(selectedProject, engineerPool) : []),
@@ -38,7 +48,7 @@ export function MatchingPage() {
           : '案件を選ぶと、既存Matching Engineで候補要員をスコア降順表示します(現在はダミーデータ)。'}
       </p>
 
-      {projectList.length === 0 ? (
+      {selectableProjects.length === 0 ? (
         <p className="empty-note">案件がありません。</p>
       ) : (
         <select
@@ -46,7 +56,7 @@ export function MatchingPage() {
           onChange={(e) => navigate(`/matching/${e.target.value}`)}
           aria-label="案件を選択"
         >
-          {projectList.map((project) => (
+          {selectableProjects.map((project) => (
             <option key={project.id} value={project.id}>
               {resolveDisplayName('project', project.id, project.projectName, useReal)}
             </option>
@@ -66,6 +76,10 @@ export function MatchingPage() {
             <span>{selectedProject.commercialFlow ?? '商流情報なし'}</span>
           </div>
         </div>
+      )}
+
+      {selectedProject && (
+        <p style={{ fontWeight: 700, fontSize: '1rem', margin: '0 0 12px' }}>マッチング候補 {filteredResults.length}件</p>
       )}
 
       {results.length > 0 && (
